@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Мудборд — Дом</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#e6ebec;color:#21323b;font-family:Arial,sans-serif}main{max-width:1380px;margin:auto;padding:55px 30px 80px}header{display:flex;justify-content:space-between;gap:40px;align-items:end;margin-bottom:34px}small{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#648083}h1{font-size:clamp(42px,6vw,78px);line-height:1;letter-spacing:-.065em;margin:15px 0 0}header p{font-size:17px;line-height:1.5;color:#65777d;max-width:400px}.board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.reference{overflow:hidden;background:#fff;border-radius:28px;box-shadow:0 16px 40px #62797818}.reference img{width:100%;height:390px;display:block;object-fit:cover;object-position:center}.reference:first-child img,.reference:nth-child(3) img{object-position:center top}.caption{padding:20px 23px 24px}.caption b{display:block;font-size:20px;letter-spacing:-.03em}.caption p{font-size:14px;line-height:1.5;color:#687c82;margin:7px 0 0}.principles{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-top:20px}.principle{padding:20px;background:#d2e1d9;border-radius:20px}.principle:nth-child(2){background:#dae2f1}.principle:nth-child(3){background:#ebe0d2}.principle:nth-child(4){background:#ded9e9}.principle strong{display:block;font-size:20px;letter-spacing:-.04em}.principle span{display:block;font-size:13px;line-height:1.5;margin-top:8px;color:#576f72}@media(max-width:760px){main{padding:35px 16px}header{display:block}header p{margin-top:16px}.board,.principles{grid-template-columns:1fr}.reference img{height:auto}.principles{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <main>
+    <header><div><small>Визуальные ориентиры · 2026</small><h1>Дом. Мудборд</h1></div><p>Четыре изображения из разговора. Сохраняем настроение и принципы, создаём собственный интерфейс.</p></header>
+    <div class="board">
+      <section class="reference"><img src="01-rooms-field.png" alt="Крупные карточки на фоне открытого зелёного пейзажа"><div class="caption"><b>01 · Воздух</b><p>Открытое пространство, паузы между объектами, спокойный вход в день.</p></div></section>
+      <section class="reference"><img src="02-open-canvas.png" alt="Свободный холст с карточками разного размера"><div class="caption"><b>02 · Масштаб</b><p>Крупные карточки и типографика, мягкая глубина, свободная композиция.</p></div></section>
+      <section class="reference"><img src="03-tablet-home.png" alt="Персональный набор карточек на планшете"><div class="caption"><b>03 · Личный набор</b><p>В центре — контекст человека; верхняя строка лишь помогает ориентироваться.</p></div></section>
+      <section class="reference"><img src="04-soft-landing.png" alt="Светлая страница с небом и природным фоном"><div class="caption"><b>04 · Настроение</b><p>Тёплый свет и мягкие цвета. Берём атмосферу, не структуру промостраницы.</p></div></section>
+    </div>
+    <div class="principles">
+      <div class="principle"><strong>Много воздуха</strong><span>Не заполнять каждый пиксель и не показывать сразу все возможности.</span></div>
+      <div class="principle"><strong>Крупно и ясно</strong><span>Читаемая типографика, большие действия, никаких микроподписей.</span></div>
+      <div class="principle"><strong>Стекло с мерой</strong><span>Мягкая прозрачность поддерживает глубину, но не снижает контраст.</span></div>
+      <div class="principle"><strong>Живой покой</strong><span>Анимация объясняет переходы; фон и интерфейс не соревнуются за внимание.</span></div>
+    </div>
+  </main>
+</body>
+</html>

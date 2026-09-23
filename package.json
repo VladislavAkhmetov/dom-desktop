@@ -1,0 +1,29 @@
+{
+  "name": "dom-desktop",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Спокойный стартовый экран для работы и жизни",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@fontsource/manrope": "^5.3.0",
+    "lucide-react": "^1.47.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.4",
+    "electron": "^41.10.7",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.3",
+    "wait-on": "^8.0.5"
+  }
+}
