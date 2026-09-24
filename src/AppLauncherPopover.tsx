@@ -47,11 +47,13 @@ export function AppLauncherPopover({
 }: Props) {
   const popoverRef = useRef<HTMLDivElement>(null)
   const isFigma = /figma/i.test(app.name)
-  const isIllustrator = /illustrator/i.test(app.name)
   const [quickLinkUrl, setQuickLinkUrl] = useState('')
   const [showQuickLink, setShowQuickLink] = useState(false)
 
+  useEffect(() => { popoverRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }, [])
+
   useEffect(() => {
+    const trigger = popoverRef.current?.parentElement?.querySelector<HTMLButtonElement>('.calm-app-btn')
     function handleMouseDown(e: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.parentElement?.contains(e.target as Node)) {
         onClose()
@@ -60,6 +62,7 @@ export function AppLauncherPopover({
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         onClose()
+        trigger?.focus()
       }
     }
     window.addEventListener('mousedown', handleMouseDown)
@@ -114,13 +117,13 @@ export function AppLauncherPopover({
           onClick={() => onOpenApp(app)}
           title={isFigma ? 'Открыть файлы на figma.com' : 'Запустить главное окно приложения'}
         >
-          <span>{isFigma ? 'Все файлы' : 'Главная'}</span>
+          <span>{isFigma ? 'Все файлы' : 'Открыть'}</span>
           <ArrowUpRight size={13} />
         </button>
       </div>
 
       {/* Быстрое действие: Создать новый */}
-      <div className="app-popover-actions">
+      {isFigma && <div className="app-popover-actions">
         <button
           className="app-new-btn"
           onClick={onNewDocument}
@@ -129,7 +132,7 @@ export function AppLauncherPopover({
           <Plus size={15} strokeWidth={2.4} />
           <span>{isFigma ? 'Новый холст' : 'Открыть приложение'}</span>
         </button>
-      </div>
+      </div>}
 
       {/* Список недавних документов */}
       <div className="app-doc-section">
@@ -148,7 +151,7 @@ export function AppLauncherPopover({
               <div className="app-doc-item-text">
                 <span className="app-doc-name">{doc.name}</span>
                 <span className="app-doc-meta">
-                  {formatRelativeTime(doc.lastOpenedAt || doc.createdAt, now)}
+                  {doc.spaceName && `${doc.spaceName} · `}{formatRelativeTime(doc.lastOpenedAt || doc.createdAt, now)}
                 </span>
               </div>
               <ArrowUpRight size={13} className="app-doc-arrow" />
@@ -196,7 +199,7 @@ export function AppLauncherPopover({
           </>
         )}
 
-        {isIllustrator && (
+        {!isFigma && (
           <button
             className="app-footer-btn"
             onClick={onAddDocument}
@@ -206,15 +209,6 @@ export function AppLauncherPopover({
           </button>
         )}
 
-        {!isFigma && !isIllustrator && (
-          <button
-            className="app-footer-btn"
-            onClick={onAddDocument}
-          >
-            <Plus size={13} />
-            <span>Добавить</span>
-          </button>
-        )}
       </div>
     </div>
   )

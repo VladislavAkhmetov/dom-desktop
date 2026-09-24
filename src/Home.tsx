@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Bookmark, Check, ChevronLeft, ChevronRight, Clock3, FileText, Globe2, Plus, Video } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Globe2, Pencil, Plus, Video } from 'lucide-react'
 import type { AppState, Reminder, Resource } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
 import { isRealReminder, postponeReminder, realEvents, remindersForDay } from './dayModel'
 import './home.css'
 import { Dialog } from './Dialog'
-import { AssistantEntry } from './Assistant'
+import { QuickEntry } from './QuickEntry'
+import { ActionMenu } from './ActionMenu'
+import { resourceAppLabel } from './resourcePresentation'
+import type { AssistantRole } from './assistantModel'
 
 function getDocAppType(doc: Resource): 'illustrator' | 'indesign' | 'photoshop' | 'word' | 'figma' | 'link' | 'file' {
   if (doc.kind === 'file') {
@@ -60,10 +63,12 @@ interface Props {
   onOpen: (resource: Resource) => void
   onAddLink: () => void
   onAssistant: (draft?: string) => void
+  onSaveThought: (title: string, dueAt: string | null) => void
+  assistantRole: AssistantRole
   onOpenWorkstage?: (spaceId: string, artifactId?: string) => void
 }
 
-export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant }: Props) {
+export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant, onSaveThought, assistantRole }: Props) {
   const [day, setDay] = useState(0)
   const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null)
   useEffect(() => { if (!undo) return; const timer = window.setTimeout(() => setUndo(null), 8000); return () => window.clearTimeout(timer) }, [undo])
@@ -139,6 +144,17 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
     setDialog(null)
   }
 
+  function changeTask(item: Reminder, patch: Partial<Reminder>, label: string) {
+    const restore = Object.fromEntries(Object.keys(patch).map(key => [key, item[key as keyof Reminder]]))
+    onChange(previous => ({ ...previous, reminders: previous.reminders.map(value => value.id === item.id ? { ...value, ...patch } : value) }))
+    setUndo({ label, restore: () => onChange(previous => ({ ...previous, reminders: previous.reminders.map(value => value.id === item.id ? { ...value, ...restore } : value) })) })
+  }
+
+  function postponeTask(item: Reminder, choice: 'hour' | 'tomorrow') {
+    const postponed = postponeReminder(item, choice)
+    changeTask(item, { dueAt: postponed.dueAt, notifiedAt: undefined }, choice === 'hour' ? 'Перенесено на час' : 'Перенесено на завтра')
+  }
+
   function showDigest(tab: typeof digestTab = 'notes') { setDigestTab(tab); setPage(0); setDialog('digest') }
 
   return <>
@@ -150,19 +166,19 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
           <div className="resume-main">
             <h2 className="resume-title">{resumeTitle}</h2>
             <p className="resume-note">{checkpoint?.note || (hasResume ? 'Всё на месте. Можно спокойно продолжить.' : 'Сохраните мысль или дело. Остальное соберётся постепенно.')}</p>
-            <button className="resume-primary" onClick={hasResume ? continueWork : onCapture}>{hasResume ? 'Продолжить' : 'Записать мысль'}<ArrowRight size={18} /></button>
+            <div className="resume-actions"><button className="resume-primary" onClick={hasResume ? continueWork : onCapture}>{hasResume ? 'Продолжить' : 'Записать мысль'}<ArrowRight size={18} /></button>{resumeResource && <span className="resume-target">{renderCompactAppIcon(resumeResource)}{resourceAppLabel(resumeResource)}</span>}</div>
           </div>
           {(displayDocs.length > 0 || savedResearch.length > 0) && <div className="resume-recent" aria-label="Недавно открывали"><span className="resume-recent-label">Под рукой</span><div>{displayDocs.map(doc => <button key={doc.id} onClick={() => onOpen(doc)} title={`Открыть ${doc.name}`}>{renderCompactAppIcon(doc)}<span>{doc.name}</span></button>)}{savedResearch.map(artifact => <button key={artifact.id} onClick={() => onOpenWorkstage ? onOpenWorkstage(artifact.spaceId, artifact.id) : onSpace(artifact.spaceId)} title={`Открыть исследование: ${artifact.query}`}><FileText size={14} /><span>{artifact.query}</span></button>)}</div></div>}
           {!displayDocs.length && !savedResearch.length && hasResume && <button className="resume-context-link" onClick={editCheckpoint}>Уточнить следующий шаг<ArrowUpRight size={14} /></button>}
         </section>
 
         <section className="calm-card plan-card" aria-label="План дня">
-          <div className="calm-card-heading"><div className="calm-tabs" aria-label="День плана"><button aria-pressed={day === 0} className={day === 0 ? 'selected' : ''} onClick={() => setDay(0)}>Сегодня</button><button aria-pressed={day === 1} className={day === 1 ? 'selected' : ''} onClick={() => setDay(1)}>Завтра</button></div><button className="calm-icon" aria-label="Добавить дело" onClick={() => onPlan(day)}><Plus size={22} /></button></div>
+          <div className="calm-card-heading"><div className="calm-tabs" aria-label="День плана"><button aria-pressed={day === 0} className={day === 0 ? 'selected' : ''} onClick={() => setDay(0)}>Сегодня</button><button aria-pressed={day === 1} className={day === 1 ? 'selected' : ''} onClick={() => setDay(1)}>Завтра</button></div><button className="calm-icon" aria-label="Добавить дело" title="Добавить дело" onClick={() => onPlan(day)}><Plus size={22} /></button></div>
           <div className="calm-plan-list">
             {schedule.slice(0, 3).map(item => (
-              <div key={item.id} className="calm-plan-item">
-                <span className="calm-time">{new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
-                <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showDigest('events')}>{item.title}</button>
+              <div key={item.id} className="calm-plan-item task-row">
+                {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
+                <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showDigest('events')}><span>{item.title}</span><time className="calm-time" dateTime={item.time}>{new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}{item.event ? ' · Событие' : ''}</time></button>
                 {item.event?.meetingUrl ? (
                   <button
                     className="plan-meeting-btn"
@@ -176,20 +192,16 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
                     <span>Войти</span>
                     <ArrowUpRight size={13} />
                   </button>
-                ) : (
-                  <button
-                    style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', color: 'inherit', display: 'grid', placeItems: 'center' }}
-                    onClick={() => item.reminder ? editReminder(item.reminder) : showDigest('events')}
-                    aria-label="Подробнее"
-                  >
-                    <ArrowUpRight size={16} />
-                  </button>
-                )}
+                ) : item.reminder ? <ActionMenu label={`Действия: ${item.title}`} actions={[
+                  { label: 'Завтра в 9:00', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
+                  { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
+                  { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
+                ]} /> : null}
               </div>
             ))}
             {!schedule.length && <div className="calm-plan-empty"><span className="empty-orbit"><Clock3 size={29} strokeWidth={1.2} /></span><h2>День пока свободен.</h2><p>Можно выбрать одно важное дело.</p><button className="calm-text-button" onClick={() => onPlan(day)}>Добавить <Plus size={17} /></button></div>}
           </div>
-          <div className="plan-bottom">{schedule.length > 3 ? <button className="calm-text-button" onClick={() => showDigest(plan.length > 0 ? 'notes' : 'events')}>Остальное — в обзоре <ArrowRight size={16} /></button> : <span className="calm-meta">Планы можно менять.</span>}{earlier.length > 0 && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}</div>
+          <div className="plan-bottom">{schedule.length > 3 && <button className="calm-text-button" onClick={() => showDigest(plan.length > 0 ? 'notes' : 'events')}>Ещё {schedule.length - 3} в обзоре <ArrowRight size={16} /></button>}{earlier.length > 0 && <button className="calm-text-button" onClick={() => showDigest()}>С прошлых дней · {earlier.length}</button>}</div>
           <div className="plan-saved" aria-label="Сохранённое">
             <div className="plan-saved-heading"><span>Сохранённое</span><small>Когда будет время</small></div>
             <div className="plan-saved-links">
@@ -200,7 +212,7 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
           </div>
         </section>
 
-        <AssistantEntry onOpen={onAssistant} />
+        <QuickEntry onSave={onSaveThought} onAssistant={onAssistant} assistantRole={assistantRole} />
       </div>
     </main>
 

@@ -94,7 +94,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   padding: 6px 14px;
   border-radius: 9999px;
   color: #52636f;
-  font-size: 13.5px;
+  font-size: var(--text-ui);
   font-weight: 600;
   background: transparent;
   border: none !important;
@@ -181,7 +181,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   outline: none !important;
   box-shadow: none !important;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: var(--text-body);
   font-weight: 500;
   color: #1e2933;
   padding: 0;
@@ -204,7 +204,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   color: #314638;
-  font-size: 13.5px;
+  font-size: var(--text-ui);
   font-weight: 600;
   border: none !important;
   box-shadow: none !important;
@@ -239,8 +239,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   align-items: center; 
   gap: 10px; 
   color: #1e2933; 
-  font-size: 22px; 
-  font-weight: 800; 
+  font-size: var(--text-title); 
+  font-weight: 700; 
   letter-spacing: -.055em; 
 }
 .brand-mark { 
@@ -251,7 +251,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   border-radius: 13px; 
   background: #1a68ff; 
   color: #fff; 
-  font-size: 26px; 
+  font-size: var(--text-title); 
   font-weight: 400; 
   line-height: 1; 
 }
@@ -271,8 +271,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   padding: 8px 18px; 
   border-radius: 9999px; 
   color: #52636f; 
-  font-size: 14px; 
-  font-weight: 800; 
+  font-size: var(--text-ui); 
+  font-weight: 700; 
 }
 .top-nav button.nav-active { 
   background: #ffffff; 
@@ -301,10 +301,10 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
 .figma-mark i:nth-child(3) { border-radius: 4px 0 0 4px; background: #a259ff; }
 .figma-mark i:nth-child(4) { border-radius: 50%; background: #1abcfe; }
 .figma-mark i:nth-child(5) { border-radius: 4px 0 4px 4px; background: #0acf83; }
-.illustrator-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #39251d; color: #ff9a35; font-size: 11px; font-weight: 800; }
-.indesign-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #3d0020; color: #ff3388; font-size: 11px; font-weight: 800; }
-.photoshop-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #001e36; color: #31a8ff; font-size: 11px; font-weight: 800; }
-.word-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #103875; color: #ffffff; font-size: 11px; font-weight: 800; }
+.illustrator-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #39251d; color: #ff9a35; font-size: var(--text-meta); font-weight: 700; }
+.indesign-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #3d0020; color: #ff3388; font-size: var(--text-meta); font-weight: 700; }
+.photoshop-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #001e36; color: #31a8ff; font-size: var(--text-meta); font-weight: 700; }
+.word-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #103875; color: #ffffff; font-size: var(--text-meta); font-weight: 700; }
 
 /* BUTTONS */
 .primary-button, .soft-button {
@@ -315,8 +315,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   min-height: 40px;
   border-radius: 9999px;
   padding: 0 16px;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--text-ui);
+  font-weight: 700;
   white-space: nowrap;
 }
 .primary-button { background: #1a68ff; color: #fff; }
@@ -365,20 +365,20 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   align-items: center; 
   gap: 7px; 
   color: #52636f; 
-  font-size: 13px; 
-  font-weight: 800; 
+  font-size: var(--text-ui); 
+  font-weight: 700; 
   letter-spacing: .08em; 
 }
 .modal h2 { 
   margin: 10px 40px 6px 0; 
-  font-size: 28px; 
-  font-weight: 800; 
+  font-size: var(--text-display); 
+  font-weight: 700; 
   letter-spacing: -.05em; 
   color: #1e2933;
 }
 .modal-intro { 
   color: #52636f; 
-  font-size: 14px; 
+  font-size: var(--text-ui); 
   font-weight: 600; 
   line-height: 1.5; 
   margin-bottom: 16px;
@@ -390,34 +390,34 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   border-radius: 16px; 
   background: #f0f5f2; 
   color: #1e2933; 
-  font-size: 14px; 
+  font-size: var(--text-ui); 
 }
 .modal textarea { min-height: 86px; resize: none; }
-.modal label { display: block; color: #52636f; font-size: 13px; font-weight: 800; }
+.modal label { display: block; color: #52636f; font-size: var(--text-ui); font-weight: 700; }
 .modal label input { margin-top: 6px; }
 .capture-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .modal-bottom { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 20px; }
 .modal-bottom.end { justify-content: flex-end; }
-.voice-hint { display: inline-flex; align-items: center; gap: 7px; color: #52636f; font-size: 13px; font-weight: 800; }
-.large-input { font-size: 18px !important; font-weight: 800 !important; }
+.voice-hint { display: inline-flex; align-items: center; gap: 7px; color: #52636f; font-size: var(--text-ui); font-weight: 700; }
+.large-input { font-size: var(--text-body) !important; font-weight: 700 !important; }
 .form-stack { display: grid; gap: 14px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; }
-.setting-row strong { display: block; font-size: 15px; color: #1e2933; }
-.setting-row small { display: block; margin-top: 4px; color: #52636f; font-size: 13px; line-height: 1.5; }
+.setting-row strong { display: block; font-size: var(--text-body); color: #1e2933; }
+.setting-row small { display: block; margin-top: 4px; color: #52636f; font-size: var(--text-ui); line-height: 1.5; }
 .setting-sub-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 8px 12px; border-radius: 12px; background: #e8efe7; margin-bottom: 6px;
 }
-.setting-sub-row strong { font-size: 13.5px; color: #23382b; }
-.setting-sub-row small { font-size: 11.5px; color: #5f7264; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+.setting-sub-row strong { font-size: var(--text-ui); color: #23382b; }
+.setting-sub-row small { font-size: var(--text-meta); color: #5f7264; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
 .toggle { width: 44px; height: 26px; padding: 3px; flex: none; border-radius: 9999px; background: #c8d6d1; }
 .toggle span { display: block; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .toggle.on { background: #1a68ff; }
 .toggle.on span { transform: translateX(18px); }
-.privacy-note { padding: 14px; border-radius: 16px; background: #f0f5f2; color: #52636f; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.privacy-note { padding: 14px; border-radius: 16px; background: #f0f5f2; color: #52636f; font-size: var(--text-ui); font-weight: 600; line-height: 1.5; }
 
-.toast { position: fixed; z-index: 120; bottom: 22px; left: 50%; display: flex; align-items: center; gap: 14px; max-width: min(90vw, 620px); padding: 13px 18px; border-radius: 9999px; transform: translateX(-50%); background: #1e2933; color: #fff; font-size: 14px; font-weight: 700; }
-.loading-screen { display: flex; align-items: center; justify-content: center; gap: 12px; height: 100dvh; color: #1e2933; font-size: 16px; font-weight: 800; }
+.toast { position: fixed; z-index: 120; bottom: 22px; left: 50%; display: flex; align-items: center; gap: 14px; max-width: min(90vw, 620px); padding: 13px 18px; border-radius: 9999px; transform: translateX(-50%); background: #1e2933; color: #fff; font-size: var(--text-ui); font-weight: 700; }
+.loading-screen { display: flex; align-items: center; justify-content: center; gap: 12px; height: 100dvh; color: #1e2933; font-size: var(--text-body); font-weight: 700; }
 
 /* SPACES OVERVIEW */
 .collection-stage { 
@@ -438,8 +438,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   min-height: 80px; 
 }
 .collection-header h1 { 
-  font-size: clamp(30px, 3.2vw, 42px); 
-  font-weight: 800; 
+  font-size: var(--text-display); 
+  font-weight: 700; 
   letter-spacing: -.065em; 
   color: #1e2933;
 }
@@ -467,8 +467,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   text-overflow: ellipsis; 
   white-space: nowrap; 
   color: #1e2933; 
-  font-size: 19px; 
-  font-weight: 800; 
+  font-size: var(--text-title); 
+  font-weight: 700; 
 }
 .overview-arrow { position: absolute; right: 20px; bottom: 20px; color: #52636f; }
 .tone-sage { background: rgba(230, 244, 235, 0.9); }
@@ -482,8 +482,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   justify-content: space-between; 
   min-height: 38px; 
   color: #52636f; 
-  font-size: 13px; 
-  font-weight: 800; 
+  font-size: var(--text-ui); 
+  font-weight: 700; 
 }
 .page-controls > div { display: flex; align-items: center; gap: 8px; }
 .page-controls button { 
@@ -522,8 +522,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   width: 100%; 
   text-overflow: ellipsis; 
   white-space: nowrap; 
-  font-size: 18px; 
-  font-weight: 800; 
+  font-size: var(--text-body); 
+  font-weight: 700; 
   color: #1e2933; 
 }
 .resource-open-label { 
@@ -532,8 +532,8 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   gap: 5px; 
   margin-top: 10px; 
   color: #1a68ff; 
-  font-size: 13px; 
-  font-weight: 800; 
+  font-size: var(--text-ui); 
+  font-weight: 700; 
 }
 .resource-remove { 
   position: absolute; 

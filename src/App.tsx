@@ -16,6 +16,8 @@ import { cachedUfaWeather, fetchUfaWeather, weatherDescription, type UfaWeather 
 import { Workstage } from './browser/Workstage'
 import { BottomDock } from './BottomDock'
 import { AssistantPanel } from './Assistant'
+import { assistantRoles, defaultAssistantPreferences } from './assistantModel'
+import { recentMaterials, resourceAppLabel } from './resourcePresentation'
 import { zenTimer } from './focus/zenTimer'
 
 const emptySession = (): BrowserSession => ({ tabs: [], activeTabId: '', splitTabId: null })
@@ -82,6 +84,7 @@ function App() {
   const [isWorkstageOpen, setIsWorkstageOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantDraft, setAssistantDraft] = useState('')
+  const [assistantPreferences, setAssistantPreferences] = useState(defaultAssistantPreferences)
   const [omniboxUrl, setOmniboxUrl] = useState('')
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve())
   const targetWorkstageSpace = state?.spaces.find(space => space.id === (workstageSpaceId || state.activeSpaceId)) || state?.spaces[0]
@@ -325,7 +328,7 @@ function App() {
 
   function createStream() {
     setNewSpaceName('')
-    setModal('newStream')
+    setModal('newSpace')
   }
 
   async function addPicked(kind: 'app' | 'file', spaceId?: string) {
@@ -515,7 +518,7 @@ function App() {
   if (!state) return <div className="loading-screen"><span className="brand-mark">✳</span><span>Собираем ваш день…</span></div>
 
   const visibleResourcePage = Math.min(resourcePage, Math.max(0, Math.ceil((currentSpace?.resources.length || 0) / 6) - 1))
-  const sortedResources = [...(currentSpace?.resources || [])].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  const sortedResources = recentMaterials(currentSpace?.resources || [])
   const activeTopSpaceId = currentSpace?.id || targetWorkstageSpace?.id
   const availableTopSpaces = state.spaces.filter(space => !space.archivedAt)
   const visibleTopSpaces = availableTopSpaces.slice(0, 3)
@@ -543,7 +546,7 @@ function App() {
                 <button className="chrome-button" onClick={() => targetWorkstageSpace && openSpace(targetWorkstageSpace.id)} title="Материалы текущего пространства"><Folder size={17} /><span>Материалы</span></button>
                 <button className={`chrome-button ${splitTabId ? 'selected' : ''}`} onClick={handleToggleSplit} disabled={tabs.length < 2} title="Открыть вторую вкладку рядом"><Columns2 size={17} /><span>Рядом</span></button>
               </> : <button className="chrome-button" onClick={() => openWorkstage()} title="Открыть текущие вкладки"><Columns2 size={17} /><span>Вкладки</span><span className="chrome-tab-count">{tabs.length}</span></button>}
-              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => setAssistantOpen(true)} aria-label="Открыть помощника" title="Помощник"><Sparkles size={19} strokeWidth={1.7} /></button>
+              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => setAssistantOpen(true)} aria-label="ИИ в Доме" title={`ИИ · ${assistantRoles[assistantPreferences.role].label}`}><Sparkles size={19} strokeWidth={1.7} /></button>
               <button className="chrome-button" onClick={() => setModal('settings')} aria-label="Настройки"><Settings2 size={19} /></button>
             </div>
           </div>
@@ -552,9 +555,9 @@ function App() {
               <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
               {visibleTopSpaces.map(space => <button key={space.id}
                 className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}`}
-                onClick={() => openWorkstage(space.id)} title={`Открыть ${space.name}`}>{space.name}</button>)}
+                onClick={() => openSpace(space.id)} title={`Материалы: ${space.name}`}>{space.name}</button>)}
               <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => { setShowSpaces(true); setViewSpaceId(null); setIsWorkstageOpen(false) }}>Все пространства</button>
-              <button className="chrome-new-space" onClick={createStream} aria-label="Создать поток" title="Создать поток"><Plus size={17} /></button>
+              <button className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Создать пространство"><Plus size={17} /></button>
             </nav>
             <div className="chrome-status">
               {isDemo ? <a className="chrome-demo" href="/" title="Вернуться к своим данным">Пример дня <X size={12} /></a> : !isDesktop && <a className="chrome-demo" href="/?demo=1">Пример дня</a>}
@@ -577,6 +580,8 @@ function App() {
               onAddLink={() => startLink()}
               onOpenWorkstage={openWorkstage}
               onAssistant={draft => { setAssistantDraft(draft || ''); setAssistantOpen(true) }}
+              onSaveThought={saveCapture}
+              assistantRole={assistantPreferences.role}
             />
           ) : (
             <Workstage
@@ -595,30 +600,25 @@ function App() {
               onOpenTab={openBrowserTab}
               onSaveTab={saveTabToSpace}
               onUpdateTab={handleUpdateTab}
+              onOpenResource={openResource}
+              onAddLink={() => startLink(targetWorkstageSpace?.id)}
             />
           )
         ) : showSpaces && !currentSpace ? (
           <main className="collection-stage" aria-label="Пространства">
             <div className="collection-header">
-              <div><h1>Пространства и потоки</h1></div>
+              <div><h1>Пространства</h1><p>Сайты, файлы и приложения для каждого дела.</p></div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="primary-button" style={{ background: '#1a68ff' }} onClick={createStream}><Plus size={18} /> Новый поток</button>
-                <button className="primary-button" onClick={() => { setNewSpaceName(''); setModal('newSpace') }}><Folder size={18} /> Пространство</button>
+                <button className="primary-button" onClick={createStream}><Plus size={18} /> Новое пространство</button>
               </div>
             </div>
             <div className="space-overview-grid">
               {state.spaces.slice(spacePage * 8, spacePage * 8 + 8).map(space => (
-                <button className={`overview-space card tone-${space.tone}`} key={space.id} onClick={() => {
-                  if (space.kind === 'stream' || space.activeSession) {
-                    openWorkstage(space.id)
-                  } else {
-                    openSpace(space.id)
-                  }
-                }}>
-                  {space.kind === 'stream' ? <Globe2 size={28} strokeWidth={1.3} color="#1a68ff" /> : <Folder size={28} strokeWidth={1.3} />}
+                <button className={`overview-space card tone-${space.tone}`} key={space.id} onClick={() => openSpace(space.id)}>
+                  <Folder size={26} strokeWidth={1.5} />
                   <span>
                     <strong>{space.name}</strong>
-                    {space.kind === 'stream' && <small style={{ display: 'block', fontSize: '13px', color: '#1a68ff', marginTop: '2px' }}>Рабочий поток</small>}
+                    <small>{space.resources.length ? `Материалы · ${space.resources.length}` : 'Можно добавить материалы'}</small>
                   </span>
                   <ArrowUpRight className="overview-arrow" size={19} />
                 </button>
@@ -637,7 +637,7 @@ function App() {
                 </div>
               </div>
               <div className="space-add-actions">
-                <button onClick={() => openWorkstage(currentSpace.id)} style={{ background: '#eef3ff', color: '#1a68ff', fontWeight: 600 }}>
+                <button onClick={() => openWorkstage(currentSpace.id)}>
                   <Globe2 size={18} /> Открыть вкладки
                 </button>
                 <button onClick={() => addPicked('file', currentSpace.id)}><FileText size={18} /> Документ</button>
@@ -645,7 +645,7 @@ function App() {
                 <button onClick={() => startLink(currentSpace.id)}><Link2 size={18} /> Сайт</button>
               </div>
             </div>
-            {currentSpace.resources.length ? <div className="resource-grid">{sortedResources.slice(visibleResourcePage * 6, visibleResourcePage * 6 + 6).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name">{resource.name}</span><span className="resource-open-label">Открыть <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div> : <div className="empty-space card"><span className="empty-space-icon"><Plus size={32} strokeWidth={1.3} /></span><h2>Здесь пока пусто.</h2><p>Добавьте документ, приложение или сайт.</p></div>}
+            {currentSpace.resources.length ? <div className="resource-grid">{sortedResources.slice(visibleResourcePage * 6, visibleResourcePage * 6 + 6).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name">{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div> : <div className="empty-space card"><span className="empty-space-icon"><Plus size={32} strokeWidth={1.3} /></span><h2>Здесь пока пусто.</h2><p>Добавьте документ, приложение или сайт.</p></div>}
             {currentSpace.resources.length > 6 && <div className="page-controls"><span>{currentSpace.resources.length} ресурсов</span><div><button onClick={() => setResourcePage(page => Math.max(0, page - 1))} disabled={visibleResourcePage === 0} aria-label="Предыдущая страница"><ChevronLeft size={20} /></button><span>{visibleResourcePage + 1} / {Math.ceil(currentSpace.resources.length / 6)}</span><button onClick={() => setResourcePage(page => Math.min(Math.ceil(currentSpace.resources.length / 6) - 1, page + 1))} disabled={visibleResourcePage >= Math.ceil(currentSpace.resources.length / 6) - 1} aria-label="Следующая страница"><ChevronRight size={20} /></button></div></div>}
           </main>
         )}
@@ -653,19 +653,17 @@ function App() {
           state={state}
           now={time}
           currentSpaceId={currentSpace?.id || targetWorkstageSpace?.id}
-          isWorkstageOpen={isWorkstageOpen}
+          isHome={!isWorkstageOpen && !currentSpace && !showSpaces}
           appIcon={productIcon}
           onCapture={openCapture}
-          onOpenWorkstage={openWorkstage}
           onOpenResource={openResource}
           onAddLink={startLink}
           onAddFile={spaceId => addPicked('file', spaceId)}
-          onOpenSpace={openSpace}
           onOpenSettings={() => setModal('settings')}
         />
       </div>
 
-      {assistantOpen && <AssistantPanel draft={assistantDraft} onDraftChange={setAssistantDraft} onClose={() => setAssistantOpen(false)} />}
+      {assistantOpen && <AssistantPanel draft={assistantDraft} preferences={assistantPreferences} onPreferencesChange={setAssistantPreferences} onDraftChange={setAssistantDraft} onClose={() => setAssistantOpen(false)} />}
       {modal === 'capture' && <Capture initialWhen={captureDefaultWhen} onClose={() => setModal(null)} onSave={saveCapture} onVoiceHint={() => setToast('Для диктовки нажмите Win + H.')} />}
       {modal && modal !== 'capture' && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div className="modal" role="dialog" aria-modal="true" aria-label="Действие"><button className="modal-close" onClick={() => setModal(null)} aria-label="Закрыть"><X size={19} /></button>
         {(modal === 'newSpace' || modal === 'newStream' || modal === 'renameSpace') && <><span className="modal-kicker"><Folder size={16} /> {modal === 'newStream' ? 'НОВЫЙ ПОТОК' : 'ПРОСТРАНСТВО'}</span><h2>{modal === 'renameSpace' ? 'Новое название' : modal === 'newStream' ? 'Как назовём поток?' : 'Для чего оставим место?'}</h2><input className="large-input" autoFocus maxLength={70} value={newSpaceName} onChange={event => setNewSpaceName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') createSpace() }} aria-label="Название пространства" />{modal === 'newSpace' && <div className="capture-options">{['Работа', 'Личное', 'Учёба', 'Поездка'].map(name => <button key={name} onClick={() => setNewSpaceName(name)}>{name}</button>)}</div>}<div className="modal-bottom end"><button className="primary-button" disabled={!newSpaceName.trim()} onClick={createSpace}>{modal === 'renameSpace' ? 'Сохранить' : 'Создать'} <ArrowRight size={17} /></button></div></>}

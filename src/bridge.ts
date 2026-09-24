@@ -38,7 +38,9 @@ const browserBridge: DomBridge = {
         return openExternalPreview(target.toString()) ? { ok: true } : { ok: false, error: 'Браузер заблокировал новое окно.' }
       } catch { return { ok: false, error: 'Некорректный адрес сайта.' } }
     }
-    return { ok: false, error: `Файл «${resource.name}» откроется в настольном приложении Illustrator.` }
+    return { ok: false, error: resource.kind === 'app'
+      ? `«${resource.name}» можно запустить из версии Дома для Windows.`
+      : `«${resource.name}» — файл на компьютере. Его открытие доступно в версии Дома для Windows.` }
   },
   async getAutostart() { return false },
   async setAutostart() { return false },

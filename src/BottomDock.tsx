@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Globe2, Plus, Timer } from 'lucide-react'
+import { Plus, Square, Timer } from 'lucide-react'
 import type { AppState, Resource } from './types'
 import { zenTimer } from './focus/zenTimer'
 import { PlayerIsland } from './player/PlayerIsland'
@@ -9,18 +9,16 @@ interface Props {
   state: AppState
   now: Date
   currentSpaceId?: string
-  isWorkstageOpen: boolean
+  isHome: boolean
   appIcon: (name: string) => ReactNode
   onCapture: () => void
-  onOpenWorkstage: (spaceId?: string) => void
   onOpenResource: (resource: Resource) => void
   onAddLink: (spaceId?: string) => void
   onAddFile: (spaceId?: string) => void
-  onOpenSpace: (spaceId: string) => void
   onOpenSettings: () => void
 }
 
-export function BottomDock({ state, now, currentSpaceId, isWorkstageOpen, appIcon, onCapture, onOpenWorkstage, onOpenResource, onAddLink, onAddFile, onOpenSpace, onOpenSettings }: Props) {
+export function BottomDock({ state, now, currentSpaceId, isHome, appIcon, onCapture, onOpenResource, onAddLink, onAddFile, onOpenSettings }: Props) {
   const [zenState, setZenState] = useState(zenTimer.getState())
   const [activeAppId, setActiveAppId] = useState<string | null>(null)
   useEffect(() => zenTimer.subscribe(setZenState), [])
@@ -36,6 +34,11 @@ export function BottomDock({ state, now, currentSpaceId, isWorkstageOpen, appIco
     const matches = docs.filter(doc => {
       if (/figma/i.test(app.name)) return doc.kind === 'link' && /figma\.com/i.test(doc.target)
       if (/illustrator/i.test(app.name)) return doc.kind === 'file' && /\.(ai|eps|svg|ait)$/i.test(doc.target)
+      if (/photoshop/i.test(app.name)) return doc.kind === 'file' && /\.(psd|psb)$/i.test(doc.target)
+      if (/indesign/i.test(app.name)) return doc.kind === 'file' && /\.(indd|idml)$/i.test(doc.target)
+      if (/word/i.test(app.name)) return doc.kind === 'file' && /\.(docx?|rtf)$/i.test(doc.target)
+      if (/excel/i.test(app.name)) return doc.kind === 'file' && /\.(xlsx?|csv)$/i.test(doc.target)
+      if (/powerpoint/i.test(app.name)) return doc.kind === 'file' && /\.pptx?$/i.test(doc.target)
       return doc.target.toLowerCase().includes(app.name.toLowerCase())
     })
     return matches.sort((a, b) => Date.parse(b.lastOpenedAt || b.createdAt) - Date.parse(a.lastOpenedAt || a.createdAt))
@@ -51,20 +54,16 @@ export function BottomDock({ state, now, currentSpaceId, isWorkstageOpen, appIco
 
   function addDocument(app: Resource) {
     if (/figma/i.test(app.name)) onAddLink(currentSpace?.id)
-    else if (/illustrator/i.test(app.name)) onAddFile(currentSpace?.id)
-    else if (currentSpace) onOpenSpace(currentSpace.id)
+    else onAddFile(currentSpace?.id)
   }
 
   return <footer className="calm-dock" aria-label="Быстрые действия">
     <div className="calm-dock-left">
-      <button className="calm-capture" onClick={onCapture} title="Записать мысль · Ctrl + Alt + Space">
+      {!isHome && <button className="calm-capture" onClick={onCapture} title="Записать мысль · Ctrl + Alt + Space">
         <Plus size={19} /><span>Записать</span><kbd>Ctrl Alt Space</kbd>
-      </button>
+      </button>}
       <button className={`calm-dock-timer ${zenState.status === 'running' ? 'active' : ''}`} onClick={() => zenState.status === 'running' ? zenTimer.stop() : zenTimer.start(30, false)} title={zenState.status === 'running' ? 'Остановить сессию фокуса' : 'Начать фокус на 30 минут'}>
-        <Timer size={18} /><span>{zenState.status === 'running' ? `Фокус ${Math.ceil(zenState.remainingSeconds / 60)} мин` : 'Фокус · 30 мин'}</span>
-      </button>
-      <button className={`calm-dock-timer dock-browser ${isWorkstageOpen ? 'active' : ''}`} onClick={() => onOpenWorkstage(currentSpace?.id)} title={currentSpace ? `Открыть вкладки «${currentSpace.name}»` : 'Открыть браузер'}>
-        <Globe2 size={18} /><span>Браузер</span>
+        {zenState.status === 'running' ? <Square size={16} /> : <Timer size={18} />}<span>{zenState.status === 'running' ? `Фокус · ${String(Math.floor(zenState.remainingSeconds / 60)).padStart(2, '0')}:${String(zenState.remainingSeconds % 60).padStart(2, '0')}` : 'Фокус · 30 мин'}</span>
       </button>
     </div>
     <PlayerIsland onOpenSettings={onOpenSettings} />

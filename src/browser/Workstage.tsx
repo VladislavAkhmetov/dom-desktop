@@ -1,5 +1,5 @@
 import { ArrowUpRight, Globe2, Plus, X } from 'lucide-react'
-import type { BrowserTab, ResearchSource, Space } from '../types'
+import type { BrowserTab, ResearchSource, Resource, Space } from '../types'
 import { BrowserPane } from './BrowserPane'
 import './browser.css'
 
@@ -16,6 +16,8 @@ export interface WorkstageProps {
   onGoHome: () => void
   onOpenTab: (tab: BrowserTab) => void
   onSaveTab: (tab: BrowserTab) => void
+  onOpenResource: (resource: Resource) => void
+  onAddLink: () => void
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
 }
 
@@ -32,6 +34,8 @@ export function Workstage({
   onGoHome,
   onOpenTab,
   onSaveTab,
+  onOpenResource,
+  onAddLink,
   onUpdateTab
 }: WorkstageProps) {
   const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0]
@@ -77,6 +81,8 @@ export function Workstage({
         onUpdateTab={onUpdateTab}
         onSaveTab={onSaveTab}
         onOpenExternal={onOpenTab}
+        onOpenResource={onOpenResource}
+        onAddLink={onAddLink}
         onSelectQuickUrl={(url, title) => {
           onUpdateTab?.(tab.id, { url, title: title || new URL(url).hostname })
         }}
@@ -85,8 +91,8 @@ export function Workstage({
   }
 
   return (
-    <main className="workstage-container" aria-label={`Поток ${space.name}`}>
-      <div className="workstage-tabs-strip" role="tablist" aria-label="Вкладки потока">
+    <main className="workstage-container" aria-label={`Браузер · ${space.name}`}>
+      <div className="workstage-tabs-strip" role="tablist" aria-label="Открытые вкладки">
         <button className="workstage-tab home-return-btn" onClick={onGoHome} title="Вернуться в Дом">
           ✳ дом.
         </button>

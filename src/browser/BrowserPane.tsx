@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookmarkPlus, Check, Globe2,
-  Lock, RotateCw, Search, X
+  FileText, Plus, RotateCw, X
 } from 'lucide-react'
-import type { BrowserTab, Space } from '../types'
+import type { BrowserTab, Resource, Space } from '../types'
 import { isDesktop } from '../bridge'
+import { recentMaterials, resourceAppLabel } from '../resourcePresentation'
 
 export interface BrowserPaneProps {
   tab?: BrowserTab
@@ -14,6 +15,8 @@ export interface BrowserPaneProps {
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
   onSaveTab: (tab: BrowserTab) => void
   onOpenExternal: (tab: BrowserTab) => void
+  onOpenResource: (resource: Resource) => void
+  onAddLink: () => void
   onSelectQuickUrl?: (url: string, title?: string) => void
 }
 
@@ -30,15 +33,6 @@ interface WebviewElement extends HTMLElement {
   isLoading: () => boolean
 }
 
-const QUICK_SITES = [
-  { name: 'ВКонтакте', url: 'https://vk.ru', icon: 'vk' },
-  { name: 'Яндекс', url: 'https://ya.ru', icon: 'yandex' },
-  { name: 'Telegram Web', url: 'https://web.telegram.org', icon: 'tg' },
-  { name: 'Figma', url: 'https://www.figma.com', icon: 'figma' },
-  { name: 'GitHub', url: 'https://github.com', icon: 'github' },
-  { name: 'Погода (Gismeteo)', url: 'https://www.gismeteo.ru', icon: 'weather' },
-]
-
 export function BrowserPane({
   tab,
   space,
@@ -47,6 +41,8 @@ export function BrowserPane({
   onUpdateTab,
   onSaveTab,
   onOpenExternal,
+  onOpenResource,
+  onAddLink,
   onSelectQuickUrl
 }: BrowserPaneProps) {
   const webviewRef = useRef<WebviewElement | null>(null)
@@ -54,7 +50,6 @@ export function BrowserPane({
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [customSearch, setCustomSearch] = useState('')
 
   const isSaved = Boolean(tab?.url && space.resources.some(r => r.kind === 'link' && r.target === tab.url))
 
@@ -141,22 +136,6 @@ export function BrowserPane({
     }
   }
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const query = customSearch.trim()
-    if (!query) return
-    let target = query
-    if (/^https?:\/\//i.test(query)) {
-      target = query
-    } else if (/^[^\s]+\.[^\s]+$/.test(query)) {
-      target = `https://${query}`
-    } else {
-      target = `https://yandex.ru/search/?text=${encodeURIComponent(query)}`
-    }
-    onSelectQuickUrl?.(target)
-    setCustomSearch('')
-  }
-
   // Display domain or formatted URL
   let displayHost = ''
   try {
@@ -168,8 +147,8 @@ export function BrowserPane({
   return (
     <section className="browser-pane-container" aria-label={isSplit ? 'Вкладка рядом' : 'Текущая вкладка'}>
       {/* Pane Toolbar */}
-      <div className="browser-pane-toolbar">
-        <div className="browser-pane-nav-buttons">
+      {(tab?.url || isSplit) && <div className="browser-pane-toolbar">
+        {isDesktop && <div className="browser-pane-nav-buttons">
           <button
             className="browser-nav-btn"
             onClick={handleBack}
@@ -196,11 +175,11 @@ export function BrowserPane({
           >
             <RotateCw size={15} />
           </button>
-        </div>
+        </div>}
 
         {tab?.url ? (
           <div className="browser-pane-address-badge" title={tab.url}>
-            <Lock size={13} className="lock-icon" />
+            <Globe2 size={14} />
             <span className="badge-host">{displayHost}</span>
             {isLoading && <span className="loading-dot" />}
           </div>
@@ -227,13 +206,13 @@ export function BrowserPane({
                   <BookmarkPlus size={15} /> <span>В материалы</span>
                 </button>
               )}
-              <button
+              {isDesktop && <button
                 className="browser-action-btn external"
                 onClick={() => onOpenExternal(tab)}
                 title="Открыть в браузере по умолчанию"
               >
                 <span>В браузере</span> <ArrowUpRight size={14} />
-              </button>
+              </button>}
             </>
           )}
 
@@ -248,7 +227,7 @@ export function BrowserPane({
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Pane Content Area */}
       <div className="browser-pane-viewport">
@@ -263,74 +242,28 @@ export function BrowserPane({
               webpreferences="contextIsolation=yes"
             />
           ) : (
-            <div className="browser-iframe-wrap">
-              <iframe
-                src={tab.url}
-                className="browser-iframe-frame"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                title={tab.title || 'Просмотр страницы'}
-              />
-              <div className="browser-web-notice">
-                <span>В режиме веб-демо сайт отображается во фрейме. В Electron-версии страницы открываются без ограничений.</span>
-                <button onClick={() => onOpenExternal(tab)}>Открыть во вкладке <ArrowUpRight size={13} /></button>
-              </div>
+            <div className="browser-handoff">
+              <Globe2 size={28} strokeWidth={1.5} />
+              <h2>{tab.title || displayHost}</h2>
+              <p>В веб-прототипе сайт откроется в соседней вкладке.<br />Материалы пространства останутся здесь.</p>
+              <button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть сайт <ArrowUpRight size={17} /></button>
             </div>
           )
         ) : (
           /* Empty / New Tab Start Screen */
           <div className="browser-start-screen">
             <div className="browser-start-card">
-              <div className="browser-start-brand">
-                <span className="browser-start-mark">✳</span>
-                <h2>Спокойный поиск и сайты</h2>
+              <span className="browser-start-eyebrow">Материалы пространства</span>
+              <h2>{space.name}</h2>
+              <p className="browser-start-sub">Поиск и адрес сайта — в строке сверху. Или вернитесь к своему материалу.</p>
+              <div className="browser-materials">
+                {recentMaterials(space.resources).filter(resource => !resource.completedAt).slice(0, 6).map(resource => <button key={resource.id}
+                  className="browser-material" onClick={() => resource.kind === 'link' ? onSelectQuickUrl?.(resource.target, resource.name) : onOpenResource(resource)}>
+                  {resource.kind === 'link' ? <Globe2 size={19} /> : <FileText size={19} />}
+                  <span><strong>{resource.name}</strong><small>{resourceAppLabel(resource)}</small></span><ArrowUpRight size={15} />
+                </button>)}
               </div>
-              <p className="browser-start-sub">
-                Введите адрес или запрос в поисковой строке выше, либо выберите один из быстрых переходов:
-              </p>
-
-              <form onSubmit={handleSearchSubmit} className="browser-start-search-form">
-                <Search size={18} className="search-icon" />
-                <input
-                  type="text"
-                  value={customSearch}
-                  onChange={e => setCustomSearch(e.target.value)}
-                  placeholder="Найти в Яндексе или открыть адрес сайта…"
-                  className="browser-start-input"
-                  autoFocus
-                />
-                <button type="submit" className="browser-start-submit-btn">Перейти</button>
-              </form>
-
-              <div className="browser-quick-grid">
-                {QUICK_SITES.map(site => (
-                  <button
-                    key={site.url}
-                    className="browser-quick-card"
-                    onClick={() => onSelectQuickUrl?.(site.url, site.name)}
-                  >
-                    <span className="quick-card-icon"><Globe2 size={20} /></span>
-                    <span className="quick-card-name">{site.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {space.resources.filter(r => r.kind === 'link').length > 0 && (
-                <div className="browser-space-links-section">
-                  <h3>Закладки пространства «{space.name}»</h3>
-                  <div className="browser-quick-grid">
-                    {space.resources.filter(r => r.kind === 'link').slice(0, 4).map(res => (
-                      <button
-                        key={res.id}
-                        className="browser-quick-card space-link"
-                        onClick={() => onSelectQuickUrl?.(res.target, res.name)}
-                      >
-                        <span className="quick-card-icon"><BookmarkPlus size={18} /></span>
-                        <span className="quick-card-name">{res.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <button className="browser-add-material" onClick={onAddLink}><Plus size={17} /> Сохранить ссылку</button>
             </div>
           </div>
         )}
