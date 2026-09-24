@@ -1,4 +1,4 @@
-.calm-home { width: min(1120px,100%); margin: auto; display: flex; flex-direction: column; gap: 21px; min-height: 0; }
+.calm-home { width: min(1120px,100%); margin: auto auto 0; display: flex; flex-direction: column; gap: 21px; min-height: 0; }
 .calm-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 4px; }
 .calm-heading h1 { font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
 .calm-heading h1::first-letter { text-transform: uppercase; }
@@ -51,6 +51,7 @@
 .resume-carousel-track::-webkit-scrollbar {
   display: none;
 }
+.resume-empty { align-self: center; max-width: 400px; color: #65745d; font-size: 14px; line-height: 1.6; }
 .resume-doc-item {
   flex: 0 0 164px;
   display: flex;
@@ -134,6 +135,9 @@
   color: #65745d;
   font-variant-numeric: tabular-nums;
   padding-left: 23px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .doc-compact-app-icon {
@@ -187,7 +191,7 @@
 .digest-choices { display: flex; align-items: center; gap: 22px; }
 .digest-choices button { display: flex; align-items: center; gap: 8px; color: #38504f; font-size: 13px; min-height: 38px; }
 .calm-count { opacity: .65; font-size: 12px; font-variant-numeric: tabular-nums; }
-.calm-dock { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 5px; }
+.calm-dock { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 5px; width: min(1120px, 100%); margin: 21px auto auto; min-height: 46px; flex: none; }
 .calm-dock-left { display: flex; align-items: center; gap: 12px; }
 
 /* Единый стиль и высота (46px) элементов нижнего дока по эталону .calm-capture */
@@ -238,6 +242,22 @@
   font-weight: 500;
   font-size: 11px;
   margin-left: 4px;
+}
+.dock-browser { background: rgba(255, 255, 255, 0.88); color: #1e2933; }
+.dock-browser svg { color: #1a68ff; }
+.dock-browser.active { background: #eaf1ff; color: #1a55d5; }
+
+@media (max-width: 1100px) {
+  .calm-dock { gap: 10px; }
+  .calm-dock-left { gap: 7px; }
+  .calm-apps { gap: 6px; }
+  .calm-capture kbd { display: none; }
+  .calm-app-btn, .calm-dock-timer, .calm-capture { padding-left: 12px; padding-right: 12px; }
+}
+@media (max-width: 760px) {
+  .calm-dock { overflow-x: auto; justify-content: flex-start; scrollbar-width: none; }
+  .calm-dock::-webkit-scrollbar { display: none; }
+  .calm-dock-left, .calm-apps { flex: none; }
 }
 
 .calm-apps { display: flex; gap: 10px; align-items: center; }
@@ -727,5 +747,14 @@
   .digest-choices button { gap: 5px; font-size: 12px; }
   .digest-choices svg { width: 17px; }
   .calm-tabs { gap: 12px; }
+}
+@media (max-height: 800px) {
+  .calm-grid { grid-template-rows: minmax(0, 275px) minmax(0, 138px); }
+  .resume-card { padding-top: 20px; padding-bottom: 20px; }
+  .resume-orbit { width: 42px; height: 42px; margin-bottom: 4px; }
+  .resume-title { font-size: 22px; }
+  .resume-carousel-wrap { margin-top: 8px; }
+  .resume-doc-preview { height: 88px; }
+  .digest-card { padding-top: 20px; padding-bottom: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

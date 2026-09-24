@@ -11,11 +11,55 @@ export interface Resource {
   completedAt?: string
 }
 
+export type SpaceKind = 'base' | 'stream'
+
+export interface BrowserTab {
+  id: string
+  title: string
+  url: string
+  pinned?: boolean
+  favicon?: string
+  lastAccessedAt?: string
+}
+
+export interface BrowserSession {
+  tabs: BrowserTab[]
+  activeTabId: string
+  splitTabId?: string | null
+  checkpointNote?: string
+  savedAt?: string
+}
+
+export interface ResearchSource {
+  title: string
+  domain: string
+  url: string
+}
+
+export interface ResearchArtifact {
+  id: string
+  query: string
+  sources: ResearchSource[]
+  summary: string
+  table?: {
+    headers: string[]
+    rows: string[][]
+  }
+  conclusion: string
+  createdAt: string
+  spaceId?: string
+}
+
 export interface Space {
   id: string
   name: string
   tone: SpaceTone
+  kind?: SpaceKind
   resources: Resource[]
+  lastActiveAt?: string
+  archivedAt?: string | null
+  activeSession?: BrowserSession
+  researchArtifacts?: ResearchArtifact[]
 }
 
 export interface Reminder {
@@ -76,6 +120,7 @@ export interface NewsItem {
 
 export interface AppState {
   version: 1
+  activeSpaceId?: string
   spaces: Space[]
   reminders: Reminder[]
   dismissedUntil: string | null

@@ -4,11 +4,17 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Спокойный стартовый экран для работы и жизни",
+  "author": "Dom Team",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "build": "tsc --noEmit && vite build",
-    "start": "electron ."
+    "start": "electron .",
+    "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
+    "pack": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --dir",
+    "dist": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js",
+    "dist:portable": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --win portable",
+    "dist:setup": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --win nsis"
   },
   "dependencies": {
     "@fontsource/manrope": "^5.3.0",
@@ -22,6 +28,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.4",
     "electron": "^41.10.7",
+    "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
     "vite": "^6.4.3",
     "wait-on": "^8.0.5"

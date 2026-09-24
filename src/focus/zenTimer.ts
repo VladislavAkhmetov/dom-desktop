@@ -17,6 +17,7 @@ class ZenTimerManager {
   private timerId: number | null = null
   private listeners: Set<(state: ZenTimerState) => void> = new Set()
   private onCompleteCallback?: () => void
+  private startedMusic = false
 
   public subscribe(listener: (state: ZenTimerState) => void): () => void {
     this.listeners.add(listener)
@@ -50,9 +51,10 @@ class ZenTimerManager {
     this.durationMinutes = minutes
     this.remainingSeconds = minutes * 60
     this.status = 'running'
+    this.startedMusic = withMusic && !audioManager.getIsPlaying()
     this.notify()
 
-    if (withMusic && !audioManager.getIsPlaying()) {
+    if (this.startedMusic) {
       audioManager.fadeInAndPlay(2500)
     }
 
@@ -86,7 +88,8 @@ class ZenTimerManager {
     this.notify()
 
     // 1. Gently fade out background music
-    await audioManager.fadeOutAndPause(3500)
+    if (this.startedMusic) await audioManager.fadeOutAndPause(3500)
+    this.startedMusic = false
 
     // 2. Play warm resonant singing bowl
     playZenBowl()

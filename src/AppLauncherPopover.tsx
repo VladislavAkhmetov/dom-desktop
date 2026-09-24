@@ -53,7 +53,7 @@ export function AppLauncherPopover({
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      if (popoverRef.current && !popoverRef.current.parentElement?.contains(e.target as Node)) {
         onClose()
       }
     }
@@ -124,10 +124,10 @@ export function AppLauncherPopover({
         <button
           className="app-new-btn"
           onClick={onNewDocument}
-          title={isFigma ? 'Создать новый черновик в Figma (figma.new)' : 'Открыть новый документ'}
+          title={isFigma ? 'Создать новый черновик в Figma (figma.new)' : 'Запустить приложение'}
         >
           <Plus size={15} strokeWidth={2.4} />
-          <span>{isFigma ? 'Новый холст' : isIllustrator ? 'Новый документ' : 'Создать'}</span>
+          <span>{isFigma ? 'Новый холст' : 'Открыть приложение'}</span>
         </button>
       </div>
 

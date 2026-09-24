@@ -1,17 +1,25 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, ArrowUpRight, Bookmark, Check, ChevronLeft, ChevronRight, Clock3, FileText, Globe2, Plus, Timer, Video } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, ArrowUpRight, Bookmark, Check, ChevronLeft, ChevronRight, Clock3, FileText, Globe2, Plus, Video } from 'lucide-react'
 import type { AppState, Reminder, Resource } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
 import { isRealReminder, postponeReminder, realEvents, remindersForDay } from './dayModel'
 import './home.css'
 import { Dialog } from './Dialog'
-import { PlayerIsland } from './player/PlayerIsland'
-import { zenTimer } from './focus/zenTimer'
-import { AppLauncherPopover } from './AppLauncherPopover'
 
-function getDocAppType(doc: Resource): 'illustrator' | 'figma' | 'link' | 'file' {
-  if (doc.kind === 'file' && (/\.(ai|eps|svg|ait)$/i.test(doc.target) || /\.(ai|eps|svg)$/i.test(doc.name) || doc.id.includes('ai-') || /illustrator/i.test(doc.name))) {
-    return 'illustrator'
+function getDocAppType(doc: Resource): 'illustrator' | 'indesign' | 'photoshop' | 'word' | 'figma' | 'link' | 'file' {
+  if (doc.kind === 'file') {
+    if (/\.(ai|eps|svg|ait)$/i.test(doc.target) || /\.(ai|eps|svg)$/i.test(doc.name) || doc.id.includes('ai-') || /illustrator/i.test(doc.name)) {
+      return 'illustrator'
+    }
+    if (/\.(indd|idml)$/i.test(doc.target) || /\.(indd|idml)$/i.test(doc.name) || /indesign/i.test(doc.name)) {
+      return 'indesign'
+    }
+    if (/\.(psd|psb)$/i.test(doc.target) || /\.(psd|psb)$/i.test(doc.name) || /photoshop/i.test(doc.name)) {
+      return 'photoshop'
+    }
+    if (/\.(docx?|rtf)$/i.test(doc.target) || /\.(docx?)$/i.test(doc.name) || /word/i.test(doc.name)) {
+      return 'word'
+    }
   }
   if (/figma/i.test(doc.name) || (doc.kind === 'link' && /figma\.com/i.test(doc.target)) || doc.id.includes('figma-')) {
     return 'figma'
@@ -24,9 +32,10 @@ function getDocAppType(doc: Resource): 'illustrator' | 'figma' | 'link' | 'file'
 
 function renderCompactAppIcon(doc: Resource) {
   const type = getDocAppType(doc)
-  if (type === 'illustrator') {
-    return <span className="doc-compact-app-icon illustrator-mark" aria-hidden="true">Ai</span>
-  }
+  if (type === 'illustrator') return <span className="doc-compact-app-icon illustrator-mark" aria-hidden="true">Ai</span>
+  if (type === 'indesign') return <span className="doc-compact-app-icon indesign-mark" aria-hidden="true">Id</span>
+  if (type === 'photoshop') return <span className="doc-compact-app-icon photoshop-mark" aria-hidden="true">Ps</span>
+  if (type === 'word') return <span className="doc-compact-app-icon word-mark" aria-hidden="true">W</span>
   if (type === 'figma') {
     return (
       <span className="doc-compact-app-icon figma-mark doc-figma-mark" aria-hidden="true">
@@ -80,6 +89,24 @@ function renderDocPreview(doc: Resource) {
       </div>
     )
   }
+  if (type === 'indesign') {
+    return (
+      <div style={{ width: '42px', height: '52px', background: 'rgba(255, 255, 255, 0.85)', borderRadius: '6px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ width: '60%', height: '5px', background: '#ea1b65', opacity: 0.8, borderRadius: '3px' }} />
+        <div style={{ width: '100%', height: '4px', background: '#96a69a', opacity: 0.5, borderRadius: '2px' }} />
+        <div style={{ width: '80%', height: '4px', background: '#96a69a', opacity: 0.4, borderRadius: '2px' }} />
+      </div>
+    )
+  }
+  if (type === 'word') {
+    return (
+      <div style={{ width: '42px', height: '52px', background: 'rgba(255, 255, 255, 0.85)', borderRadius: '6px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ width: '45%', height: '5px', background: '#185abd', opacity: 0.8, borderRadius: '3px' }} />
+        <div style={{ width: '100%', height: '4px', background: '#96a69a', opacity: 0.5, borderRadius: '2px' }} />
+        <div style={{ width: '90%', height: '4px', background: '#96a69a', opacity: 0.4, borderRadius: '2px' }} />
+      </div>
+    )
+  }
   if (type === 'link') {
     return (
       <div className="preview-mosaic">
@@ -113,22 +140,12 @@ interface Props {
   onSpace: (id: string) => void
   onOpen: (resource: Resource) => void
   onAddLink: () => void
-  onAddFile?: () => void
-  onOpenSettings?: () => void
-  appIcon: (name: string) => ReactNode
+  onOpenWorkstage?: (spaceId: string, artifactId?: string) => void
 }
 
-export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen, onAddLink, onAddFile, onOpenSettings, appIcon }: Props) {
+export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen, onAddLink, onOpenWorkstage }: Props) {
   const [day, setDay] = useState(0)
   const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null)
-  const [zenState, setZenState] = useState(zenTimer.getState())
-  const [activeAppId, setActiveAppId] = useState<string | null>(null)
-  useEffect(() => {
-    zenTimer.setOnComplete(() => {
-      setDialog('checkpoint')
-    })
-    return zenTimer.subscribe(setZenState)
-  }, [])
   useEffect(() => { if (!undo) return; const timer = window.setTimeout(() => setUndo(null), 8000); return () => window.clearTimeout(timer) }, [undo])
   const [dialog, setDialog] = useState<'checkpoint' | 'digest' | 'reminder' | null>(null)
   const [digestTab, setDigestTab] = useState<'notes' | 'reading' | 'events'>('notes')
@@ -193,14 +210,13 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
   const recentDocs = resources
     .filter(resource => resource.kind !== 'app' && resource.lastOpenedAt && !resource.completedAt)
     .sort((a, b) => Date.parse(b.lastOpenedAt!) - Date.parse(a.lastOpenedAt!))
-  const displayDocs = recentDocs.length > 0
-    ? recentDocs.slice(0, 6)
-    : resources.filter(resource => resource.kind !== 'app').slice(0, 4)
+  const displayDocs = recentDocs.slice(0, 6)
   const recent = recentDocs[0]
   const checkpoint = state.checkpoint && state.spaces.some(space => space.id === state.checkpoint?.spaceId) ? state.checkpoint : undefined
+  const latestSession = state.spaces.filter(space => space.activeSession?.tabs.length).sort((a, b) => Date.parse(b.lastActiveAt || '') - Date.parse(a.lastActiveAt || ''))[0]
   const resumeSpace = state.spaces.find(space => space.id === (checkpoint?.spaceId || recent?.spaceId)) || state.spaces[0]
   const resumeResource = checkpoint ? resources.find(resource => resource.id === checkpoint.resourceId) : recent
-  const apps = resources.filter(resource => resource.kind === 'app').slice(0, 4)
+  const resumeTitle = checkpoint?.nextStep || (latestSession ? `Вернуться в «${latestSession.name}»` : recent ? 'Недавно открывали' : 'Можно начать с малого.')
   const selectedDay = new Date(now)
   selectedDay.setDate(selectedDay.getDate() + day)
   const plan = remindersForDay(state, selectedDay)
@@ -217,59 +233,6 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
   const digestItems = digestTab === 'notes' ? realReminders : digestTab === 'reading' ? links : events
   const totalPages = Math.max(1, Math.ceil(digestItems.length / 4))
   const visiblePage = Math.min(page, totalPages - 1)
-
-  function getAppDocuments(appResource: Resource) {
-    const isFigma = /figma/i.test(appResource.name)
-    const isIllustrator = /illustrator/i.test(appResource.name)
-
-    const allDocs = state.spaces.flatMap(space =>
-      space.resources
-        .filter(res => res.id !== appResource.id && res.kind !== 'app')
-        .map(res => ({ ...res, spaceName: space.name }))
-    )
-
-    const filtered = allDocs.filter(doc => {
-      if (isFigma) {
-        return doc.kind === 'link' && (/figma\.com/i.test(doc.target) || /figma/i.test(doc.name) || doc.id.startsWith('starter-figma') || doc.id.startsWith('figma-'))
-      }
-      if (isIllustrator) {
-        return doc.kind === 'file' && (/\.(ai|eps|svg|ait)$/i.test(doc.target) || /\.(ai|eps|svg)$/i.test(doc.name) || doc.id.startsWith('starter-ai') || doc.id.startsWith('ai-'))
-      }
-      return doc.target.toLowerCase().includes(appResource.name.toLowerCase())
-    })
-
-    return filtered.sort((a, b) => {
-      const timeA = Date.parse(a.lastOpenedAt || a.createdAt) || 0
-      const timeB = Date.parse(b.lastOpenedAt || b.createdAt) || 0
-      return timeB - timeA
-    })
-  }
-
-  function handleNewDocument(appResource: Resource) {
-    if (/figma/i.test(appResource.name)) {
-      onOpen({
-        id: crypto.randomUUID(),
-        name: 'Новый холст Figma',
-        kind: 'link',
-        target: 'https://figma.new',
-        createdAt: new Date().toISOString(),
-        lastOpenedAt: new Date().toISOString()
-      })
-    } else {
-      onOpen(appResource)
-    }
-  }
-
-  function handleAddDocument(appResource: Resource) {
-    if (/figma/i.test(appResource.name)) {
-      onAddLink()
-    } else if (/illustrator/i.test(appResource.name)) {
-      if (onAddFile) onAddFile()
-      else onSpace(resumeSpace?.id || state.spaces[0]?.id || '')
-    } else {
-      onSpace(resumeSpace?.id || state.spaces[0]?.id || '')
-    }
-  }
 
   function editCheckpoint() {
     setSpaceId(resumeSpace?.id || '')
@@ -303,12 +266,12 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
     <main className="calm-home" aria-label="Ваш день">
       <div className="calm-heading"><h1>{now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}</h1><button className="calm-text-button" onClick={editCheckpoint}>Оставить на завтра <ArrowUpRight size={17} /></button></div>
       <div className="calm-grid">
-        <section className="calm-card resume-card" aria-label="Остановились вчера">
+        <section className="calm-card resume-card" aria-label="Продолжение работы">
           <div className="resume-heading-wrap">
             <span className="empty-orbit resume-orbit">
               <Clock3 size={28} strokeWidth={1.2} />
             </span>
-            <h2 className="resume-title">Остановились вчера.</h2>
+            <h2 className="resume-title">{resumeTitle}</h2>
           </div>
 
           <div className="resume-carousel-wrap">
@@ -320,6 +283,63 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
+              {checkpoint && <button className="resume-doc-item" onClick={() => resumeResource ? onOpen(resumeResource) : resumeSpace?.activeSession?.tabs.length ? onOpenWorkstage?.(resumeSpace.id) : resumeSpace && onSpace(resumeSpace.id)} title={`Продолжить в «${resumeSpace?.name}»`}>
+                <div className="resume-doc-preview preview-web"><Clock3 size={30} strokeWidth={1.4} /></div>
+                <div className="resume-doc-info"><div className="resume-doc-name-row"><span className="resume-doc-title">{resumeResource?.name || resumeSpace?.name}</span></div><span className="resume-doc-time">{checkpoint.note || 'Открыть пространство'}</span></div>
+              </button>}
+              {/* СОХРАНЁННЫЕ БРАУЗЕРНЫЕ СЕССИИ (10 ВКЛАДОК) */}
+              {state.spaces.filter(s => s.activeSession?.tabs.length && s.id !== checkpoint?.spaceId).map(space => (
+                <button
+                  key={`session-${space.id}`}
+                  className="resume-doc-item"
+                  onClick={() => onOpenWorkstage ? onOpenWorkstage(space.id) : onSpace(space.id)}
+                  title={`Продолжить работу в «${space.name}»`}
+                >
+                  <div className="resume-doc-preview preview-web" style={{ background: '#e0ecf7' }}>
+                    <div style={{ textAlign: 'center', color: '#1a68ff', fontWeight: 600 }}>
+                      <Globe2 size={24} style={{ margin: '0 auto 4px' }} />
+                      <span style={{ fontSize: '13px', display: 'block', color: '#243b2c' }}>
+                        {space.activeSession?.tabs.length} вкладок
+                      </span>
+                    </div>
+                  </div>
+                  <div className="resume-doc-info">
+                    <div className="resume-doc-name-row">
+                      <span className="doc-compact-app-icon web-mark" aria-hidden="true">
+                        <Globe2 size={13} strokeWidth={2} />
+                      </span>
+                      <span className="resume-doc-title">Сессия: {space.name}</span>
+                    </div>
+                    <span className="resume-doc-time">{formatRelativeDocTime(space.activeSession?.savedAt)}</span>
+                  </div>
+                </button>
+              ))}
+
+              {/* СОХРАНЁННЫЕ ИССЛЕДОВАНИЯ */}
+              {state.spaces.flatMap(s => (s.researchArtifacts || []).map(art => ({ ...art, spaceName: s.name, spaceId: s.id }))).slice(0, 2).map(art => (
+                <button
+                  key={`art-${art.id}`}
+                  className="resume-doc-item"
+                  onClick={() => onOpenWorkstage ? onOpenWorkstage(art.spaceId, art.id) : onSpace(art.spaceId)}
+                  title={`Открыть исследование: ${art.query}`}
+                >
+                  <div className="resume-doc-preview preview-ui" style={{ background: '#f3efe6' }}>
+                    <div style={{ textAlign: 'center', color: '#7c5f24', fontWeight: 600 }}>
+                      <span style={{ fontSize: '20px', display: 'block', marginBottom: '2px' }}>✦</span>
+                      <span style={{ fontSize: '13px', display: 'block', color: '#382f18' }}>
+                        {art.sources.length} источника
+                      </span>
+                    </div>
+                  </div>
+                  <div className="resume-doc-info">
+                    <div className="resume-doc-name-row">
+                      <span className="resume-doc-title">✦ {art.query}</span>
+                    </div>
+                    <span className="resume-doc-time">{formatRelativeDocTime(art.createdAt)}</span>
+                  </div>
+                </button>
+              ))}
+
               {displayDocs.map(doc => (
                 <button
                   key={doc.id}
@@ -339,6 +359,7 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
                   </div>
                 </button>
               ))}
+              {!checkpoint && !latestSession && displayDocs.length === 0 && <div className="resume-empty">Откройте материал через Дом или создайте поток. Здесь появится, с чего можно продолжить.</div>}
             </div>
           </div>
         </section>
@@ -389,69 +410,6 @@ export function Home({ state, now, onChange, onCapture, onPlan, onSpace, onOpen,
           <div className="digest-choices"><button onClick={() => showDigest('notes')}><FileText size={20} strokeWidth={1.5} /><span>Мысли и дела</span><span className="calm-count">{realReminders.length}</span></button><button onClick={() => showDigest('reading')}><Bookmark size={20} strokeWidth={1.5} /><span>Почитать</span><span className="calm-count">{links.length}</span></button><button onClick={() => showDigest('events')}><Clock3 size={20} strokeWidth={1.5} /><span>События</span><span className="calm-count">{events.length}</span></button></div>
         </section>
       </div>
-      <footer className="calm-dock">
-        <div className="calm-dock-left">
-          <button className="calm-capture" onClick={onCapture}>
-            <Plus size={19} />
-            Записать
-            <kbd>Ctrl Alt Space</kbd>
-          </button>
-          {zenState.status === 'running' ? (
-            <button className="calm-dock-timer active" onClick={() => zenTimer.stop()} title="Остановить сессию фокуса">
-              <Timer size={18} />
-              <span>Фокус {Math.ceil(zenState.remainingSeconds / 60)} мин</span>
-              <small>Завершить</small>
-            </button>
-          ) : (
-            <button className="calm-dock-timer" onClick={() => zenTimer.start(30)} title="Сесть за дело на 30 минут с фоновой музыкой">
-              <Timer size={18} />
-              <span>Фокус • 30 мин</span>
-            </button>
-          )}
-        </div>
-        <PlayerIsland onOpenSettings={onOpenSettings} />
-        <div className="calm-apps" aria-label="Приложения">
-          {apps.map(resource => (
-            <div className="calm-app-wrapper" key={resource.id}>
-              <button
-                className={`calm-app-btn ${activeAppId === resource.id ? 'active' : ''}`}
-                onClick={() => setActiveAppId(current => current === resource.id ? null : resource.id)}
-                title={resource.name}
-                aria-expanded={activeAppId === resource.id}
-              >
-                <span className="calm-app-icon">{appIcon(resource.name)}</span>
-                <span>{resource.name}</span>
-              </button>
-
-              {activeAppId === resource.id && (
-                <AppLauncherPopover
-                  app={resource}
-                  recentDocuments={getAppDocuments(resource)}
-                  now={now}
-                  appIcon={appIcon}
-                  onOpenDocument={(doc) => {
-                    onOpen(doc)
-                    setActiveAppId(null)
-                  }}
-                  onOpenApp={(appRes) => {
-                    onOpen(appRes)
-                    setActiveAppId(null)
-                  }}
-                  onNewDocument={() => {
-                    handleNewDocument(resource)
-                    setActiveAppId(null)
-                  }}
-                  onAddDocument={() => {
-                    handleAddDocument(resource)
-                    setActiveAppId(null)
-                  }}
-                  onClose={() => setActiveAppId(null)}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </footer>
     </main>
 
     {dialog === 'checkpoint' && <Dialog title="С чего продолжим?" onClose={() => setDialog(null)}>

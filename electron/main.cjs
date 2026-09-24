@@ -62,21 +62,36 @@ function showWindow() {
   mainWindow.focus()
 }
 
+function getAssetPath(filename) {
+  const candidates = [
+    path.join(__dirname, '..', 'build', filename),
+    path.join(__dirname, '..', 'dist', filename),
+    path.join(__dirname, '..', 'public', filename),
+    path.join(process.resourcesPath || '', filename)
+  ]
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return path.join(__dirname, '..', 'public', filename)
+}
+
 function createWindow() {
+  const appIcon = getAssetPath('icon.ico')
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
     minWidth: 900,
     minHeight: 650,
     title: 'Дом',
-    icon: path.join(__dirname, '..', 'public', 'tray.png'),
+    icon: fs.existsSync(appIcon) ? appIcon : getAssetPath('tray.png'),
     backgroundColor: '#a4b8ac',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      webviewTag: true
     }
   })
   mainWindow.on('close', event => {
@@ -90,8 +105,17 @@ function createWindow() {
     return { action: 'deny' }
   })
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const home = isDev ? DEV_URL : `file://${path.join(__dirname, '..', 'dist', 'index.html')}`
-    if (!url.startsWith(home)) event.preventDefault()
+    if (isDev) {
+      if (!url.startsWith(DEV_URL)) {
+        event.preventDefault()
+        if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+      }
+    } else {
+      if (!url.startsWith('file://')) {
+        event.preventDefault()
+        if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+      }
+    }
   })
   mainWindow.webContents.on('did-fail-load', (_event, code, description) => console.error('UI load failed:', code, description))
   if (isDev) mainWindow.loadURL(DEV_URL)
@@ -99,7 +123,7 @@ function createWindow() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, '..', 'public', 'tray.png'))
+  const icon = nativeImage.createFromPath(getAssetPath('tray.png'))
   tray = new Tray(icon)
   tray.setToolTip('Дом — всё нужное рядом')
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -181,19 +205,44 @@ ipcMain.handle('calendar:fetch', async (_event, url) => {
 })
 ipcMain.handle('window:show', () => { showWindow(); return true })
 
-app.whenReady().then(() => {
-  createWindow()
-  createTray()
-  globalShortcut.register('Control+Alt+Space', () => {
-    showWindow()
-    mainWindow.webContents.send('focus:capture')
-  })
-  checkReminders()
-  setInterval(checkReminders, 15_000)
-})
+const gotTheLock = app.requestSingleInstanceLock()
 
-app.on('activate', showWindow)
-app.on('before-quit', () => { quitting = true })
-app.on('will-quit', () => globalShortcut.unregisterAll())
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      showWindow()
+    }
+  })
+
+  app.whenReady().then(() => {
+    createWindow()
+    createTray()
+    globalShortcut.register('Control+Alt+Space', () => {
+      showWindow()
+      mainWindow?.webContents.send('focus:capture')
+    })
+    checkReminders()
+    setInterval(checkReminders, 15_000)
+  })
+
+  app.on('web-contents-created', (_event, contents) => {
+    if (contents.getType() === 'webview') {
+      const ua = contents.userAgent.replace(/Electron\/\S+\s?/g, '')
+      contents.setUserAgent(ua)
+      contents.setWindowOpenHandler(({ url }) => {
+        contents.loadURL(url)
+        return { action: 'deny' }
+      })
+    }
+  })
+
+  app.on('activate', showWindow)
+  app.on('before-quit', () => { quitting = true })
+  app.on('will-quit', () => globalShortcut.unregisterAll())
+}
+
 process.on('unhandledRejection', error => console.error(error))
 
