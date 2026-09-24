@@ -57,7 +57,7 @@ export function BottomDock({ state, now, currentSpaceId, isWorkstageOpen, appIco
 
   return <footer className="calm-dock" aria-label="Быстрые действия">
     <div className="calm-dock-left">
-      <button className="calm-capture" onClick={onCapture}>
+      <button className="calm-capture" onClick={onCapture} title="Записать мысль · Ctrl + Alt + Space">
         <Plus size={19} /><span>Записать</span><kbd>Ctrl Alt Space</kbd>
       </button>
       <button className={`calm-dock-timer ${zenState.status === 'running' ? 'active' : ''}`} onClick={() => zenState.status === 'running' ? zenTimer.stop() : zenTimer.start(30, false)} title={zenState.status === 'running' ? 'Остановить сессию фокуса' : 'Начать фокус на 30 минут'}>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AppWindow, ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Pencil,
   Cloud, CloudRain, CloudSnow, CloudSun, Columns2, ExternalLink, FileText, Folder, Globe2, Link2,
-  Plus, Settings2, Sun, X
+  Plus, Settings2, Sparkles, Sun, X
 } from 'lucide-react'
 import { bridge, isDesktop } from './bridge'
 import { Home } from './Home'
@@ -15,6 +15,7 @@ import { parseICal, normalizeCalendarUrl } from './calendar/ical'
 import { cachedUfaWeather, fetchUfaWeather, weatherDescription, type UfaWeather } from './weather'
 import { Workstage } from './browser/Workstage'
 import { BottomDock } from './BottomDock'
+import { AssistantPanel } from './Assistant'
 import { zenTimer } from './focus/zenTimer'
 
 const emptySession = (): BrowserSession => ({ tabs: [], activeTabId: '', splitTabId: null })
@@ -78,7 +79,9 @@ function App() {
   const [newCalendarName, setNewCalendarName] = useState('')
   const [newCalendarUrl, setNewCalendarUrl] = useState('')
   const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false)
-  const [isWorkstageOpen, setIsWorkstageOpen] = useState(true)
+  const [isWorkstageOpen, setIsWorkstageOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantDraft, setAssistantDraft] = useState('')
   const [omniboxUrl, setOmniboxUrl] = useState('')
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve())
   const targetWorkstageSpace = state?.spaces.find(space => space.id === (workstageSpaceId || state.activeSpaceId)) || state?.spaces[0]
@@ -523,104 +526,41 @@ function App() {
   return (
     <div className="app-shell">
       <div className="page-wrap">
-        <header className="topbar calm-topbar unified-topbar">
-          <div className="topbar-left">
-            <button
-              className="brand"
-              onClick={() => {
-                setViewSpaceId(null)
-                setShowSpaces(false)
-                setIsWorkstageOpen(previous => !previous)
-              }}
-              aria-label="Переключить Дом и Браузер"
-              title={isWorkstageOpen ? 'Открыть главную Дом' : 'Вернуться в браузер'}
-            >
-              <span className="brand-mark">✳</span>
-              <span>дом<span className="brand-dot">.</span></span>
+        <header className="browser-chrome">
+          <div className="chrome-main">
+            <button className="brand" onClick={returnHome} aria-label="На главную Дом">
+              <span className="brand-mark">✳</span><span>дом<span className="brand-dot">.</span></span>
             </button>
-
-            <button className="calm-weather" onClick={() => setModal('weather')} aria-label="Погода и дороги в Уфе">
-              <span>Уфа</span>
-              {weather ? weatherIcon(weather.code) : <Cloud size={20} />}
-              <span>{weather ? `${Math.round(weather.temperature)}°` : '—°'}</span>
-            </button>
-
-            <div className="topbar-spaces">
-              {visibleTopSpaces.map(s => (
-                <button
-                  key={s.id}
-                  className={`space-nav-pill ${(isWorkstageOpen && s.id === targetWorkstageSpace?.id) || currentSpace?.id === s.id ? 'active' : ''}`}
-                  onClick={() => openWorkstage(s.id)}
-                  title={`Открыть ${s.name}`}
-                >
-                  {s.name}
-                </button>
-              ))}
-              <button className="space-nav-pill" onClick={() => { setShowSpaces(true); setViewSpaceId(null); setIsWorkstageOpen(false) }}>Все</button>
-              <button className="space-nav-pill add-stream" onClick={createStream} title="Создать быстрый поток">
-                <Plus size={15} /> Поток
-              </button>
-            </div>
-          </div>
-
-          <div className="topbar-center">
             <div className="calm-omnibox">
-              <Globe2 size={16} className="omnibox-icon" />
-              <input
-                type="text"
-                className="omnibox-input"
-                value={omniboxUrl}
-                onChange={e => setOmniboxUrl(e.target.value)}
-                onKeyDown={handleOmniboxKeyDown}
-                placeholder="Поиск или адрес сайта · Ctrl L"
-                aria-label="Поиск или адрес сайта"
-              />
+              <Globe2 size={17} className="omnibox-icon" />
+              <input type="text" className="omnibox-input" value={omniboxUrl}
+                onChange={e => setOmniboxUrl(e.target.value)} onKeyDown={handleOmniboxKeyDown}
+                placeholder="Поиск или адрес сайта" aria-label="Поиск или адрес сайта" />
+              <kbd>Ctrl L</kbd>
+            </div>
+            <div className="chrome-actions">
+              {isWorkstageOpen ? <>
+                <button className="chrome-button" onClick={() => targetWorkstageSpace && openSpace(targetWorkstageSpace.id)} title="Материалы текущего пространства"><Folder size={17} /><span>Материалы</span></button>
+                <button className={`chrome-button ${splitTabId ? 'selected' : ''}`} onClick={handleToggleSplit} disabled={tabs.length < 2} title="Открыть вторую вкладку рядом"><Columns2 size={17} /><span>Рядом</span></button>
+              </> : <button className="chrome-button" onClick={() => openWorkstage()} title="Открыть текущие вкладки"><Columns2 size={17} /><span>Вкладки</span><span className="chrome-tab-count">{tabs.length}</span></button>}
+              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => setAssistantOpen(true)} aria-label="Открыть помощника" title="Помощник"><Sparkles size={19} strokeWidth={1.7} /></button>
+              <button className="chrome-button" onClick={() => setModal('settings')} aria-label="Настройки"><Settings2 size={19} /></button>
             </div>
           </div>
-
-          <div className="topbar-right">
-            {!isWorkstageOpen ? (
-              <>
-                <button className="calm-pill-btn" onClick={() => openWorkstage()} title="Открыть текущий поток">
-                  <Globe2 size={15} />
-                  <span>Вкладки ({tabs.length})</span>
-                </button>
-                <div className="calm-clock">
-                  {isDemo ? (
-                    <a className="calm-demo" href="/" title="Вернуться к своим данным">Пример дня <X size={13} /></a>
-                  ) : (
-                    <>
-                      <span>{time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
-                      {!isDesktop && <a className="calm-demo-link" href="/?demo=1">Пример дня</a>}
-                    </>
-                  )}
-                </div>
-                <button className="round-button settings-button" onClick={() => setModal('settings')} aria-label="Настройки">
-                  <Settings2 size={19} />
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="calm-pill-btn" onClick={() => targetWorkstageSpace && openSpace(targetWorkstageSpace.id)} title="Материалы текущего пространства">
-                  <Folder size={16} /><span>Материалы</span>
-                </button>
-                <button className={`calm-pill-btn ${splitTabId ? 'active' : ''}`} onClick={handleToggleSplit} disabled={tabs.length < 2} title="Открыть вторую вкладку рядом">
-                  <Columns2 size={16} /><span>Рядом</span>
-                </button>
-
-                <button
-                  className="calm-pill-btn leave-tomorrow-pill"
-                  onClick={returnHome}
-                  title="Вернуться в Дом. Вкладки сохраняются автоматически"
-                >
-                  <span>В Дом</span>
-                </button>
-
-                <button className="round-button settings-button" onClick={() => setModal('settings')} aria-label="Настройки">
-                  <Settings2 size={19} />
-                </button>
-              </>
-            )}
+          <div className="chrome-secondary">
+            <nav className="chrome-spaces" aria-label="Пространства">
+              <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
+              {visibleTopSpaces.map(space => <button key={space.id}
+                className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}`}
+                onClick={() => openWorkstage(space.id)} title={`Открыть ${space.name}`}>{space.name}</button>)}
+              <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => { setShowSpaces(true); setViewSpaceId(null); setIsWorkstageOpen(false) }}>Все пространства</button>
+              <button className="chrome-new-space" onClick={createStream} aria-label="Создать поток" title="Создать поток"><Plus size={17} /></button>
+            </nav>
+            <div className="chrome-status">
+              {isDemo ? <a className="chrome-demo" href="/" title="Вернуться к своим данным">Пример дня <X size={12} /></a> : !isDesktop && <a className="chrome-demo" href="/?demo=1">Пример дня</a>}
+              <button className="chrome-weather" onClick={() => setModal('weather')} aria-label="Погода и дороги в Уфе">{weather ? weatherIcon(weather.code) : <Cloud size={16} />}<span>Уфа · {weather ? `${Math.round(weather.temperature)}°` : '—°'}</span></button>
+              <time>{time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time>
+            </div>
           </div>
         </header>
 
@@ -636,6 +576,7 @@ function App() {
               onOpen={openResource}
               onAddLink={() => startLink()}
               onOpenWorkstage={openWorkstage}
+              onAssistant={draft => { setAssistantDraft(draft || ''); setAssistantOpen(true) }}
             />
           ) : (
             <Workstage
@@ -724,6 +665,7 @@ function App() {
         />
       </div>
 
+      {assistantOpen && <AssistantPanel draft={assistantDraft} onDraftChange={setAssistantDraft} onClose={() => setAssistantOpen(false)} />}
       {modal === 'capture' && <Capture initialWhen={captureDefaultWhen} onClose={() => setModal(null)} onSave={saveCapture} onVoiceHint={() => setToast('Для диктовки нажмите Win + H.')} />}
       {modal && modal !== 'capture' && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div className="modal" role="dialog" aria-modal="true" aria-label="Действие"><button className="modal-close" onClick={() => setModal(null)} aria-label="Закрыть"><X size={19} /></button>
         {(modal === 'newSpace' || modal === 'newStream' || modal === 'renameSpace') && <><span className="modal-kicker"><Folder size={16} /> {modal === 'newStream' ? 'НОВЫЙ ПОТОК' : 'ПРОСТРАНСТВО'}</span><h2>{modal === 'renameSpace' ? 'Новое название' : modal === 'newStream' ? 'Как назовём поток?' : 'Для чего оставим место?'}</h2><input className="large-input" autoFocus maxLength={70} value={newSpaceName} onChange={event => setNewSpaceName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') createSpace() }} aria-label="Название пространства" />{modal === 'newSpace' && <div className="capture-options">{['Работа', 'Личное', 'Учёба', 'Поездка'].map(name => <button key={name} onClick={() => setNewSpaceName(name)}>{name}</button>)}</div>}<div className="modal-bottom end"><button className="primary-button" disabled={!newSpaceName.trim()} onClick={createSpace}>{modal === 'renameSpace' ? 'Сохранить' : 'Создать'} <ArrowRight size={17} /></button></div></>}

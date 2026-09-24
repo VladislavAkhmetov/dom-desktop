@@ -161,6 +161,12 @@ export function PlayerIsland({ onOpenSettings: _onOpenSettings }: Props) {
       <div
         className={`calm-player-island ${isPlaying ? 'playing' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={event => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault()
+            setIsOpen(open => !open)
+          }
+        }}
         role="button"
         tabIndex={0}
         aria-label="Управление звуком"

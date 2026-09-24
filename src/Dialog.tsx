@@ -8,11 +8,11 @@ export function Dialog({ title, children, onClose }: { title: string; children: 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     const root = ref.current!
-    ;(root.querySelector<HTMLElement>('textarea, input') || root.querySelector<HTMLElement>('button'))?.focus()
+    ;(root.querySelector<HTMLElement>('textarea:not(:disabled), input:not(:disabled):not([type="checkbox"])') || root.querySelector<HTMLElement>('button:not(:disabled)'))?.focus()
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.stopPropagation(); closeRef.current() }
       if (event.key !== 'Tab') return
-      const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input, textarea, select, summary, [href]')].filter(item => item.getClientRects().length > 0)
+      const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, [href]')].filter(item => item.getClientRects().length > 0)
       const first = items[0], last = items[items.length - 1]
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
