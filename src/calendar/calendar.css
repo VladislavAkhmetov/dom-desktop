@@ -1,0 +1,24 @@
+.calendar-view { font-size: 12px; margin-top: 12px; }
+.calendar-navigation { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.calendar-navigation strong { flex: 1; text-transform: capitalize; }
+.calendar-navigation button { padding: 5px; border-radius: 6px; display: flex; align-items: center; background: #e7eedf; }
+.calendar-days, .calendar-month, .calendar-all-day { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); }
+.calendar-days span { padding: 5px; text-align: center; color: #526552; }
+.calendar-date { min-height: 85px; padding: 5px; border: 1px solid #e0e8dc; overflow: hidden; }
+.calendar-date-number { font-weight: 600; padding: 4px; }
+.calendar-date.outside-month { opacity: .5; }
+.calendar-event-chip, .calendar-task { display: block; width: 100%; background: #dbe8d1; padding: 4px; margin-top: 3px; border-radius: 5px; font-size: 11px; text-align: left; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.calendar-task { background: #f4f7ee; border: 1px solid #d5dfce; cursor: grab; }
+.calendar-all-day > div { padding: 4px; min-height: 45px; border-left: 1px solid #d7e0d1; }
+.calendar-scroll { display: flex; max-height: 280px; overflow: auto; margin-top: 8px; }
+.calendar-time-axis { width: 24px; flex: none; }
+.calendar-time-axis span { height: 24px; display: block; font-size: 10px; color: #597052; }
+.calendar-week { flex: 1; display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); height: 576px; }
+.calendar-time-day { position: relative; border-left: 1px solid #d7e0d1; background: repeating-linear-gradient(to bottom, transparent 0 23px, #d7e0d1 23px 24px); }
+.calendar-interval { position: absolute; left: 1px; right: 1px; border-radius: 4px; background: #cdddbe; font-size: 10px; overflow: hidden; text-align: left; padding: 2px; }
+.plan-view-switch { display: flex; gap: 7px; margin: 10px 0; }
+.plan-view-switch button { font-size: 12px; padding: 5px 8px; border-radius: 7px; background: #eef3e8; }
+.plan-view-switch button[aria-pressed=true] { background: #355b47; color: #fff; }
+.task-interval { background: #fafcf5; border: 1px solid #a8bfa0; }
+.calendar-date-number[aria-current=date] { background: #355b47; color: #fff; border-radius: 50%; min-width: 25px; }
+.calendar-more { padding: 5px 2px; font-size: 11px; color: #466b50; }

@@ -1,14 +1,19 @@
-export interface ParsedCapture { title: string; dueAt: string | null }
+import { localDate } from '../shared/state'
+
+export interface ParsedCapture { title: string; dueAt: string | null; plannedDate: string | null; kind: 'note' | 'task' }
 
 export function parseCapture(raw: string, now = new Date()): ParsedCapture {
   let text = raw.trim().replace(/^напомни(?:\s+мне)?\s+/i, '')
   let dueAt: Date | null = null
+  let plannedDate: string | null = null
 
   const relative = text.match(/(?<![\p{L}\p{N}])через\s+(\d+)\s+(минут[уы]?|минуту|час(?:а|ов)?)(?![\p{L}\p{N}])/iu)
   if (relative) {
     const amount = Number(relative[1])
     const minutes = relative[2].toLowerCase().startsWith('час') ? amount * 60 : amount
-    if (amount > 0 && minutes <= 525600) dueAt = new Date(now.getTime() + minutes * 60_000)
+    if (!(amount > 0 && minutes <= 525600)) return { title: raw.trim(), dueAt: null, plannedDate: null, kind: 'note' }
+    dueAt = new Date(now.getTime() + minutes * 60_000)
+    plannedDate = localDate(dueAt)
     text = text.replace(relative[0], '')
   } else {
     const dayWord = text.match(/(?<![\p{L}\p{N}])(сегодня|завтра|послезавтра)(?![\p{L}\p{N}])/iu)
@@ -27,21 +32,22 @@ export function parseCapture(raw: string, now = new Date()): ParsedCapture {
         const month = Number(dateMatch[2]) - 1
         const year = dateMatch[3] ? Number(dateMatch[3]) : now.getFullYear()
         date.setFullYear(year, month, day)
-        if (date.getDate() !== day || date.getMonth() !== month) return { title: raw.trim(), dueAt: null }
-        if (!dateMatch[3] && date.getTime() < now.getTime()) date.setFullYear(year + 1)
+        if (date.getDate() !== day || date.getMonth() !== month) return { title: raw.trim(), dueAt: null, plannedDate: null, kind: 'note' }
+        if (!dateMatch[3] && localDate(date)! < localDate(now)!) date.setFullYear(year + 1)
         text = text.replace(dateMatch[0], '')
       }
       if (timeMatch) {
         date.setHours(Number(timeMatch[1]), Number(timeMatch[2] ?? 0), 0, 0)
         text = text.replace(timeMatch[0], '')
-      } else date.setHours(9, 0, 0, 0)
-      if (!dayWord && !dateMatch && date <= now) date.setDate(date.getDate() + 1)
-      dueAt = date
+        if (!dayWord && !dateMatch && date <= now) date.setDate(date.getDate() + 1)
+        dueAt = date
+      }
+      plannedDate = localDate(date)
     }
   }
 
   text = text.replace(/^[,.:;\s]+|[,.:;\s]+$/g, '').replace(/\s{2,}/g, ' ')
-  return { title: text || raw.trim(), dueAt: dueAt?.toISOString() ?? null }
+  return { title: text || raw.trim(), dueAt: dueAt?.toISOString() ?? null, plannedDate, kind: plannedDate ? 'task' : 'note' }
 }
 
 export function toLocalInput(iso: string | null): string {
@@ -101,4 +107,3 @@ export function formatCountdown(iso: string | null, now = new Date()): Countdown
     isPast: diffMs < 0
   }
 }
-

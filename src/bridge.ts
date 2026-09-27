@@ -1,4 +1,6 @@
 import type { AppState, DomBridge } from './types'
+import { applyChanges, diffState, emptyState, migrateState } from '../shared/state'
+import { searchState } from './search'
 
 const STORAGE_KEY = 'dom-browser-preview-v1'
 
@@ -11,18 +13,42 @@ function openExternalPreview(target: string) {
 }
 
 function firstState(): AppState {
-  return { version: 1, spaces: [{ id: 'first-space', name: 'Моё пространство', tone: 'sage', resources: [] }], reminders: [], dismissedUntil: null }
+  return emptyState()
+}
+const database = new Promise<IDBDatabase>((resolve, reject) => {
+  const request = indexedDB.open('dom-preview', 1)
+  request.onupgradeneeded = () => request.result.createObjectStore('state')
+  request.onsuccess = () => resolve(request.result)
+  request.onerror = () => reject(request.error)
+})
+async function transaction(update?: (value: AppState) => AppState): Promise<AppState> {
+  const db = await database
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('state', update ? 'readwrite' : 'readonly')
+    const store = tx.objectStore('state')
+    const request = store.get('app')
+    let result: AppState
+    request.onsuccess = () => {
+      try {
+        const legacy = localStorage.getItem(STORAGE_KEY)
+        const value = request.result || (legacy ? migrateState(JSON.parse(legacy)) : firstState())
+        result = update ? update(value) : value
+        if (update) store.put(result, 'app')
+      } catch (error) { tx.abort(); reject(error) }
+    }
+    tx.oncomplete = () => resolve(result)
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error || new Error('Запись отменена'))
+  })
 }
 const browserBridge: DomBridge = {
   async getState() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      const state = saved ? JSON.parse(saved) as AppState : firstState()
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-      return state
-    } catch { return firstState() }
+    return transaction(value => migrateState(value))
   },
-  async saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true },
+  async saveState(state) { const previous = await transaction(); await transaction(value => applyChanges(value, diffState(previous, state))); return true },
+  async applyChanges(changes) { return transaction(value => applyChanges(value, changes)) },
+  async search(query) { return searchState(await transaction(), query) },
+  async backup() { const value = await transaction(); localStorage.setItem(`${STORAGE_KEY}-backup`, JSON.stringify(value)); return true },
   async pickResource() { return null },
   async openResource(resource) {
     if (resource.target === 'preview:figma') {

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .vite/
+.cache/
 .npm-cache/
 .history/
 *.log
@@ -8,4 +9,3 @@ dist/
 release/
 .env
 .env.*
-

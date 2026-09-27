@@ -1,0 +1,49 @@
+.app-shell.browsing { min-height: 0; height: 100dvh; overflow: hidden; background: #eef3ec; }
+.browsing .page-wrap { padding: 0; height: 100%; min-height: 0; gap: 0; }
+.browsing .browser-chrome { border-radius: 0; max-width: none; margin: 0; background: #eef3ec; }
+.browsing .chrome-main { height: 44px; min-height: 44px; padding: 4px 145px 4px 12px; gap: 12px; }
+.desktop .chrome-main { padding-right: 145px; }
+.desktop .browser-chrome { -webkit-app-region: drag; }
+.desktop .browser-chrome button, .desktop .browser-chrome input, .desktop .calm-omnibox, .desktop .chrome-spaces { -webkit-app-region: no-drag; }
+.browsing .chrome-main .brand { width: 90px; font-size: 18px; }
+.browsing .chrome-main .brand-mark { height: 28px; width: 28px; font-size: 19px; }
+.browsing .calm-omnibox { height: 34px; max-width: none; }
+.browsing .chrome-secondary { height: 44px; min-height: 44px; padding: 0 12px; gap: 12px; }
+.browsing .chrome-space { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.browsing .chrome-actions { gap: 3px; }
+.browsing .chrome-button span, .browsing .chrome-status { display: none; }
+.browser-navigation { display: flex; gap: 2px; align-items: center; }
+.browser-navigation button { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; }
+.browser-navigation button:hover { background: #dce7df; }
+.compact-stage { display: flex; flex-direction: row; border-radius: 0; background: #f7faf5; min-height: 0; }
+.browsing .workstage-container.compact-stage { margin: 0; border: 0; border-radius: 0; }
+.browsing:not(.desktop) .chrome-main, .browsing.platform-mac .chrome-main { padding-right: 12px; }
+.tab-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; padding: 8px; background: #eef3ec; border-right: 1px solid #d9e2d9; }
+.sidebar-collapsed .tab-sidebar { width: 48px; flex-basis: 48px; padding: 5px; }
+.tab-sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
+.tab-sidebar-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.tab-sidebar-heading button, .split-label button { padding: 6px; display: grid; place-items: center; }
+.tab-search { width: 100%; font-size: 14px; border-radius: 9px; padding: 8px; margin: 6px 0; background: #fff; }
+.vertical-tabs { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 3px; }
+.vertical-tabs .workstage-tab-wrap { display: flex; align-items: center; width: 100%; min-height: 38px; flex-shrink: 0; border-radius: 8px; }
+.vertical-tabs .workstage-tab-wrap.active { background: #fff; }
+.vertical-tabs .workstage-tab { width: 100%; min-width: 0; padding: 9px 7px; gap: 7px; font-size: 14px; border-radius: 8px; }
+.vertical-tabs .workstage-tab svg { flex: none; }
+.vertical-tabs .workstage-tab-title { flex: 1; text-align: left; text-overflow: ellipsis; overflow: hidden; }
+.vertical-tabs .tab-close { flex: none; margin: 0 4px; }
+.sidebar-collapsed .tab-close { display: none; }
+.vertical-tabs .home-return-btn { color: #355b47 !important; background: transparent !important; justify-content: flex-start; }
+.sidebar-collapsed .home-return-btn { display: none; }
+.vertical-tabs .new-tab-btn { width: 100%; min-height: 34px; border-radius: 8px; display: flex; gap: 8px; justify-content: flex-start; font-size: 14px; }
+.tab-sidebar-footer { border-top: 1px solid #d9e2d9; padding-top: 6px; display: grid; gap: 2px; }
+.tab-sidebar-footer button { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px; text-align: left; border-radius: 7px; }
+.tab-sidebar-footer button:hover { background: #dce7df; }
+.compact-stage .workstage-canvas { display: flex; flex: 1; width: 0; min-height: 0; padding: 0; gap: 1px; background: #d9e2d9; }
+.native-pane { display: flex; flex: 1; flex-direction: column; width: 0; min-height: 0; background: #f7faf5; }
+.native-viewport { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.native-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.native-status { position: absolute; top: 20px; left: 20px; font-size: 13px; color: #718073; }
+.split-label { display: flex; justify-content: space-between; align-items: center; height: 30px; padding-left: 12px; font-size: 12px; }
+.browsing .browser-handoff, .browsing .browser-start-screen { height: 100%; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.platform-mac .brand { margin-left: 64px; }

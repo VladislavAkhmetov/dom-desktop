@@ -551,3 +551,49 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
 
 @media (max-height: 730px) { .page-wrap { padding-top: 14px; padding-bottom: 12px; } .card { border-radius: 26px; } }
 
+
+
+.vscode-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #007acc; color: #ffffff; font-size: 13px; font-weight: 700; }
+.telegram-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #229ed9; color: #ffffff; font-size: 13px; font-weight: 700; }
+.notion-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #000000; color: #ffffff; font-size: 13px; font-weight: 700; font-family: serif; }
+.spotify-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #1db954; color: #000000; font-size: 13px; font-weight: 700; }
+.obsidian-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #7c3aed; color: #ffffff; font-size: 13px; font-weight: 700; }
+.slack-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #4a154b; color: #ecb22e; font-size: 13px; font-weight: 700; }
+.docs-mark { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 5px; background: #2684fc; color: #ffffff; font-size: 13px; font-weight: 700; }
+
+/* Quick app add popover */
+.quick-app-add-popover {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  right: 0;
+  width: 320px;
+  background: rgba(246, 250, 243, 0.96);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px -10px rgba(20, 50, 30, 0.22);
+  padding: 18px;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #284436;
+}
+.quick-app-add-header { display: flex; justify-content: space-between; align-items: center; }
+.quick-app-add-header strong { font-size: 15px; font-weight: 600; color: #1f3c2b; }
+.quick-app-add-close { width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, 0.05); color: #557062; cursor: pointer; display: grid; place-items: center; }
+.quick-app-add-close:hover { background: rgba(0, 0, 0, 0.1); color: #1f3c2b; }
+.quick-app-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; max-height: 220px; overflow-y: auto; }
+.quick-app-item-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(60, 95, 75, 0.12); background: rgba(255, 255, 255, 0.65); color: #294635; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s ease; }
+.quick-app-item-btn:hover { background: #ffffff; border-color: rgba(60, 95, 75, 0.3); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(30, 50, 35, 0.08); }
+.quick-app-custom-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(60, 95, 75, 0.12); padding-top: 12px; }
+.quick-app-custom-form input { padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(60, 95, 75, 0.18); background: rgba(255, 255, 255, 0.7); font-size: 13px; color: #1f3c2b; outline: none; }
+.quick-app-custom-form input:focus { background: #fff; border-color: #355e47; }
+.quick-app-custom-actions { display: flex; gap: 8px; }
+.quick-app-submit-btn { flex: 1; padding: 8px 14px; border-radius: 10px; border: none; background: #365e49; color: #ffffff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.quick-app-submit-btn:hover { background: #274937; }
+.quick-app-file-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px; border-radius: 10px; border: 1px dashed rgba(60, 95, 75, 0.3); background: rgba(255, 255, 255, 0.4); color: #385b48; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%; }
+.quick-app-file-btn:hover { background: rgba(255, 255, 255, 0.8); border-color: #355e47; }
+.app-footer-remove-btn { color: #8a4136 !important; }
+.app-footer-remove-btn:hover { background: rgba(180, 50, 40, 0.08) !important; color: #6e271e !important; }

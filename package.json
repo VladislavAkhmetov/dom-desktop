@@ -7,7 +7,13 @@
   "author": "Dom Team",
   "main": "electron/main.cjs",
   "scripts": {
+    "test": "vitest run && node scripts/test-storage.cjs",
+    "test:unit": "vitest run",
+    "test:storage": "node scripts/test-storage.cjs",
+    "test:browser": "npm run build && node scripts/test-browser.cjs",
+    "postinstall": "node --experimental-require-module ./node_modules/electron-builder/cli.js install-app-deps",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
+    "dev:web": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "start": "electron .",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
@@ -18,19 +24,24 @@
   },
   "dependencies": {
     "@fontsource/manrope": "^5.3.0",
+    "better-sqlite3": "^13.0.3",
+    "ical.js": "^2.2.1",
     "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.4",
     "electron": "^41.10.7",
     "electron-builder": "^26.15.3",
+    "jsdom": "^26.1.0",
     "typescript": "^7.0.2",
     "vite": "^6.4.3",
+    "vitest": "^4.1.11",
     "wait-on": "^8.0.5"
   }
 }

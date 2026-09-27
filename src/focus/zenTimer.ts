@@ -18,6 +18,7 @@ class ZenTimerManager {
   private listeners: Set<(state: ZenTimerState) => void> = new Set()
   private onCompleteCallback?: () => void
   private startedMusic = false
+  private endsAt = 0
 
   public subscribe(listener: (state: ZenTimerState) => void): () => void {
     this.listeners.add(listener)
@@ -50,6 +51,7 @@ class ZenTimerManager {
 
     this.durationMinutes = minutes
     this.remainingSeconds = minutes * 60
+    this.endsAt = Date.now() + minutes * 60000
     this.status = 'running'
     this.startedMusic = withMusic && !audioManager.getIsPlaying()
     this.notify()
@@ -59,8 +61,9 @@ class ZenTimerManager {
     }
 
     this.timerId = window.setInterval(() => {
-      if (this.remainingSeconds > 1) {
-        this.remainingSeconds -= 1
+      const seconds = Math.max(0, Math.ceil((this.endsAt - Date.now()) / 1000))
+      if (seconds > 0) {
+        this.remainingSeconds = seconds
         this.notify()
       } else {
         this.complete()
@@ -74,6 +77,8 @@ class ZenTimerManager {
       this.timerId = null
     }
     this.status = 'idle'
+    if (this.startedMusic) audioManager.pause()
+    this.startedMusic = false
     this.remainingSeconds = this.durationMinutes * 60
     this.notify()
   }

@@ -1,8 +1,39 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('dom', {
+  platform: process.platform,
   getState: () => ipcRenderer.invoke('state:get'),
   saveState: state => ipcRenderer.invoke('state:save', state),
+  applyChanges: changes => ipcRenderer.invoke('state:apply', changes),
+  search: query => ipcRenderer.invoke('state:search', query),
+  backup: () => ipcRenderer.invoke('state:backup'),
+  closeCapture: () => ipcRenderer.invoke('capture:close'),
+  integrations: {
+    configureGoogle: value => ipcRenderer.invoke('google:configure', value),
+    googleConfigured: () => ipcRenderer.invoke('google:configured'),
+    connectMail: () => ipcRenderer.invoke('gmail:connect'),
+    syncMail: id => ipcRenderer.invoke('gmail:sync', id),
+    disconnectMail: id => ipcRenderer.invoke('gmail:disconnect', id),
+    fetchFeed: url => ipcRenderer.invoke('feed:fetch', url),
+    readMaterial: id => ipcRenderer.invoke('material:read', id),
+    addCalendar: (name, url) => ipcRenderer.invoke('calendar:add', name, url),
+    fetchCalendarSource: id => ipcRenderer.invoke('calendar:source', id),
+    removeCalendar: id => ipcRenderer.invoke('calendar:remove', id),
+    configureAI: (value, key) => ipcRenderer.invoke('ai:configure', value, key),
+    runAI: request => ipcRenderer.invoke('ai:run', request),
+    cancelAI: id => ipcRenderer.invoke('ai:cancel', id),
+    onAI: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('ai:event', listener); return () => ipcRenderer.removeListener('ai:event', listener) }
+  },
+  browser: {
+    show: value => ipcRenderer.invoke('browser:show', value),
+    hide: id => ipcRenderer.invoke('browser:hide', id),
+    block: value => ipcRenderer.invoke('browser:block', value),
+    close: id => ipcRenderer.invoke('browser:close', id),
+    park: ids => ipcRenderer.invoke('browser:park', ids),
+    action: (id, action) => ipcRenderer.invoke('browser:action', id, action),
+    text: id => ipcRenderer.invoke('browser:text', id),
+    onEvent: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('browser:event', listener); return () => ipcRenderer.removeListener('browser:event', listener) }
+  },
   pickResource: kind => ipcRenderer.invoke('resource:pick', kind),
   openResource: resource => ipcRenderer.invoke('resource:open', resource),
   getAutostart: () => ipcRenderer.invoke('settings:getAutostart'),

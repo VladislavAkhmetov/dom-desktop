@@ -3,7 +3,7 @@ import { MoreHorizontal } from 'lucide-react'
 
 interface Action { label: string; icon: ReactNode; onSelect: () => void }
 
-export function ActionMenu({ label, actions }: { label: string; actions: Action[] }) {
+export function ActionMenu({ label, actions, triggerContent }: { label: string; actions: Action[]; triggerContent?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -28,7 +28,7 @@ export function ActionMenu({ label, actions }: { label: string; actions: Action[
       items[next]?.focus()
     }
   }}>
-    <button ref={trigger} className="task-more" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}><MoreHorizontal size={18} /></button>
+    <button ref={trigger} className={triggerContent ? 'menu-trigger' : 'task-more'} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}>{triggerContent || <MoreHorizontal size={18} />}</button>
     {open && <div className="action-menu-popover" id={id} role="menu" aria-label={label}>{actions.map(action => <button role="menuitem" key={action.label} onClick={() => { setOpen(false); trigger.current?.focus(); action.onSelect() }}>{action.icon}<span>{action.label}</span></button>)}</div>}
   </div>
 }

@@ -167,6 +167,16 @@ export function AppLauncherPopover({
       </div>
 
       {/* Нижняя панель действий */}
+      {onRemoveQuickApp && (
+        <button
+          className="app-footer-btn app-footer-remove-btn"
+          onClick={() => onRemoveQuickApp(app)}
+          title="Убрать из быстрого доступа"
+        >
+          <X size={13} />
+          <span>Убрать из панели</span>
+        </button>
+      )}
       <div className="app-popover-footer">
         {isFigma && (
           <>
@@ -208,7 +218,16 @@ export function AppLauncherPopover({
             <span>Выбрать файл...</span>
           </button>
         )}
-
+        {onRemoveQuickApp && (
+          <button
+            className="app-footer-btn app-footer-remove-btn"
+            onClick={() => onRemoveQuickApp(app)}
+            title="Убрать из быстрого доступа"
+          >
+            <X size={13} />
+            <span>Убрать из панели</span>
+          </button>
+        )}
       </div>
     </div>
   )

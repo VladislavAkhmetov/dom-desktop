@@ -9,6 +9,7 @@
   "files": [
     "dist/**/*",
     "electron/**/*",
+    "shared/**/*",
     "public/**/*",
     "package.json"
   ],
@@ -36,5 +37,9 @@
   },
   "portable": {
     "artifactName": "${productName}-${version}-Portable.exe"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.productivity"
   }
 }

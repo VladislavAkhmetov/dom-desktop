@@ -1,0 +1,18 @@
+.browser-chrome .chrome-secondary { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: center; }
+.chrome-spaces { overflow-x: auto; min-width: 0; scrollbar-width: none; white-space: nowrap; }
+.chrome-status { justify-self: end; }
+.attention-island { display: flex; align-items: center; gap: 8px; min-width: 160px; max-width: 270px; padding: 5px 9px; border-radius: 12px; background: #355b47; color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.3); -webkit-app-region: no-drag; }
+.attention-island > div { min-width: 0; }
+.attention-island strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; max-width: 150px; }
+.attention-island small { display: block; color: #dce8d8; font-size: 10px; }
+.attention-island button { display: flex; align-items: center; flex: none; color: #fff; font-size: 11px; padding: 4px; border-radius: 5px; }
+.attention-island button:hover { background: rgba(255,255,255,.15); }
+.island-idle { width: 8px; }
+.browser-chrome .chrome-secondary:has(.island-idle) { grid-template-columns: minmax(0,1fr) auto auto; }
+.browser-chrome .chrome-spaces { scrollbar-width: none; }
+.browser-chrome .chrome-spaces::-webkit-scrollbar { display: none; }
+.attention-island.live-hint { animation: island-nudge .45s ease-in-out 1; }
+.calm-plan-item.live-hint { animation: island-nudge .45s ease-in-out 1; }
+@keyframes island-nudge { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-1px); } 75% { transform: translateX(1px); } }
+.browsing .chrome-secondary { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); }
+@media (max-width: 1000px) { .chrome-status .chrome-weather { display: none; } .attention-island { max-width: 220px; } }

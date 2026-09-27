@@ -1,6 +1,7 @@
-import { ArrowUpRight, Globe2, Plus, X } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowUpRight, Globe2, Plus, X, PanelLeftClose, PanelLeftOpen, Pin, Archive, BookmarkPlus, GitBranch, FileInput } from 'lucide-react'
 import type { BrowserTab, ResearchSource, Resource, Space } from '../types'
-import { BrowserPane } from './BrowserPane'
+import { NativePane } from './NativePane'
 import './browser.css'
 
 export interface WorkstageProps {
@@ -19,6 +20,9 @@ export interface WorkstageProps {
   onOpenResource: (resource: Resource) => void
   onAddLink: () => void
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
+  onPark: () => void
+  onImport: () => void
+  onBranch: () => void
 }
 
 export function Workstage({
@@ -36,8 +40,13 @@ export function Workstage({
   onSaveTab,
   onOpenResource,
   onAddLink,
-  onUpdateTab
+  onUpdateTab,
+  onPark,
+  onImport,
+  onBranch
 }: WorkstageProps) {
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('dom-tab-sidebar') === 'collapsed')
+  const [search, setSearch] = useState('')
   const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0]
   const splitTab = tabs.find(tab => tab.id === splitTabId && tab.id !== activeTab?.id)
 
@@ -72,7 +81,7 @@ export function Workstage({
     }
 
     return (
-      <BrowserPane
+      <NativePane
         key={tab.id}
         tab={tab}
         space={space}
@@ -91,12 +100,15 @@ export function Workstage({
   }
 
   return (
-    <main className="workstage-container" aria-label={`Браузер · ${space.name}`}>
-      <div className="workstage-tabs-strip" role="tablist" aria-label="Открытые вкладки">
+    <main className={`workstage-container compact-stage ${collapsed ? 'sidebar-collapsed' : ''}`} aria-label={`Браузер · ${space.name}`}>
+      <aside className="tab-sidebar" aria-label="Вкладки пространства">
+        <div className="tab-sidebar-heading"><strong>{collapsed ? '' : space.name}</strong><button onClick={() => { setCollapsed(!collapsed); localStorage.setItem('dom-tab-sidebar', !collapsed ? 'collapsed' : 'expanded') }} title={collapsed ? 'Развернуть вкладки' : 'Свернуть вкладки'} aria-label={collapsed ? 'Развернуть вкладки' : 'Свернуть вкладки'}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button></div>
+        {!collapsed && <input className="tab-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Найти вкладку" aria-label="Найти вкладку" />}
+        <div className="vertical-tabs" role="tablist" aria-label="Открытые вкладки">
         <button className="workstage-tab home-return-btn" onClick={onGoHome} title="Вернуться в Дом">
           ✳ дом.
         </button>
-        {tabs.map(tab => (
+        {tabs.filter(tab => `${tab.title} ${tab.url}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))).map(tab => (
           <div
             className={`workstage-tab-wrap ${tab.id === activeTab?.id ? 'active' : ''} ${tab.id === splitTab?.id ? 'split-active' : ''}`}
             key={tab.id}
@@ -109,7 +121,7 @@ export function Workstage({
               title={tab.title || tab.url || 'Новая вкладка'}
             >
               <Globe2 size={16} />
-              <span className="workstage-tab-title">{tab.title || tab.url || 'Новая вкладка'}</span>
+              {!collapsed && <span className="workstage-tab-title">{tab.pinned ? '• ' : ''}{tab.title || tab.url || 'Новая вкладка'}{tab.protected ? ' · не завершено' : ''}</span>}
             </button>
             <button
               className="tab-close"
@@ -122,9 +134,16 @@ export function Workstage({
           </div>
         ))}
         <button className="new-tab-btn" onClick={onAddTab} title="Новая вкладка" aria-label="Новая вкладка">
-          <Plus size={18} />
+          <Plus size={18} />{!collapsed && 'Новая вкладка'}
         </button>
-      </div>
+        </div>
+        <div className="tab-sidebar-footer">
+          {activeTab?.parentTabId && tabs.some(tab => tab.id === activeTab.parentTabId) && <button onClick={() => onSelectTab(activeTab.parentTabId!)} title="Вернуться к исходной вкладке"><ArrowUpRight size={17} />{!collapsed && 'К исходной вкладке'}</button>}
+          <button onClick={onPark} title="Сохранить и прибрать"><Archive size={17} />{!collapsed && 'Сохранить и прибрать'}</button>
+          {activeTab?.url && <><button onClick={() => onSaveTab(activeTab)} title="Сохранить в материалы"><BookmarkPlus size={17} />{!collapsed && 'В материалы'}</button><button onClick={() => onUpdateTab?.(activeTab.id, { pinned: !activeTab.pinned })} title="Закрепить вкладку"><Pin size={17} />{!collapsed && (activeTab.pinned ? 'Открепить' : 'Закрепить')}</button><button onClick={onBranch} title="Открыть отдельную ветку"><GitBranch size={17} />{!collapsed && 'Отдельная ветка'}</button></>}
+          <button onClick={onImport} title="Перенести вкладки"><FileInput size={17} />{!collapsed && 'Перенести вкладки'}</button>
+        </div>
+      </aside>
       <div className={`workstage-canvas ${splitTab ? 'split' : ''}`}>
         {pane(activeTab)}
         {splitTab && pane(splitTab, true)}

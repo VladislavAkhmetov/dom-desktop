@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Проверочный выпуск Дома</title>
+  <link>https://example.com/dom-preview</link>
+  <description>Вымышленные материалы для проверки браузерного интерфейса.</description>
+  <item><title>Проверка RSS: заметка о следующем шаге</title><link>https://example.com/dom-preview/next-step</link><description><![CDATA[<p>Перед перерывом можно записать одно следующее действие. Этот материал — тестовая запись для проверки RSS, а не публикация редакции.</p>]]></description><pubDate>Sun, 27 Sep 2026 05:00:00 GMT</pubDate></item>
+  <item><title>Проверка RSS: материалы по пространствам</title><link>https://example.com/dom-preview/spaces</link><description>Второй тестовый материал проверяет сортировку и короткое описание в карточке.</description><pubDate>Sun, 27 Sep 2026 04:00:00 GMT</pubDate></item>
+</channel></rss>

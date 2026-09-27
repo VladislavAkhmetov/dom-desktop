@@ -48,7 +48,17 @@ export function exampleDay(): AppState {
       { id: 'example-personal', title: 'Забрать заказ по дороге домой', createdAt, dueAt: at(20), done: false },
       { id: 'example-note', title: 'В выходные попробовать новый маршрут для прогулки', createdAt, dueAt: null, done: false }
     ],
-    events: [{ id: 'example-meeting', title: 'Разговор с командой', startAt: at(19), endAt: at(19, 30), category: 'meeting' }]
+    events: [{ id: 'example-meeting', title: 'Разговор с командой', startAt: at(19), endAt: at(19, 30), category: 'meeting' }],
+    mailAccounts: [{ id: 'example-mail', email: 'demo@example.com', importantSenders: ['team@example.com'], lastSyncedAt: createdAt }],
+    mailMessages: [
+      { id: 'example-mail-1', accountId: 'example-mail', gmailId: 'example-1', threadId: 'example-1', from: 'Команда <team@example.com>', subject: 'Пример: материалы к обсуждению', snippet: 'Собрали вопросы к встрече. Посмотрите два варианта главной и оставьте комментарий к тому, который легче читать.', receivedAt: at(8, 30), unread: true, important: true, url: 'https://example.com/demo/meeting' },
+      { id: 'example-mail-2', accountId: 'example-mail', gmailId: 'example-2', threadId: 'example-2', from: 'Мастерская <studio@example.com>', subject: 'Пример: время занятия', snippet: 'Занятие начнётся в субботу в 12:00. Можно прийти на десять минут раньше, чтобы выбрать материалы.', receivedAt: yAt(17), unread: true, important: false, url: 'https://example.com/demo/workshop' }
+    ],
+    newsEditions: [{ id: 'example-edition', createdAt, articles: [
+      { id: 'example-news-1', title: 'Пример: как вернуться к делу после перерыва', url: 'https://example.com/demo/return', source: 'Демонстрационный источник', summary: 'В этом примере статья предлагает оставить короткую заметку о следующем шаге перед завершением работы. На карточке виден фрагмент; полный материал открывается отдельно.', publishedAt: createdAt },
+      { id: 'example-news-2', title: 'Пример: прогулка на выходных', url: 'https://example.com/demo/walk', source: 'Демонстрационный источник', summary: 'Пример личной подборки: маршрут на пару часов, удобный транспорт и место, где можно остановиться на кофе.', publishedAt: createdAt },
+      { id: 'example-news-3', title: 'Пример: находки для нового проекта', url: 'https://example.com/demo/project', source: 'Демонстрационный источник', summary: 'Небольшая подборка идей для проекта. Этот выпуск демонстрирует размер карточки и подробность описания и не содержит настоящих новостей.', publishedAt: createdAt }
+    ] }]
   }
 }
 
