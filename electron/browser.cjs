@@ -4,17 +4,21 @@ const path = require('node:path')
 function validURL(value) { try { return ['https:', 'http:'].includes(new URL(value).protocol) } catch { return false } }
 
 class BrowserManager {
-  constructor(window) {
+  constructor(window, partitionName = 'persist:dom-browser') {
     this.window = window
     this.tabs = new Map()
     this.blocked = false
-    const profile = session.fromPartition('persist:dom-browser')
+    this.partition = partitionName
+    const profile = session.fromPartition(partitionName)
     profile.setPermissionRequestHandler(async (contents, permission, callback, details) => {
       if (!['media', 'geolocation', 'notifications', 'clipboard-read'].includes(permission)) return callback(false)
       let hostname
       try { hostname = new URL(contents.getURL()).hostname } catch { return callback(false) }
       const result = await dialog.showMessageBox(this.window, { type: 'question', title: 'Разрешение сайта', message: `${hostname} запрашивает доступ: ${permission}`, detail: details.mediaTypes?.join(', ') || '', buttons: ['Не разрешать', 'Разрешить'], defaultId: 0, cancelId: 0 })
       callback(result.response === 1)
+    })
+    profile.setPermissionCheckHandler((_contents, permission) => {
+      return ['media', 'geolocation', 'notifications', 'clipboard-read'].includes(permission)
     })
     profile.on('will-download', (_event, item) => item.setSaveDialogOptions({ title: 'Сохранить загрузку', defaultPath: item.getFilename() }))
   }
@@ -24,7 +28,7 @@ class BrowserManager {
     if (!tab || typeof tab.id !== 'string' || typeof spaceId !== 'string' || !validURL(tab.url)) return
     let record = this.tabs.get(tab.id)
     if (!record) {
-      const view = new WebContentsView({ webPreferences: { partition: 'persist:dom-browser', preload: path.join(__dirname, 'page-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } })
+      const view = new WebContentsView({ webPreferences: { partition: this.partition, preload: path.join(__dirname, 'page-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } })
       record = { id: tab.id, spaceId, view, url: tab.url, desired: true, protected: false, bounds }
       this.tabs.set(tab.id, record)
       this.window.contentView.addChildView(view)
@@ -32,12 +36,19 @@ class BrowserManager {
       const contents = view.webContents
       contents.setUserAgent(contents.getUserAgent().replace(/Electron\/\S+\s?/g, ''))
       const navigate = (_event, url) => { record.url = url; this.metadata(record, { url, lastAccessedAt: new Date().toISOString(), error: undefined }) }
+      contents.on('will-navigate', (event, url) => { if (!validURL(url)) event.preventDefault() })
+      contents.on('will-redirect', (event, url) => { if (!validURL(url)) event.preventDefault() })
       contents.on('did-navigate', navigate)
       contents.on('did-navigate-in-page', navigate)
       contents.on('did-start-loading', () => this.metadata(record, { error: undefined }))
       contents.on('page-title-updated', (_event, title) => this.metadata(record, { title }))
       contents.on('page-favicon-updated', (_event, icons) => { if (icons[0]) this.metadata(record, { favicon: icons[0] }) })
       contents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => { if (isMainFrame && code !== -3) this.metadata(record, { error: description }) })
+      contents.on('certificate-error', (event, _url, error, _cert, callback) => {
+        event.preventDefault()
+        callback(false)
+        this.metadata(record, { error: `Ошибка безопасности SSL: ${error}` })
+      })
       contents.on('render-process-gone', () => this.metadata(record, { error: 'Страница остановлена. Обновите её, чтобы продолжить.' }))
       contents.setWindowOpenHandler(({ url, disposition }) => {
         if (validURL(url)) this.send({ type: 'new-tab', spaceId: record.spaceId, parentTabId: record.id, url, background: disposition === 'background-tab' })
@@ -46,7 +57,7 @@ class BrowserManager {
       contents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown' || !(input.control || input.meta)) return
         const key = input.key.toLowerCase()
-        if (['l', 'k', 't', 'w', 'tab'].includes(key) || (input.alt && input.code === 'Space')) {
+        if (['d', 'l', 'k', 't', 'w', 'tab', 'h'].includes(key) || (key === 'a' && input.shift) || (input.alt && input.code === 'Space')) {
           event.preventDefault(); this.window.webContents.focus(); this.send({ type: 'shortcut', key, shift: input.shift, alt: input.alt })
         }
       })
@@ -56,19 +67,31 @@ class BrowserManager {
       record.url = tab.url
       record.view.webContents.loadURL(tab.url).catch(() => undefined)
     }
+    record.spaceId = spaceId
     record.desired = true
     record.bounds = { x: Math.max(0, Math.round(bounds.x)), y: Math.max(0, Math.round(bounds.y)), width: Math.max(1, Math.round(bounds.width)), height: Math.max(1, Math.round(bounds.height)) }
     record.view.setBounds(record.bounds)
     record.view.setVisible(!this.blocked)
   }
-  hide(id) { const record = this.tabs.get(id); if (record) { record.desired = false; record.view.setVisible(false) } }
+  move(id, spaceId) { const record = this.tabs.get(id); if (record && typeof spaceId === 'string') record.spaceId = spaceId }
+  hide(id) {
+    const record = this.tabs.get(id)
+    if (!record) return
+    if (record.desired && !record.view.webContents.isDestroyed()) record.view.webContents.capturePage().then(frame => {
+      if (this.tabs.get(id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: id, image: frame.resize({ width: Math.min(1000, frame.getSize().width) }).toDataURL() })
+    }).catch(() => undefined)
+    record.desired = false
+    record.view.setVisible(false)
+  }
   async block(value) {
     if (this.blocked === Boolean(value)) return
     this.blocked = Boolean(value)
     for (const record of this.tabs.values()) {
       if (this.blocked && record.desired) {
         // The trusted UI gets a frozen page while the native page is blocked.
-        record.view.webContents.capturePage().then(frame => this.send({ type: 'cover', tabId: record.id, image: frame.toDataURL() })).catch(() => undefined)
+        record.view.webContents.capturePage().then(frame => {
+          if (this.tabs.get(record.id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: record.id, image: frame.resize({ width: Math.min(1000, frame.getSize().width) }).toDataURL() })
+        }).catch(() => undefined)
       }
       record.view.setVisible(record.desired && !this.blocked)
     }
@@ -108,6 +131,17 @@ class BrowserManager {
     if (!record) return
     record.protected = Boolean(signal.dirty || signal.playing)
     this.metadata(record, { protected: record.protected, scrollY: Math.max(0, Number(signal.scrollY) || 0) })
+  }
+  passwordOffer(sender, data) {
+    const record = [...this.tabs.values()].find(item => item.view.webContents.id === sender.id)
+    if (!record || !data || !data.origin || !data.password) return
+    this.send({
+      type: 'password-offer',
+      origin: data.origin,
+      username: data.username || '',
+      password: data.password,
+      title: data.title || ''
+    })
   }
   action(id, action) {
     const contents = this.tabs.get(id)?.view.webContents

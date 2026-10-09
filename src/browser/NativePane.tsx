@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, FileText, Globe2, Plus, RotateCw, X } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { ArrowUpRight, Globe2, RotateCw, X } from 'lucide-react'
 import { bridge } from '../bridge'
 import type { BrowserPaneProps } from './BrowserPane'
-import { recentMaterials, resourceAppLabel } from '../resourcePresentation'
+import { NewPage } from './NewPage'
+import { isCabinetPreview } from '../cabinetMode'
 
-export function NativePane({ tab, space, isSplit, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onSelectQuickUrl }: BrowserPaneProps) {
+export function NativePane({ tab, space, isSplit, isPaired, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onNavigate, onFocusAddress }: BrowserPaneProps) {
   const viewport = useRef<HTMLDivElement>(null)
   const [cover, setCover] = useState('')
-  useEffect(() => {
+  const prototypeUrl = tab?.url && !bridge.browser && (() => { try { const url = new URL(tab.url); return url.origin === window.location.origin && (url.pathname === '/prototype/weekend.html' || isCabinetPreview && url.pathname === '/assets/moodboard/index.html') ? url.href : null } catch { return null } })()
+  useLayoutEffect(() => {
     if (!tab || !bridge.browser || !/^https?:\/\//i.test(tab.url) || tab.error) { if (tab?.error) bridge.browser?.hide(tab.id); return }
     const element = viewport.current!
     const show = () => { const bounds = element.getBoundingClientRect(); bridge.browser!.show({ tab, spaceId: space.id, bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } }).catch(() => undefined) }
@@ -17,13 +19,13 @@ export function NativePane({ tab, space, isSplit, onCloseSplit, onOpenExternal, 
     window.addEventListener('resize', show)
     const off = bridge.browser.onEvent(event => { if (event.type === 'cover' && event.tabId === tab.id) setCover(event.image) })
     return () => { observer.disconnect(); window.removeEventListener('resize', show); off(); bridge.browser?.hide(tab.id) }
-  }, [tab?.id, tab?.url, tab?.error, space.id])
+  }, [tab?.id, tab?.url, tab?.error, space.id, isSplit, isPaired])
   return <section className="native-pane" aria-label={isSplit ? 'Страница рядом' : 'Текущая страница'}>
-    {isSplit && <div className="split-label"><span>{tab?.title || 'Страница рядом'}</span><button onClick={onCloseSplit} aria-label="Закрыть просмотр рядом"><X size={16} /></button></div>}
-    <div className="native-viewport" ref={viewport}>
+    {(isPaired || isSplit) && <div className="split-label"><span>{tab?.title || 'Страница рядом'}</span>{isSplit && <button onClick={onCloseSplit} aria-label="Закрыть просмотр рядом"><X size={18} /></button>}</div>}
+    <div className="native-viewport" ref={viewport} data-workspace-tab-id={tab?.id}>
       {tab?.error ? <div className="browser-handoff"><h2>Не удалось открыть страницу</h2><p>{tab.error}</p><button className="resume-primary" onClick={() => bridge.browser?.action(tab.id, 'reload')}><RotateCw size={16} /> Попробовать снова</button></div>
-      : tab?.url ? bridge.browser ? <>{cover && <img className="native-cover" src={cover} alt="" />}<span className="native-status">{tab.title}</span></> : <div className="browser-handoff"><Globe2 size={28} /><h2>{tab.title}</h2><p>Просмотр сайтов внутри Дома доступен в настольной версии.<br />В этом прототипе ссылка откроется в соседней вкладке.</p><button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть сайт <ArrowUpRight size={17} /></button></div>
-      : <div className="browser-start-screen"><div className="browser-start-card"><span className="browser-start-eyebrow">Материалы пространства</span><h2>{space.name}</h2><p>Введите адрес сверху или продолжите с сохранённого материала.</p><div className="browser-materials">{recentMaterials(space.resources).filter(item => !item.completedAt).slice(0, 6).map(item => <button className="browser-material" key={item.id} onClick={() => item.kind === 'link' ? onSelectQuickUrl?.(item.target, item.name) : onOpenResource(item)}>{item.kind === 'link' ? <Globe2 size={19} /> : <FileText size={19} />}<span><strong>{item.name}</strong><small>{resourceAppLabel(item)}</small></span><ArrowUpRight size={15} /></button>)}</div><button className="browser-add-material" onClick={onAddLink}><Plus size={17} /> Сохранить ссылку</button></div></div>}
+      : tab?.url ? bridge.browser ? <>{cover && <img className="native-cover" src={cover} alt="" />}</> : prototypeUrl ? <iframe className="prototype-page" title={tab.title || 'Страница пространства'} src={prototypeUrl} sandbox="allow-same-origin" /> : <div className="browser-handoff"><Globe2 size={32} /><h2>{tab.title}</h2><button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть в браузере <ArrowUpRight size={20} /></button></div>
+      : <NewPage space={space} autoFocus={!isSplit} onOpen={(address, title) => onNavigate?.(address, title)} onOpenResource={onOpenResource} onAddLink={onAddLink} onFocusAddress={onFocusAddress} />}
     </div>
   </section>
 }

@@ -11,6 +11,7 @@ export interface BrowserPaneProps {
   tab?: BrowserTab
   space: Space
   isSplit?: boolean
+  isPaired?: boolean
   onCloseSplit?: () => void
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
   onSaveTab: (tab: BrowserTab) => void
@@ -18,6 +19,9 @@ export interface BrowserPaneProps {
   onOpenResource: (resource: Resource) => void
   onAddLink: () => void
   onSelectQuickUrl?: (url: string, title?: string) => void
+  onAddTab?: () => void
+  onFocusAddress?: () => void
+  onNavigate?: (address: string, title?: string) => void
 }
 
 interface WebviewElement extends HTMLElement {
@@ -245,8 +249,7 @@ export function BrowserPane({
             <div className="browser-handoff">
               <Globe2 size={28} strokeWidth={1.5} />
               <h2>{tab.title || displayHost}</h2>
-              <p>В веб-прототипе сайт откроется в соседней вкладке.<br />Материалы пространства останутся здесь.</p>
-              <button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть сайт <ArrowUpRight size={17} /></button>
+              <button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть в браузере <ArrowUpRight size={17} /></button>
             </div>
           )
         ) : (
@@ -255,7 +258,6 @@ export function BrowserPane({
             <div className="browser-start-card">
               <span className="browser-start-eyebrow">Материалы пространства</span>
               <h2>{space.name}</h2>
-              <p className="browser-start-sub">Поиск и адрес сайта — в строке сверху. Или вернитесь к своему материалу.</p>
               <div className="browser-materials">
                 {recentMaterials(space.resources).filter(resource => !resource.completedAt).slice(0, 6).map(resource => <button key={resource.id}
                   className="browser-material" onClick={() => resource.kind === 'link' ? onSelectQuickUrl?.(resource.target, resource.name) : onOpenResource(resource)}>

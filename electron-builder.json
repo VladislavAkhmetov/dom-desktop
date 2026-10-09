@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "com.dom.desktop",
-  "productName": "Дом",
+  "appId": "com.dombro.desktop",
+  "productName": "dombro",
   "directories": {
     "output": "release",
     "buildResources": "build"
@@ -32,7 +32,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Дом",
+    "shortcutName": "dombro",
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "portable": {
@@ -41,5 +41,6 @@
   "mac": {
     "target": ["dmg", "zip"],
     "category": "public.app-category.productivity"
-  }
+  },
+  "publish": null
 }

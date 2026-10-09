@@ -1,9 +1,9 @@
 {
-  "name": "dom-desktop",
+  "name": "dombro",
   "private": true,
   "type": "module",
   "version": "0.1.0",
-  "description": "Спокойный стартовый экран для работы и жизни",
+  "description": "dombro — спокойный рабочий дашборд и браузер для жизни и работы",
   "author": "Dom Team",
   "main": "electron/main.cjs",
   "scripts": {
@@ -11,15 +11,19 @@
     "test:unit": "vitest run",
     "test:storage": "node scripts/test-storage.cjs",
     "test:browser": "npm run build && node scripts/test-browser.cjs",
+    "test:cabinet-native": "npm run build && node scripts/test-cabinet-native.cjs",
     "postinstall": "node --experimental-require-module ./node_modules/electron-builder/cli.js install-app-deps",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
+    "dev:cabinet": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev --cabinet-pilot\"",
     "dev:web": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "start": "electron .",
+    "start:cabinet": "electron . --cabinet-pilot",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
     "pack": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --dir",
     "dist": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js",
     "dist:portable": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --win portable",
+    "dist:portable:cabinet": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --config electron-builder.cabinet.json --win portable",
     "dist:setup": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --win nsis"
   },
   "dependencies": {
@@ -27,6 +31,7 @@
     "better-sqlite3": "^13.0.3",
     "ical.js": "^2.2.1",
     "lucide-react": "^1.47.0",
+    "motion": "^14.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

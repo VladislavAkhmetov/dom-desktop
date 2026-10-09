@@ -16,7 +16,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .page-wrap { padding: 18px 28px 22px; }
 .browser-chrome { flex: none; width: 100%; max-width: 1600px; margin: 0 auto 24px; border-radius: 16px; background: rgba(244, 249, 246, .86); backdrop-filter: blur(24px); color: var(--ink); }
 .chrome-main { display: flex; align-items: center; gap: 24px; min-height: 62px; padding: 8px 18px; }
-.browser-chrome .brand { flex: none; width: 112px; font-size: var(--text-title); color: #2e453b; }
+.browser-chrome .brand { flex: none; width: auto; font-size: var(--text-title); color: #2e453b; }
 .browser-chrome .brand-mark { width: 32px; height: 32px; border-radius: 10px; background: #385f4e; font-size: var(--text-title); }
 .browser-chrome .brand-dot { color: #385f4e; }
 .browser-chrome .calm-omnibox { height: 39px; width: auto; flex: 1; max-width: 720px; margin: 0 auto; border-radius: 9px; background: rgba(255,255,255,.65); padding: 0 14px; backdrop-filter: none; }

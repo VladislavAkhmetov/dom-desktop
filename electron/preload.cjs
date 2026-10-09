@@ -1,7 +1,12 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
+const isCabinetPilot =
+  !process.argv.includes('--legacy-pilot') &&
+  (typeof window === 'undefined' || !window.location.search.includes('cabinet=0'))
+
 contextBridge.exposeInMainWorld('dom', {
   platform: process.platform,
+  cabinetPilot: isCabinetPilot,
   getState: () => ipcRenderer.invoke('state:get'),
   saveState: state => ipcRenderer.invoke('state:save', state),
   applyChanges: changes => ipcRenderer.invoke('state:apply', changes),
@@ -24,9 +29,16 @@ contextBridge.exposeInMainWorld('dom', {
     cancelAI: id => ipcRenderer.invoke('ai:cancel', id),
     onAI: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('ai:event', listener); return () => ipcRenderer.removeListener('ai:event', listener) }
   },
+  vault: {
+    listCredentials: origin => ipcRenderer.invoke('vault:credentials:list', origin),
+    saveCredential: cred => ipcRenderer.invoke('vault:credentials:save', cred),
+    removeCredential: id => ipcRenderer.invoke('vault:credentials:remove', id),
+    importCredentials: csv => ipcRenderer.invoke('vault:credentials:import', csv)
+  },
   browser: {
     show: value => ipcRenderer.invoke('browser:show', value),
     hide: id => ipcRenderer.invoke('browser:hide', id),
+    move: (id, spaceId) => ipcRenderer.invoke('browser:move', id, spaceId),
     block: value => ipcRenderer.invoke('browser:block', value),
     close: id => ipcRenderer.invoke('browser:close', id),
     park: ids => ipcRenderer.invoke('browser:park', ids),

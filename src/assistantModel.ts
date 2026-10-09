@@ -16,6 +16,6 @@ export const defaultAssistantPreferences: AssistantPreferences = {
 
 export const assistantRoles = {
   chat: { label: 'Чат', title: 'Обсудить и разобраться', description: 'Отвечает на ваши сообщения. Контекст можно добавить к конкретному запросу.' },
-  helper: { label: 'Помощник', title: 'Помочь с текущим делом', description: 'Использует выбранный контекст дашборда и браузера. Предлагает шаги; вы решаете, что применить.' },
-  agent: { label: 'Агент', title: 'Поручить результат', description: 'Выполняет согласованные задачи в дашборде и браузере. Показывает ход работы и результат.' }
+  helper: { label: 'Разобрать материалы', title: 'Помочь с текущим делом', description: 'Использует выбранный контекст дашборда и браузера. Предлагает шаги; вы решаете, что применить.' },
+  agent: { label: 'Предложить действия', title: 'Поручить результат', description: 'Выполняет согласованные задачи в дашборде и браузере. Показывает ход работы и результат.' }
 } satisfies Record<AssistantRole, { label: string; title: string; description: string }>

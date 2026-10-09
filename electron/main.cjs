@@ -12,9 +12,26 @@ const { pathToFileURL } = require('node:url')
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173'
 const isDev = process.argv.includes('--dev')
 const isSmoke = process.argv.includes('--smoke-test')
+const isCabinetPilot =
+  !process.argv.includes('--legacy-pilot') &&
+  process.env.DOM_LEGACY_PILOT !== '1'
+
+const isDedicatedPilotProfile =
+  process.argv.includes('--cabinet-pilot') ||
+  process.env.DOM_CABINET_PILOT === '1' ||
+  path.basename(process.execPath || '').toLowerCase().includes('cabinet') ||
+  Boolean(process.env.PORTABLE_EXECUTABLE_FILE && path.basename(process.env.PORTABLE_EXECUTABLE_FILE).toLowerCase().includes('cabinet'))
+
+const customUserData = process.argv.find(value => /^--user-data-dir=/.test(value))?.split('=')[1]
+
 if (isSmoke) {
   const id = process.argv.find(value => /^--smoke-id=\d+$/.test(value))?.split('=')[1] || String(process.pid)
   const directory = path.join(app.getPath('temp'), `dom-smoke-${id}`)
+  fs.mkdirSync(directory, { recursive: true }); app.setPath('userData', directory)
+} else if (customUserData) {
+  fs.mkdirSync(customUserData, { recursive: true }); app.setPath('userData', customUserData)
+} else if (isDedicatedPilotProfile) {
+  const directory = path.join(app.getPath('appData'), 'dombro-cabinet-pilot')
   fs.mkdirSync(directory, { recursive: true }); app.setPath('userData', directory)
 }
 let mainWindow
@@ -82,15 +99,19 @@ trustedHandle('calendar:remove', async (_event, id) => { vault.set(`calendar:${i
 trustedHandle('ai:configure', (_event, value, key) => ai.configure(value, key))
 trustedHandle('ai:run', (event, request) => ai.run(request, value => { if (!event.sender.isDestroyed()) event.sender.send('ai:event', value) }))
 trustedHandle('ai:cancel', (_event, id) => ai.cancel(id))
+trustedHandle('vault:credentials:list', (_event, origin) => vault.getCredentials(origin))
+trustedHandle('vault:credentials:save', (_event, cred) => vault.saveCredential(cred))
+trustedHandle('vault:credentials:remove', (_event, id) => vault.removeCredential(id))
+trustedHandle('vault:credentials:import', (_event, csv) => vault.importCredentialsCsv(csv))
 
 async function showCapture() {
   if (!captureWindow || captureWindow.isDestroyed()) {
-    captureWindow = new BrowserWindow({ width: 580, height: 520, show: false, frame: false, resizable: false, skipTaskbar: true, alwaysOnTop: true, backgroundColor: '#f5f8f2', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } })
+    captureWindow = new BrowserWindow({ width: 580, height: 520, show: false, frame: false, resizable: false, skipTaskbar: true, alwaysOnTop: true, backgroundColor: '#f5f8f2', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, additionalArguments: isCabinetPilot ? ['--cabinet-pilot'] : [] } })
     captureWindow.on('close', event => { if (!quitting) { event.preventDefault(); captureWindow.hide() } })
     captureWindow.webContents.on('will-navigate', (event, url) => { if (!trustedURL(url)) event.preventDefault() })
     captureWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-    if (isDev) await captureWindow.loadURL(`${DEV_URL}/#capture`)
-    else await captureWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'capture' })
+    if (isDev) await captureWindow.loadURL(isCabinetPilot ? `${DEV_URL}/?cabinet=1#capture` : `${DEV_URL}/#capture`)
+    else await captureWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), isCabinetPilot ? { search: 'cabinet=1', hash: 'capture' } : { hash: 'capture' })
   }
   if (!isSmoke) { captureWindow.show(); captureWindow.focus() }
 }
@@ -122,7 +143,7 @@ function createWindow() {
     height: 920,
     minWidth: 900,
     minHeight: 650,
-    title: 'Дом',
+    title: isCabinetPilot ? 'dombro (кабинеты)' : 'dombro',
     icon: fs.existsSync(appIcon) ? appIcon : getAssetPath('tray.png'),
     backgroundColor: '#a4b8ac',
     autoHideMenuBar: true,
@@ -132,10 +153,11 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      additionalArguments: isCabinetPilot ? ['--cabinet-pilot'] : []
     }
   })
-  browser = new BrowserManager(mainWindow)
+  browser = new BrowserManager(mainWindow, isCabinetPilot ? 'persist:dom-cabinet-browser' : 'persist:dom-browser')
   mainWindow.on('close', event => {
     if (!quitting) {
       event.preventDefault()
@@ -150,16 +172,16 @@ function createWindow() {
     if (!trustedURL(url)) { event.preventDefault(); if (/^https?:\/\//i.test(url)) shell.openExternal(url) }
   })
   mainWindow.webContents.on('did-fail-load', (_event, code, description) => console.error('UI load failed:', code, description))
-  if (isDev) mainWindow.loadURL(DEV_URL)
-  else mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  if (isDev) mainWindow.loadURL(isCabinetPilot ? `${DEV_URL}?cabinet=1` : DEV_URL)
+  else mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), isCabinetPilot ? { search: 'cabinet=1' } : undefined)
 }
 
 function createTray() {
   const icon = nativeImage.createFromPath(getAssetPath('tray.png'))
   tray = new Tray(icon)
-  tray.setToolTip('Дом — всё нужное рядом')
+  tray.setToolTip('dombro — всё нужное рядом')
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Открыть Дом', click: showWindow },
+    { label: 'Открыть dombro', click: showWindow },
     { type: 'separator' },
     { label: 'Выйти', click: () => { quitting = true; app.quit() } }
   ]))
@@ -181,8 +203,8 @@ async function checkReminders() {
     broadcastState(next)
     if (Notification.isSupported()) {
       const all = [...due.map(item => item.title), ...events.map(item => `Скоро: ${item.title}`)]
-      const bodies = all.length > 3 ? [`Напоминаний: ${all.length}. Откройте Дом, чтобы посмотреть.`] : all
-      for (const body of bodies) { const notification = new Notification({ title: 'Дом напоминает', body, silent: true }); notification.on('click', showWindow); notification.show() }
+      const bodies = all.length > 3 ? [`Напоминаний: ${all.length}. Откройте dombro, чтобы посмотреть.`] : all
+      for (const body of bodies) { const notification = new Notification({ title: 'dombro напоминает', body, silent: true }); notification.on('click', showWindow); notification.show() }
     }
   } catch (error) { console.error('Reminder check failed:', error.message) }
   finally { checkingReminders = false }
@@ -240,12 +262,14 @@ trustedHandle('window:show', () => { showWindow(); return true })
 trustedHandle('capture:close', () => captureWindow?.hide())
 trustedHandle('browser:show', (_event, value) => browser.show(value))
 trustedHandle('browser:hide', (_event, id) => browser.hide(id))
+trustedHandle('browser:move', (_event, id, spaceId) => browser.move(id, spaceId))
 trustedHandle('browser:block', (_event, value) => browser.block(value))
 trustedHandle('browser:close', (_event, id) => browser.close(id))
 trustedHandle('browser:park', (_event, ids) => browser.park(ids))
 trustedHandle('browser:action', (_event, id, action) => browser.action(id, action))
 trustedHandle('browser:text', (_event, id) => browser.text(id))
 ipcMain.on('page:signal', (event, value) => browser?.pageSignal(event.sender, value))
+ipcMain.on('page:password-offer', (event, value) => browser?.passwordOffer(event.sender, value))
 
 const gotTheLock = app.requestSingleInstanceLock()
 

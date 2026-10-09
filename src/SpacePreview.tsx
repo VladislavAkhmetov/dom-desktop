@@ -5,7 +5,7 @@ export function spaceContents(space: Space) {
   const tabs = space.activeSession?.tabs.filter(tab => tab.url).length || 0
   const materials = space.resources.length
   const count = (value: number, forms: string[]) => `${value} ${forms[value % 100 >= 11 && value % 100 <= 14 ? 2 : value % 10 === 1 ? 0 : value % 10 >= 2 && value % 10 <= 4 ? 1 : 2]}`
-  return [tabs ? count(tabs, ['вкладка', 'вкладки', 'вкладок']) : '', materials ? count(materials, ['материал', 'материала', 'материалов']) : ''].filter(Boolean).join(' · ') || 'Можно начать с одной ссылки'
+  return [tabs ? count(tabs, ['вкладка', 'вкладки', 'вкладок']) : '', materials ? count(materials, ['материал', 'материала', 'материалов']) : ''].filter(Boolean).join(' · ')
 }
 
 /** A small, decorative view of the actual resource types in a space. */

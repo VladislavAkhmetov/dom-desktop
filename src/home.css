@@ -284,7 +284,7 @@
 .calm-app-icon { display: grid; place-items: center; width: 22px; height: 24px; }
 .calm-app-icon .figma-mark { transform: none; }
 .calm-app-icon .illustrator-mark { width: 21px; height: 21px; font-size: var(--text-meta); border-radius: 5px; }
-.calm-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 20px; background: rgba(25,43,32,.22); backdrop-filter: blur(14px); }
+.calm-backdrop { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(25,43,32,.22); backdrop-filter: blur(14px); }
 .calm-dialog { width: min(540px,100%); max-height: calc(100dvh - 40px); border-radius: 30px; background: #f6f8f2; padding: 30px; color: #293d30; }
 .calm-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
 .calm-dialog h2 { font-size: var(--text-display); letter-spacing: -.045em; font-weight: 600; }

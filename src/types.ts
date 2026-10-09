@@ -8,13 +8,19 @@ export interface Resource {
   target: string
   createdAt: string
   lastOpenedAt?: string
+  pinnedToDock?: boolean
   completedAt?: string
+  bookmarkGroupId?: string
 }
 
-export type SpaceKind = 'base' | 'stream'
+export interface BookmarkGroup { id: string; name: string }
+export interface BookmarkDestination { spaceId: string; groupId?: string }
+
+export type SpaceKind = 'base' | 'stream' | 'web'
 
 export interface BrowserTab {
   id: string
+  contextId?: string
   title: string
   url: string
   pinned?: boolean
@@ -25,6 +31,7 @@ export interface BrowserTab {
   scrollY?: number
   protected?: boolean
   error?: string
+  closedIndex?: number
 }
 
 export interface BrowserSession {
@@ -62,23 +69,42 @@ export interface Space {
   tone: SpaceTone
   kind?: SpaceKind
   resources: Resource[]
+  bookmarkGroups?: BookmarkGroup[]
   lastActiveAt?: string
   archivedAt?: string | null
   activeSession?: BrowserSession
+  workContexts?: WorkContext[]
+  activeContextId?: string
   researchArtifacts?: ResearchArtifact[]
   checkpoint?: Checkpoint
   checkpointHistory?: Checkpoint[]
   label?: 'work' | 'personal'
+  pinned?: boolean
+  nameOrigin?: 'temporary' | 'suggested' | 'manual'
+  legacyOrigin?: { spaceId: string; spaceName: string; contextId: string }
 }
 
 export interface Checkpoint {
   id: string
   spaceId: string
+  contextId?: string
   resourceId?: string
   note: string
   nextStep: string
   savedAt: string
   session?: BrowserSession
+}
+
+export interface WorkContext {
+  id: string
+  title: string
+  documentIds: string[]
+  excludedDocumentIds?: string[]
+  activeTabId?: string
+  splitTabId?: string | null
+  lastActiveAt?: string
+  checkpoint?: Checkpoint
+  completedAt?: string
 }
 
 export interface Reminder {
@@ -127,8 +153,8 @@ export interface CalendarSubscription {
 
 export interface MailAccount { id: string; email: string; historyId?: string; lastSyncedAt?: string; error?: string; importantSenders?: string[] }
 export interface MailMessage { id: string; accountId: string; gmailId: string; threadId: string; from: string; subject: string; snippet: string; receivedAt: string; unread: boolean; important: boolean; gmailImportant?: boolean; url: string }
-export interface FeedSource { id: string; name: string; url: string; error?: string }
-export interface FeedArticle { id: string; title: string; url: string; source: string; summary: string; publishedAt: string }
+export interface FeedSource { id: string; name: string; url: string; error?: string; topic?: string }
+export interface FeedArticle { id: string; title: string; url: string; source: string; summary: string; publishedAt: string; sourceId?: string; topic?: string; image?: string }
 export interface NewsEdition { id: string; createdAt: string; articles: FeedArticle[] }
 export interface AIConfiguration { provider: 'openai' | 'anthropic' | 'compatible'; model: string; endpoint?: string; role: 'chat' | 'helper' | 'agent'; dailyRequestLimit: number; maxOutputTokens: number; background?: { enabled: boolean; hour: number; mail: boolean; news: boolean }; configured?: boolean }
 export interface AIContext { id: string; title: string; url?: string; text: string }
@@ -164,9 +190,28 @@ export interface NewsItem {
   time: string
 }
 
+export interface UserProfile {
+  name: string
+  avatarTone?: SpaceTone
+  avatarEmoji?: string
+  status?: string
+}
+
+export interface HistoryItem {
+  id: string
+  url: string
+  title: string
+  visitedAt: string
+  favicon?: string
+  spaceId?: string
+}
+
 export interface AppState {
   version: 1 | 2
   revision?: number
+  cabinetVersion?: 1
+  userProfile?: UserProfile
+  backgroundImage?: string
   dashboard?: { preset: 'overview' | 'quiet'; widgets: WidgetConfig[] }
   liveHints?: boolean
   dismissedNotices?: string[]
@@ -175,9 +220,11 @@ export interface AppState {
   mailMessages?: MailMessage[]
   feedSources?: FeedSource[]
   newsEditions?: NewsEdition[]
+  newsPreferences?: { topics: string[]; activeTopic?: string }
   aiConfiguration?: AIConfiguration
   aiJournal?: AIJournalEntry[]
   activeSpaceId?: string
+  lastBookmarkDestination?: BookmarkDestination
   spaces: Space[]
   reminders: Reminder[]
   dismissedUntil: string | null
@@ -187,6 +234,7 @@ export interface AppState {
   morningTabs?: MorningTab[]
   inboxMessages?: InboxMessage[]
   newsItems?: NewsItem[]
+  history?: HistoryItem[]
   aiInsight?: string
   checkpoint?: {
     spaceId: string
@@ -197,16 +245,32 @@ export interface AppState {
   }
 }
 
+export interface SavedCredential {
+  id: string
+  origin: string
+  username: string
+  password: string
+  title?: string
+  updatedAt: string
+}
+
 export interface OpenResult { ok: boolean; error?: string }
 
 export interface DomBridge {
   platform?: string
+  cabinetPilot?: boolean
   getState(): Promise<AppState>
   saveState(state: AppState): Promise<boolean>
   applyChanges(changes: import('../shared/state').StateChange[]): Promise<AppState>
   search(query: string): Promise<{ id: string; spaceId: string; title: string; target: string }[]>
   backup(): Promise<boolean>
   closeCapture?(): Promise<void>
+  vault?: {
+    listCredentials(origin?: string): Promise<SavedCredential[]>
+    saveCredential(cred: { id?: string; origin: string; username: string; password: string; title?: string }): Promise<SavedCredential>
+    removeCredential(id: string): Promise<boolean>
+    importCredentials(csv: string): Promise<number>
+  }
   integrations?: {
     configureGoogle(clientId: string): Promise<void>
     googleConfigured(): Promise<boolean>
@@ -226,6 +290,7 @@ export interface DomBridge {
   browser?: {
     show(value: { tab: BrowserTab; spaceId: string; bounds: { x: number; y: number; width: number; height: number } }): Promise<void>
     hide(id: string): Promise<void>
+    move?(id: string, spaceId: string): Promise<void>
     block(value: boolean): Promise<void>
     close(id: string): Promise<boolean>
     park(ids: string[]): Promise<{ protectedCount: number }>
@@ -250,3 +315,4 @@ export type NativeBrowserEvent =
   | { type: 'new-tab'; spaceId: string; parentTabId: string; url: string; background: boolean }
   | { type: 'shortcut'; key: string; shift: boolean; alt: boolean }
   | { type: 'cover'; tabId: string; image: string }
+  | { type: 'password-offer'; origin: string; username: string; password: string; title?: string }

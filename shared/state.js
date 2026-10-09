@@ -1,14 +1,28 @@
-const collections = new Set(['spaces', 'reminders', 'events', 'calendarSubscriptions', 'morningTabs', 'inboxMessages', 'newsItems', 'mailAccounts', 'mailMessages', 'feedSources', 'newsEditions', 'aiJournal'])
+const collections = new Set(['spaces', 'workContexts', 'bookmarkGroups', 'reminders', 'events', 'calendarSubscriptions', 'morningTabs', 'inboxMessages', 'newsItems', 'mailAccounts', 'mailMessages', 'feedSources', 'newsEditions', 'aiJournal', 'history'])
 const forbidden = new Set(['__proto__', 'prototype', 'constructor'])
 
 export function emptyState() {
-  return { version: 2, revision: 0, spaces: [{ id: 'first-space', name: 'Моё пространство', tone: 'sage', resources: [] }], reminders: [], dismissedUntil: null }
+  return { version: 2, revision: 0, userProfile: { name: 'Пользователь', avatarTone: 'sage' }, spaces: [{ id: 'first-space', name: 'Моё пространство', tone: 'sage', resources: [] }], reminders: [], dismissedUntil: null }
 }
 
 export function localDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+// Adopt the old space session once. Never rebuild a live group from a checkpoint.
+export function normalizeSpace(space) {
+  if (space.workContexts?.length) return space
+  const id = `${space.id}:context`
+  const session = space.activeSession || space.checkpoint?.session
+  const recent = space.resources.filter(item => item.kind === 'file' && item.lastOpenedAt && !item.completedAt).sort((a, b) => Date.parse(b.lastOpenedAt) - Date.parse(a.lastOpenedAt))[0]
+  const chosen = space.resources.find(item => item.id === space.checkpoint?.resourceId && item.kind === 'file' && !item.completedAt) || recent
+  const dates = [space.lastActiveAt, recent?.lastOpenedAt, session?.savedAt, space.checkpoint?.savedAt].filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))
+  const checkpoint = space.checkpoint ? { ...space.checkpoint, contextId: id } : undefined
+  return { ...space, activeContextId: id, workContexts: [{ id, title: '', documentIds: chosen ? [chosen.id] : [], activeTabId: session?.activeTabId || '', splitTabId: session?.splitTabId || null, lastActiveAt: dates[0], checkpoint }],
+    ...(checkpoint ? { checkpoint } : {}),
+    ...(session ? { activeSession: { ...session, tabs: session.tabs.map(tab => ({ ...tab, contextId: id })), closedTabs: session.closedTabs?.map(tab => ({ ...tab, contextId: id })) } } : {}) }
 }
 
 export function migrateState(input) {
@@ -26,6 +40,7 @@ export function migrateState(input) {
     }
   }
   state.version = 2
+  state.spaces = state.spaces.map(normalizeSpace)
   state.revision = Number.isSafeInteger(state.revision) ? state.revision : 0
   return state
 }

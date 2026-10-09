@@ -3,6 +3,8 @@ import type { AppState } from './types'
 import { applyChanges, diffState, migrateState, type StateChange } from '../shared/state'
 import { bridge } from './bridge'
 import { exampleDay, isDemo, saveExample } from './demo'
+import { isCabinetPreview } from './cabinetMode'
+import { upgradeCabinets } from './cabinetModel'
 
 export function usePersistentState(onError: (message: string) => void) {
   const [state, setState] = useState<AppState | null>(null)
@@ -21,14 +23,37 @@ export function usePersistentState(onError: (message: string) => void) {
   }
   useEffect(() => {
     let active = true
-    ;(isDemo ? Promise.resolve(migrateState(exampleDay())) : bridge.getState()).then(value => { if (active) rebase(value) }).catch(error => errors.current(`Не удалось загрузить данные: ${error.message}`))
+    ;(isDemo ? Promise.resolve(migrateState(exampleDay())) : bridge.getState())
+      .then(async value => {
+        if (!active) return
+        if (isCabinetPreview && value.cabinetVersion !== 1) {
+          const upgraded = upgradeCabinets(value)
+          const changes = diffState(value, upgraded)
+          if (changes.length > 0 && !isDemo) {
+            try {
+              const remote = await bridge.applyChanges(changes)
+              if (active) {
+                rebase(remote)
+                return
+              }
+            } catch (err) {
+              console.error('Failed to persist cabinet upgrade:', err)
+            }
+          }
+          rebase(upgraded)
+        } else {
+          rebase(isCabinetPreview ? upgradeCabinets(value) : value)
+        }
+      })
+      .catch(error => errors.current(`Не удалось загрузить данные: ${error.message}`))
     const off = bridge.onStateChanged(value => { if (active && !isDemo) rebase(value) })
     return () => { active = false; off() }
   }, [])
   function commit(updater: (previous: AppState) => AppState) {
     const previous = current.current
     if (!previous) return
-    const next = updater(previous)
+    const updated = updater(previous)
+    const next = isCabinetPreview ? upgradeCabinets(updated) : updated
     const changes = diffState(previous, next)
     if (!changes.length) return Promise.resolve(true)
     if (isDemo) { publish(next); saveExample(next); return Promise.resolve(true) }

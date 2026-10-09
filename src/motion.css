@@ -1,0 +1,30 @@
+/* Moving layers inherit each control's existing surface, radius and typography. */
+.fluid-group { position: relative; isolation: isolate; }
+.fluid-selection, .fluid-hover { position: absolute; top: 0; left: 0; pointer-events: none; border-radius: var(--fluid-radius, 18px); }
+.fluid-selection { z-index: -2; background: var(--fluid-selected, rgba(255,255,255,.62)); box-shadow: var(--fluid-shadow, 0 2px 5px rgba(51,80,61,.035)); }
+.fluid-hover { z-index: -1; background: var(--fluid-preview, rgba(255,255,255,.36)); }
+.chrome-spaces.fluid-group .chrome-space.selected, .chrome-spaces.fluid-group .chrome-space:hover { background: transparent; box-shadow: none; }
+.settings-nav.fluid-group { --fluid-radius: 12px; --fluid-selected: rgba(207,225,202,.65); --fluid-preview: rgba(219,233,215,.45); --fluid-shadow: none; }
+.settings-nav.fluid-group button[aria-current], .settings-nav.fluid-group button:hover { background: transparent; }
+.fluid-menu-items { --fluid-radius: 6px; --fluid-preview: #e8edde; }
+.browser-menu .fluid-menu-items { --fluid-radius: 13px; }
+.action-menu-popover .fluid-menu-items button:hover, .action-menu-popover .fluid-menu-items button:focus { background: transparent; }
+.browser-menu.action-menu-popover .fluid-menu-items > button { min-height: 38px; gap: 10px; padding: 9px 12px; font-size: var(--text-ui); border-radius: 13px; }
+.browser-menu.action-menu-popover .fluid-menu-items > button > span { overflow-wrap: anywhere; }
+.fluid-button { transition-property: background-color, color, border-color, box-shadow, opacity; }
+.fluid-button:active:not(:disabled) { transform: none; }
+.dock-entry-popover.fluid-surface, .calm-dialog.fluid-surface { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .fluid-button { transform: none !important; }
+}
+@media (max-width: 640px) {
+  .browser-menu.action-menu-popover .fluid-menu-items > button { min-width: 44px; min-height: 44px; }
+}
+
+/* Temporary inert scenes preserve visual continuity; the real route is already interactive. */
+.workspace-transition { position: fixed; inset: 0; z-index: 150; pointer-events: none; overflow: hidden; contain: layout paint; }
+.workspace-transition .workspace-scene { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; pointer-events: none; isolation: isolate; }
+.workspace-aperture { position: absolute; inset: 0; overflow: hidden; will-change: clip-path; }
+.workspace-aperture .workspace-scene { transform-origin: 50% 50%; }
+.workspace-transition-frame { position: absolute; pointer-events: none; border: 1px solid rgba(255,255,255,.8); box-shadow: 0 10px 36px rgba(34,63,47,.08); }
+.workspace-transition-title { position: absolute; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 1.35; pointer-events: none; }

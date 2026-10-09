@@ -8,8 +8,9 @@ async function start() {
   fs.mkdirSync(workerData.directory, { recursive: true })
   const db = new Database(path.join(workerData.directory, 'dom.sqlite'))
   db.pragma('journal_mode = WAL')
+  db.pragma('synchronous = NORMAL')
   db.exec('CREATE TABLE IF NOT EXISTS globals (key TEXT PRIMARY KEY, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS entities (collection TEXT NOT NULL, id TEXT NOT NULL, ordinal INTEGER NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(collection,id)); CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(id UNINDEXED, spaceId UNINDEXED, title, target, text, tokenize="unicode61");')
-  const entityCollections = new Set(['spaces', 'reminders', 'events', 'calendarSubscriptions', 'morningTabs', 'inboxMessages', 'newsItems', 'mailAccounts', 'mailMessages', 'feedSources', 'newsEditions', 'aiJournal'])
+  const entityCollections = new Set(['spaces', 'reminders', 'events', 'calendarSubscriptions', 'morningTabs', 'inboxMessages', 'newsItems', 'mailAccounts', 'mailMessages', 'feedSources', 'newsEditions', 'aiJournal', 'history'])
   const upsert = db.prepare('INSERT INTO entities VALUES (?,?,?,?) ON CONFLICT(collection,id) DO UPDATE SET ordinal=excluded.ordinal,payload=excluded.payload WHERE ordinal!=excluded.ordinal OR payload!=excluded.payload')
   const write = db.transaction((state, changes) => {
     const roots = changes ? new Set(changes.map(change => change.path[0])) : null

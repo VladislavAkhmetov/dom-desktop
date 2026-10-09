@@ -1,0 +1,24 @@
+.focus-dialog { width: min(560px, 100%); }
+.focus-task-list { display: grid; gap: 8px; max-height: min(340px, 45dvh); overflow: auto; margin: 12px 0 24px; }
+.focus-task { display: flex; align-items: center; gap: 13px; padding: 15px 17px; border: 1px solid transparent; border-radius: 18px; background: rgba(231,238,224,.6); cursor: pointer; }
+.focus-task:hover { background: #e7eddf; }
+.focus-task.selected { background: #e0e9d8; border-color: #648372; }
+.focus-task input { flex: none; width: 19px; height: 19px; margin: 0; accent-color: #355b47; }
+.focus-task span { display: grid; gap: 4px; min-width: 0; }
+.focus-task strong { font-size: 15px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.focus-task small { color: #59705e; font-size: 12px; }
+.focus-add-task { margin-bottom: 20px; }
+.focus-picker-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.focus-durations { display: flex; padding: 4px; border-radius: 24px; background: #e8eedf; gap: 3px; }
+.focus-durations button { min-height: 36px; padding: 7px 12px; border-radius: 20px; font-size: 13px; }
+.focus-durations button[aria-pressed=true] { background: #fff; color: #284d38; }
+.focus-session { display: grid; gap: 32px; padding: 12px 0 4px; text-align: center; }
+.focus-session h3 { margin: 0; font-size: clamp(23px, 4vw, 30px); line-height: 1.4; font-weight: 500; letter-spacing: -.7px; overflow-wrap: anywhere; }
+.focus-clock { display: grid; justify-items: center; gap: 12px; }
+.focus-clock time { font-size: clamp(64px, 12vw, 88px); line-height: 1.05; letter-spacing: -4px; font-variant-numeric: tabular-nums; color: #355b47; }
+.focus-clock > span { font-size: 14px; color: #59705e; }
+.focus-progress { width: min(240px, 100%); height: 4px; margin-top: 8px; border-radius: 4px; overflow: hidden; background: #dce5d3; }
+.focus-progress i { display: block; height: 100%; background: #648372; transition: width 1s linear; }
+.focus-session-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.focus-dialog .focus-session-actions .calm-primary { min-width: 190px; justify-content: center; align-self: center; font-size: 14px; }
+@media (max-width: 480px) { .focus-task { padding: 12px; } .focus-session { gap: 24px; } .focus-picker-actions { gap: 18px; } }

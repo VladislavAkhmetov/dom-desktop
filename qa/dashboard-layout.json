@@ -1,0 +1,1217 @@
+{
+  "checkedAt": "2026-09-30T08:45:03.400Z",
+  "browser": "Chrome",
+  "allShellCoordinatesIdentical": true,
+  "checks": [
+    {
+      "size": {
+        "width": 960,
+        "height": 720
+      },
+      "route": "Мой день",
+      "metrics": {
+        "cards": [
+          {
+            "class": "calm-card resume-card",
+            "overflow": 0,
+            "scroll": "auto"
+          },
+          {
+            "class": "calm-card plan-card",
+            "overflow": 0,
+            "scroll": "hidden"
+          },
+          {
+            "class": "quick-widget",
+            "overflow": 0,
+            "scroll": "visible"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 912,
+            "x": 24,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 912,
+            "x": 24,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 912,
+            "x": 24,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 912,
+            "x": 24,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 960,
+        "height": 720
+      },
+      "route": "Работа",
+      "metrics": {
+        "cards": [
+          {
+            "class": "resource-card card",
+            "overflow": 0,
+            "scroll": "hidden"
+          },
+          {
+            "class": "resource-card card",
+            "overflow": 0,
+            "scroll": "hidden"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 912,
+            "x": 24,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 912,
+            "x": 24,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 912,
+            "x": 24,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 912,
+            "x": 24,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 960,
+        "height": 720
+      },
+      "route": "Поездка на выходные",
+      "metrics": {
+        "cards": [
+          {
+            "class": "space-continuation card",
+            "overflow": 0,
+            "scroll": "auto"
+          },
+          {
+            "class": "empty-space card",
+            "overflow": 0,
+            "scroll": "auto"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 912,
+            "x": 24,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 912,
+            "x": 24,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 912,
+            "x": 24,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 912,
+            "x": 24,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 960,
+        "height": 720
+      },
+      "route": "Учёба",
+      "metrics": {
+        "cards": [
+          {
+            "class": "empty-space card",
+            "overflow": 0,
+            "scroll": "auto"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 912,
+            "x": 24,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 912,
+            "x": 24,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 912,
+            "x": 24,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 912,
+            "x": 24,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 960,
+        "height": 720
+      },
+      "route": "Все пространства",
+      "metrics": {
+        "cards": [
+          {
+            "class": "overview-space card tone-sage",
+            "overflow": 0,
+            "scroll": "hidden"
+          },
+          {
+            "class": "overview-space card tone-sand",
+            "overflow": 0,
+            "scroll": "hidden"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 912,
+            "x": 24,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 912,
+            "x": 24,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 912,
+            "x": 24,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 912,
+            "x": 24,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 640,
+        "height": 800
+      },
+      "route": "Мой день",
+      "metrics": {
+        "cards": [
+          {
+            "class": "calm-card resume-card",
+            "overflow": 0,
+            "scroll": "auto"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 136,
+            "width": 616,
+            "x": 12,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 616,
+            "x": 12,
+            "y": 164
+          },
+          {
+            "class": "hub-content",
+            "height": 374,
+            "width": 616,
+            "x": 12,
+            "y": 286
+          },
+          {
+            "class": "hub-bottom",
+            "height": 112,
+            "width": 616,
+            "x": 12,
+            "y": 672
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 640,
+        "height": 800
+      },
+      "route": "Работа",
+      "metrics": {
+        "cards": [
+          {
+            "class": "resource-card card",
+            "overflow": 0,
+            "scroll": "hidden"
+          },
+          {
+            "class": "resource-card card",
+            "overflow": 0,
+            "scroll": "hidden"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 136,
+            "width": 616,
+            "x": 12,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 616,
+            "x": 12,
+            "y": 164
+          },
+          {
+            "class": "hub-content",
+            "height": 374,
+            "width": 616,
+            "x": 12,
+            "y": 286
+          },
+          {
+            "class": "hub-bottom",
+            "height": 112,
+            "width": 616,
+            "x": 12,
+            "y": 672
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 640,
+        "height": 800
+      },
+      "route": "Поездка на выходные",
+      "metrics": {
+        "cards": [
+          {
+            "class": "space-continuation card",
+            "overflow": 0,
+            "scroll": "auto"
+          },
+          {
+            "class": "empty-space card",
+            "overflow": 6,
+            "scroll": "auto"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 136,
+            "width": 616,
+            "x": 12,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 616,
+            "x": 12,
+            "y": 164
+          },
+          {
+            "class": "hub-content",
+            "height": 374,
+            "width": 616,
+            "x": 12,
+            "y": 286
+          },
+          {
+            "class": "hub-bottom",
+            "height": 112,
+            "width": 616,
+            "x": 12,
+            "y": 672
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 640,
+        "height": 800
+      },
+      "route": "Учёба",
+      "metrics": {
+        "cards": [
+          {
+            "class": "empty-space card",
+            "overflow": 0,
+            "scroll": "auto"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 136,
+            "width": 616,
+            "x": 12,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 616,
+            "x": 12,
+            "y": 164
+          },
+          {
+            "class": "hub-content",
+            "height": 374,
+            "width": 616,
+            "x": 12,
+            "y": 286
+          },
+          {
+            "class": "hub-bottom",
+            "height": 112,
+            "width": 616,
+            "x": 12,
+            "y": 672
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 640,
+        "height": 800
+      },
+      "route": "Все пространства",
+      "metrics": {
+        "cards": [
+          {
+            "class": "overview-space card tone-sage",
+            "overflow": 10,
+            "scroll": "hidden"
+          },
+          {
+            "class": "overview-space card tone-sand",
+            "overflow": 10,
+            "scroll": "hidden"
+          }
+        ],
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 136,
+            "width": 616,
+            "x": 12,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 616,
+            "x": 12,
+            "y": 164
+          },
+          {
+            "class": "hub-content",
+            "height": 374,
+            "width": 616,
+            "x": 12,
+            "y": 286
+          },
+          {
+            "class": "hub-bottom",
+            "height": 112,
+            "width": 616,
+            "x": 12,
+            "y": 672
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 600
+      },
+      "route": "Мой день",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 32.5,
+            "y": 71
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 32.5,
+            "y": 139
+          },
+          {
+            "class": "hub-content",
+            "height": 318,
+            "width": 1200,
+            "x": 32.5,
+            "y": 259
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 32.5,
+            "y": 587
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 600
+      },
+      "route": "Работа",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 32.5,
+            "y": 71
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 32.5,
+            "y": 139
+          },
+          {
+            "class": "hub-content",
+            "height": 318,
+            "width": 1200,
+            "x": 32.5,
+            "y": 259
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 32.5,
+            "y": 587
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 600
+      },
+      "route": "Поездка на выходные",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 32.5,
+            "y": 71
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 32.5,
+            "y": 139
+          },
+          {
+            "class": "hub-content",
+            "height": 318,
+            "width": 1200,
+            "x": 32.5,
+            "y": 259
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 32.5,
+            "y": 587
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 600
+      },
+      "route": "Учёба",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 32.5,
+            "y": 71
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 32.5,
+            "y": 139
+          },
+          {
+            "class": "hub-content",
+            "height": 318,
+            "width": 1200,
+            "x": 32.5,
+            "y": 259
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 32.5,
+            "y": 587
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 600
+      },
+      "route": "Все пространства",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 32.5,
+            "y": 71
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 32.5,
+            "y": 139
+          },
+          {
+            "class": "hub-content",
+            "height": 318,
+            "width": 1200,
+            "x": 32.5,
+            "y": 259
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 32.5,
+            "y": 587
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "Мой день",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 40,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 40,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 1200,
+            "x": 40,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 40,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "Работа",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 40,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 40,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 1200,
+            "x": 40,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 40,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "Поездка на выходные",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 40,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 40,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 1200,
+            "x": 40,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 40,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "Учёба",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 40,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 40,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 1200,
+            "x": 40,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 40,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "Все пространства",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 58,
+            "width": 1200,
+            "x": 40,
+            "y": 16
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 40,
+            "y": 84
+          },
+          {
+            "class": "hub-content",
+            "height": 438,
+            "width": 1200,
+            "x": 40,
+            "y": 204
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 40,
+            "y": 652
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1920,
+        "height": 945
+      },
+      "route": "Мой день",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 72,
+            "width": 1200,
+            "x": 360,
+            "y": 82.5
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 360,
+            "y": 168.5
+          },
+          {
+            "class": "hub-content",
+            "height": 504,
+            "width": 1200,
+            "x": 360,
+            "y": 292.5
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 360,
+            "y": 810.5
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1920,
+        "height": 945
+      },
+      "route": "Работа",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 72,
+            "width": 1200,
+            "x": 360,
+            "y": 82.5
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 360,
+            "y": 168.5
+          },
+          {
+            "class": "hub-content",
+            "height": 504,
+            "width": 1200,
+            "x": 360,
+            "y": 292.5
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 360,
+            "y": 810.5
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1920,
+        "height": 945
+      },
+      "route": "Поездка на выходные",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 72,
+            "width": 1200,
+            "x": 360,
+            "y": 82.5
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 360,
+            "y": 168.5
+          },
+          {
+            "class": "hub-content",
+            "height": 504,
+            "width": 1200,
+            "x": 360,
+            "y": 292.5
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 360,
+            "y": 810.5
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1920,
+        "height": 945
+      },
+      "route": "Учёба",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 72,
+            "width": 1200,
+            "x": 360,
+            "y": 82.5
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 360,
+            "y": 168.5
+          },
+          {
+            "class": "hub-content",
+            "height": 504,
+            "width": 1200,
+            "x": 360,
+            "y": 292.5
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 360,
+            "y": 810.5
+          }
+        ]
+      }
+    },
+    {
+      "size": {
+        "width": 1920,
+        "height": 945
+      },
+      "route": "Все пространства",
+      "metrics": {
+        "contentOverflow": 0,
+        "pageOverflow": [
+          0,
+          0
+        ],
+        "shell": [
+          {
+            "class": "hub-ambient",
+            "height": 72,
+            "width": 1200,
+            "x": 360,
+            "y": 82.5
+          },
+          {
+            "class": "browser-chrome",
+            "height": 110,
+            "width": 1200,
+            "x": 360,
+            "y": 168.5
+          },
+          {
+            "class": "hub-content",
+            "height": 504,
+            "width": 1200,
+            "x": 360,
+            "y": 292.5
+          },
+          {
+            "class": "hub-bottom",
+            "height": 52,
+            "width": 1200,
+            "x": 360,
+            "y": 810.5
+          }
+        ]
+      }
+    }
+  ]
+}

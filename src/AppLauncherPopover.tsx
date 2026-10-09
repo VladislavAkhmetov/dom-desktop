@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpRight, FolderOpen, Plus } from 'lucide-react'
+import { ArrowUpRight, FolderOpen, Plus, X } from 'lucide-react'
 import type { Resource } from './types'
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onOpenApp: (appResource: Resource) => void
   onNewDocument: () => void
   onAddDocument: () => void
+  onRemoveQuickApp?: (appResource: Resource) => void
   onClose: () => void
 }
 
@@ -43,6 +44,7 @@ export function AppLauncherPopover({
   onOpenApp,
   onNewDocument,
   onAddDocument,
+  onRemoveQuickApp,
   onClose
 }: Props) {
   const popoverRef = useRef<HTMLDivElement>(null)

@@ -5,7 +5,7 @@
 .desktop .chrome-main { padding-right: 145px; }
 .desktop .browser-chrome { -webkit-app-region: drag; }
 .desktop .browser-chrome button, .desktop .browser-chrome input, .desktop .calm-omnibox, .desktop .chrome-spaces { -webkit-app-region: no-drag; }
-.browsing .chrome-main .brand { width: 90px; font-size: 18px; }
+.browsing .chrome-main .brand { width: auto; font-size: 18px; }
 .browsing .chrome-main .brand-mark { height: 28px; width: 28px; font-size: 19px; }
 .browsing .calm-omnibox { height: 34px; max-width: none; }
 .browsing .chrome-secondary { height: 44px; min-height: 44px; padding: 0 12px; gap: 12px; }

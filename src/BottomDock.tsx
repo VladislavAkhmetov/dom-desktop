@@ -1,29 +1,64 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Plus, Square, Timer } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { PenLine, Pin, Plus, Sparkles, Timer, X } from 'lucide-react'
 import type { AppState, Resource } from './types'
 import { zenTimer } from './focus/zenTimer'
 import { PlayerIsland } from './player/PlayerIsland'
 import { AppLauncherPopover } from './AppLauncherPopover'
+import { QuickAppsSettings } from './QuickAppsSettings'
+import { QuickEntry } from './QuickEntry'
+import { AnimatePresence } from 'motion/react'
+import { FluidButton, FluidSurface } from './FluidMotion'
+import './digest.css'
 
 interface Props {
   state: AppState
   now: Date
   currentSpaceId?: string
-  isHome: boolean
   appIcon: (name: string) => ReactNode
   onCapture: () => void
+  onFocus: () => void
+  onSaveThought: (title: string, dueAt: string | null, plannedDate?: string | null, kind?: 'note' | 'task') => unknown
+  onAssistant: (draft?: string) => void
   onOpenResource: (resource: Resource) => void
   onAddLink: (spaceId?: string) => void
   onAddFile: (spaceId?: string) => void
   onOpenSettings: () => void
+  onChange: (update: (state: AppState) => AppState) => unknown
+  onAddApp: (spaceId?: string) => void
 }
 
-export function BottomDock({ state, now, currentSpaceId, isHome, appIcon, onCapture, onOpenResource, onAddLink, onAddFile, onOpenSettings }: Props) {
+export function BottomDock({ state, now, currentSpaceId, appIcon, onFocus, onSaveThought, onAssistant, onOpenResource, onAddLink, onAddFile, onOpenSettings, onChange, onAddApp }: Props) {
+  const [entryMode, setEntryMode] = useState<'note' | 'ai' | null>(null)
+  const entryAnchor = useRef<HTMLDivElement>(null)
+  const noteButton = useRef<HTMLButtonElement>(null)
+  const aiButton = useRef<HTMLButtonElement>(null)
+  const closeEntry = (restoreFocus = false) => {
+    if (restoreFocus) (entryMode === 'ai' ? aiButton : noteButton).current?.focus()
+    setEntryMode(null)
+  }
+  useEffect(() => {
+    const open = () => { setActiveAppId(null); setEntryMode('note') }
+    window.addEventListener('dom:quick-entry', open)
+    return () => window.removeEventListener('dom:quick-entry', open)
+  }, [])
+  useEffect(() => {
+    if (!entryMode) return
+    const outside = (event: PointerEvent) => { if (!entryAnchor.current?.contains(event.target as Node)) setEntryMode(null) }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.querySelector('.calm-backdrop')) return
+      event.preventDefault(); closeEntry(true)
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [entryMode])
   const [zenState, setZenState] = useState(zenTimer.getState())
   const [activeAppId, setActiveAppId] = useState<string | null>(null)
+  const [editingApps, setEditingApps] = useState(false)
   useEffect(() => zenTimer.subscribe(setZenState), [])
 
   const apps = state.spaces.flatMap(space => space.resources.filter(resource => resource.kind === 'app'))
+    .sort((a, b) => Number(Boolean(b.pinnedToDock)) - Number(Boolean(a.pinnedToDock)) || Date.parse(b.lastOpenedAt || b.createdAt) - Date.parse(a.lastOpenedAt || a.createdAt))
     .filter((app, index, all) => all.findIndex(item => item.target.toLowerCase() === app.target.toLowerCase()) === index).slice(0, 4)
   const currentSpace = state.spaces.find(space => space.id === currentSpaceId) || state.spaces[0]
 
@@ -57,20 +92,26 @@ export function BottomDock({ state, now, currentSpaceId, isHome, appIcon, onCapt
     else onAddFile(currentSpace?.id)
   }
 
-  return <footer className="calm-dock" aria-label="Быстрые действия">
+  return <footer className="hub-bottom" aria-label="Быстрые действия"><div className="calm-dock">
     <div className="calm-dock-left">
-      {!isHome && <button className="calm-capture" onClick={onCapture} title="Записать мысль · Ctrl + Alt + Space">
-        <Plus size={19} /><span>Записать</span><kbd>Ctrl Alt Space</kbd>
-      </button>}
-      <button className={`calm-dock-timer ${zenState.status === 'running' ? 'active' : ''}`} onClick={() => zenState.status === 'running' ? zenTimer.stop() : zenTimer.start(30, false)} title={zenState.status === 'running' ? 'Остановить сессию фокуса' : 'Начать фокус на 30 минут'}>
-        {zenState.status === 'running' ? <Square size={16} /> : <Timer size={18} />}<span>{zenState.status === 'running' ? `Фокус · ${String(Math.floor(zenState.remainingSeconds / 60)).padStart(2, '0')}:${String(zenState.remainingSeconds % 60).padStart(2, '0')}` : 'Фокус · 30 мин'}</span>
-      </button>
+      <div className="dock-entry-anchor" ref={entryAnchor}>
+        <FluidButton ref={noteButton} className="calm-capture dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'note' ? null : 'note') }} title="Записать · Ctrl + Alt + Space" aria-expanded={entryMode === 'note'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><PenLine size={19} /><span>Записать</span></FluidButton>
+        <FluidButton ref={aiButton} className="dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'ai' ? null : 'ai') }} aria-expanded={entryMode === 'ai'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><Sparkles size={19} /><span>Спросить ИИ</span></FluidButton>
+        <AnimatePresence>{entryMode && <FluidSurface key="quick-entry" className="dock-entry-popover" id="dock-quick-entry" role="dialog" aria-label={entryMode === 'note' ? 'Быстрая запись' : 'Вопрос ИИ'} style={{ x: '-50%', transformOrigin: 'bottom center' }}>
+          <button className="dock-entry-close calm-icon" aria-label="Закрыть быстрый ввод" onClick={() => closeEntry(true)}><X size={20} /></button>
+          <QuickEntry mode={entryMode} onModeChange={setEntryMode} showModes={false} autoFocus onSave={onSaveThought} onAssistant={draft => { setEntryMode(null); onAssistant(draft) }} />
+        </FluidSurface>}</AnimatePresence>
+      </div>
+      <FluidButton className={`calm-dock-timer ${zenState.status === 'running' ? 'active' : ''}`} onClick={onFocus} title={zenState.task?.title || (zenState.status === 'running' ? 'Открыть сессию фокуса' : 'Выбрать дело для фокуса')}>
+        <Timer size={18} /><span>{zenState.status === 'running' ? `Фокус · ${String(Math.floor(zenState.remainingSeconds / 60)).padStart(2, '0')}:${String(zenState.remainingSeconds % 60).padStart(2, '0')}` : zenState.status === 'completed' ? 'Фокус завершён' : 'Фокус'}</span>
+      </FluidButton>
     </div>
     <PlayerIsland onOpenSettings={onOpenSettings} />
+    </div>
     <div className="calm-apps" aria-label="Приложения">
       {apps.map(app => <div className="calm-app-wrapper" key={app.id}>
-        <button className={`calm-app-btn ${activeAppId === app.id ? 'active' : ''}`} onClick={() => setActiveAppId(current => current === app.id ? null : app.id)} title={app.name} aria-expanded={activeAppId === app.id}>
-          <span className="calm-app-icon">{appIcon(app.name)}</span><span>{app.name}</span>
+        <button className={`calm-app-btn ${activeAppId === app.id ? 'active' : ''}`} onClick={() => setActiveAppId(current => current === app.id ? null : app.id)} title={`${app.name}${app.pinnedToDock ? ' · закреплено' : ' · недавнее'}`} aria-label={app.name} aria-expanded={activeAppId === app.id}>
+          <span className="calm-app-icon">{appIcon(app.name)}</span>{app.pinnedToDock && <Pin size={10} className="quick-app-pin" />}
         </button>
         {activeAppId === app.id && <AppLauncherPopover
           app={app}
@@ -78,12 +119,14 @@ export function BottomDock({ state, now, currentSpaceId, isHome, appIcon, onCapt
           now={now}
           appIcon={appIcon}
           onOpenDocument={resource => { onOpenResource(resource); setActiveAppId(null) }}
-          onOpenApp={resource => { onOpenResource(resource); setActiveAppId(null) }}
+          onOpenApp={resource => { onOpenResource(/^https?:\/\//i.test(resource.target) ? { ...resource, kind: 'link' } : resource); setActiveAppId(null) }}
           onNewDocument={() => { newDocument(app); setActiveAppId(null) }}
           onAddDocument={() => { addDocument(app); setActiveAppId(null) }}
           onClose={() => setActiveAppId(null)}
         />}
       </div>)}
+      <button className="quick-app-add" aria-label="Настроить быстрые приложения" title="Добавить или закрепить приложение" onClick={() => { setActiveAppId(null); setEditingApps(true) }}><Plus size={19} /></button>
     </div>
+    {editingApps && <QuickAppsSettings state={state} onChange={onChange} currentSpaceId={currentSpace?.id} appIcon={appIcon} onPick={() => onAddApp(currentSpace?.id)} onClose={() => setEditingApps(false)} />}
   </footer>
 }

@@ -1,0 +1,78 @@
+[
+  {
+    "level": 0,
+    "message": "[vite] connecting..."
+  },
+  {
+    "level": 0,
+    "message": "[vite] connected."
+  },
+  {
+    "level": 1,
+    "message": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'tab' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'tab' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'tab' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'tab' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  },
+  {
+    "level": 3,
+    "message": "Uncaught SyntaxError: Identifier 'closeBtn' has already been declared"
+  }
+]

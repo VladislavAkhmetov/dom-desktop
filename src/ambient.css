@@ -1,0 +1,74 @@
+.ambient-preview { position: relative; width: fit-content; color: var(--ink, #28473e); -webkit-app-region: no-drag; }
+.ambient-preview:has(.ambient-card) { z-index: 70; }
+.ambient-preview > button { position: relative; isolation: isolate; }
+.ambient-preview > button::before { content: ''; position: absolute; inset: -5px -9px; z-index: -1; border: 1px solid transparent; border-radius: 19px; background: rgba(255,255,255,0); transition: background .18s, border-color .18s, box-shadow .18s; }
+.ambient-preview > button:hover::before, .ambient-preview > button:focus-visible::before, .ambient-preview > button[aria-expanded=true]::before { background: rgba(255,255,255,.28); border-color: rgba(255,255,255,.32); box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+.ambient-weather > button::before { inset: -4px -8px; border-radius: 13px; }
+.ambient-card-anchor { position: absolute; top: 100%; left: -9px; width: min(296px, calc(100vw - 24px)); padding-top: 14px; }
+.ambient-weather .ambient-card-anchor { left: auto; right: -8px; }
+.ambient-card { max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 18px 17px 10px; border: 1px solid rgba(255,255,255,.8); border-radius: 24px; background: linear-gradient(145deg,rgba(255,255,255,.94),rgba(241,247,243,.91)); backdrop-filter: blur(28px) saturate(1.35); -webkit-backdrop-filter: blur(28px) saturate(1.35); box-shadow: 0 18px 48px -15px rgba(30,58,48,.27), 0 3px 10px rgba(30,58,48,.06), inset 0 1px 0 #fff; animation: ambient-card-in .18s cubic-bezier(.2,.8,.2,1); transform-origin: top left; }
+.ambient-weather .ambient-card { transform-origin: top right; }
+.ambient-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.ambient-card-heading h2 { font-size: 15px; font-weight: 700; letter-spacing: -.025em; line-height: 1.4; }
+.ambient-card-heading h2::first-letter { text-transform: uppercase; }
+.ambient-card-meta { color: var(--muted, #5e766a); font-size: 11px; }
+.ambient-month-navigation { display: flex; gap: 4px; }
+.ambient-month-navigation button { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; color: var(--accent, #365d4e); }
+.ambient-month-navigation button:hover { background: rgba(64,101,81,.08); }
+.ambient-month-weekdays, .ambient-month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); text-align: center; }
+.ambient-month-weekdays { margin-bottom: 6px; color: var(--muted, #5e766a); font-size: 10px; font-weight: 600; }
+.ambient-month-weekdays > :nth-child(n+6) { color: #9b786f; }
+.ambient-month-day { display: grid; place-items: center; height: 33px; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ambient-month-day > span { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 50%; }
+.ambient-month-day.weekend { color: #98766c; }
+.ambient-month-day.outside { color: rgba(65,89,77,.28); }
+.ambient-month-day.today > span { background: var(--accent, #365d4e); color: #fff; font-weight: 700; box-shadow: 0 3px 8px rgba(39,77,58,.16); }
+.ambient-month-caption { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 35px; margin-top: 6px; color: var(--muted, #5e766a); font-size: 10px; }
+.ambient-month-caption > span::first-letter { text-transform: uppercase; }
+.ambient-month-caption button { padding: 5px 0 5px 5px; color: var(--accent, #365d4e); font-size: 10px; font-weight: 700; }
+.ambient-card-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 39px; padding: 9px 4px; border-top: 1px solid rgba(65,99,80,.1); color: var(--accent, #365d4e); font-size: 12px; font-weight: 600; text-align: left; }
+.ambient-card-action:hover { color: #183f31; background: rgba(64,101,81,.04); border-radius: 0 0 13px 13px; }
+.ambient-weather-current { display: flex; align-items: center; gap: 10px; margin: -2px 0 16px; }
+.ambient-weather-current > strong { font-size: 30px; font-weight: 500; line-height: 1; letter-spacing: -.06em; }
+.ambient-weather-current > span { max-width: 125px; color: var(--muted, #5e766a); font-size: 11px; line-height: 1.45; }
+.ambient-weather-days { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; padding-bottom: 14px; }
+.ambient-weather-day { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 4px 10px; border-radius: 16px; background: rgba(89,122,101,.055); }
+.ambient-weather-day > span:first-child { font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.ambient-weather-day > small { color: var(--muted, #5e766a); font-size: 9px; }
+.ambient-weather-symbol { display: grid; place-items: center; height: 38px; color: #587768; }
+.ambient-weather-temperatures { display: flex; align-items: baseline; justify-content: center; gap: 7px; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ambient-weather-temperatures > strong { font-weight: 700; }
+.ambient-weather-temperatures > span { color: var(--muted, #5e766a); }
+.ambient-weather-rain { display: flex; align-items: center; gap: 3px; padding-top: 3px; }
+.ambient-empty { padding: 10px 0 18px; color: var(--muted, #5e766a); font-size: 12px; line-height: 1.6; }
+.weather-details { color: var(--ink, #28473e); }
+.calm-dialog.weather-dialog { width: min(560px,100%); padding: 24px; scrollbar-width: thin; }
+.weather-dialog .calm-dialog-heading { margin-bottom: 16px; }
+.weather-dialog .calm-dialog-heading h2 { font-size: 24px; }
+.weather-details-current { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 16px; }
+.weather-details-current > div { display: grid; gap: 8px; }
+.weather-details-current span { font-size: 15px; font-weight: 600; }
+.weather-details-current strong { font-size: 52px; line-height: 1; letter-spacing: -.07em; font-weight: 500; }
+.weather-details-current p { color: var(--muted, #5e766a); font-size: 13px; }
+.weather-details-current > svg { margin-right: 12px; color: #678675; }
+.weather-details-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 18px; }
+.weather-details-metrics > div { display: grid; gap: 8px; padding: 13px 10px; background: rgba(89,122,101,.065); border-radius: 16px; }
+.weather-details-metrics span { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted, #5e766a); }
+.weather-details-metrics strong { font-size: 17px; font-weight: 600; }
+.weather-details h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; }
+.weather-details-forecast { display: grid; }
+.weather-details-day { display: grid; grid-template-columns: 66px minmax(0,1fr) 43px 62px; align-items: center; gap: 10px; min-height: 46px; border-top: 1px solid rgba(65,99,80,.1); }
+.weather-details-day > div:first-child { display: grid; gap: 3px; }
+.weather-details-day > div:first-child strong { font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.weather-details-day small { color: var(--muted, #5e766a); font-size: 10px; }
+.weather-details-condition { display: flex; align-items: center; gap: 8px; }
+.weather-details-condition > small { font-size: 11px; line-height: 1.4; }
+.weather-details-rain { display: flex; align-items: center; gap: 3px; color: var(--muted, #5e766a); font-size: 10px; }
+.weather-details-footer { display: flex; justify-content: space-between; gap: 10px; padding: 16px 0 12px; color: var(--muted, #5e766a); font-size: 10px; }
+.weather-details-footer a { color: inherit; text-decoration: none; }
+.weather-details-footer a:hover { text-decoration: underline; }
+.browsing .ambient-date { display: none; }
+@keyframes ambient-card-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 480px) { .weather-details-day { grid-template-columns: 56px minmax(0,1fr) 40px 57px; gap: 5px; } .weather-details-condition > small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ambient-card { animation: none; } .ambient-preview > button::before { transition: none; } }
+@media (prefers-reduced-transparency: reduce) { .ambient-card { background: #f5f9f5; backdrop-filter: none; -webkit-backdrop-filter: none; } }

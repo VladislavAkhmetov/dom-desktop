@@ -1,11 +1,15 @@
 import type { AppState, Checkpoint } from './types'
+import { normalizeSpace } from '../shared/state'
+import { contextSession, currentContext } from './workContexts'
 
-export function saveCheckpoint(state: AppState, spaceId: string, details: { note?: string; nextStep?: string; resourceId?: string } = {}, now = new Date()): AppState {
-  const space = state.spaces.find(item => item.id === spaceId)
-  if (!space) return state
+export function saveCheckpoint(state: AppState, spaceId: string, details: { note?: string; nextStep?: string; resourceId?: string; contextId?: string } = {}, now = new Date()): AppState {
+  const original = state.spaces.find(item => item.id === spaceId)
+  if (!original) return state
+  const space = normalizeSpace(original)
+  const context = space.workContexts!.find(item => item.id === details.contextId) || currentContext(space)
   const checkpoint: Checkpoint = {
-    id: crypto.randomUUID(), spaceId, note: details.note ?? space.checkpoint?.note ?? '', nextStep: details.nextStep ?? space.checkpoint?.nextStep ?? '',
-    resourceId: details.resourceId, savedAt: now.toISOString(), session: structuredClone(space.activeSession)
+    id: crypto.randomUUID(), spaceId, contextId: context.id, note: details.note ?? context.checkpoint?.note ?? '', nextStep: details.nextStep ?? context.checkpoint?.nextStep ?? '',
+    resourceId: details.resourceId, savedAt: now.toISOString(), session: structuredClone(contextSession(space, context.id))
   }
-  return { ...state, spaces: state.spaces.map(item => item.id === spaceId ? { ...item, checkpoint, checkpointHistory: [checkpoint, ...(item.checkpointHistory || [])].slice(0, 20) } : item) }
+  return { ...state, spaces: state.spaces.map(item => item.id === spaceId ? { ...space, checkpoint, workContexts: space.workContexts!.map(value => value.id === context.id ? { ...value, checkpoint, lastActiveAt: checkpoint.savedAt, completedAt: undefined, documentIds: details.resourceId && space.resources.some(resource => resource.id === details.resourceId && resource.kind === 'file') ? [...new Set([...value.documentIds, details.resourceId])] : value.documentIds } : value), checkpointHistory: [checkpoint, ...(item.checkpointHistory || [])].slice(0, 20) } : item) }
 }

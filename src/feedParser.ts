@@ -12,7 +12,22 @@ export function parseFeed(raw: string, source: FeedSource): FeedArticle[] {
       const url = new URL(address, source.url)
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return []
       const published = text('pubDate', 'published', 'updated', 'date')
-      return [{ id: url.toString(), title: clean(text('title')) || source.name, url: url.toString(), source: source.name, summary: clean(text('description', 'summary', 'encoded', 'content')), publishedAt: Number.isFinite(Date.parse(published)) ? new Date(published).toISOString() : '' }]
+      const content = text('description', 'summary', 'encoded', 'content')
+      const html = new DOMParser().parseFromString(content, 'text/html')
+      const media = [...item.getElementsByTagName('*')].find(element => ['thumbnail', 'content', 'enclosure'].includes(element.localName) && (element.getAttribute('type')?.startsWith('image/') || element.getAttribute('medium') === 'image' || element.localName === 'thumbnail'))
+      const imageAddress = media?.getAttribute('url') || html.querySelector('img')?.getAttribute('src')
+      let image: string | undefined
+      if (imageAddress) { try { const address = new URL(imageAddress, source.url); if (address.protocol === 'https:' && !address.username && !address.password) image = address.href } catch { /* A malformed thumbnail doesn't invalidate the article. */ } }
+      return [{ id: url.toString(), title: clean(text('title')) || source.name, url: url.toString(), source: source.name, sourceId: source.id, topic: source.topic, image, summary: clean(content), publishedAt: Number.isFinite(Date.parse(published)) ? new Date(published).toISOString() : '' }]
     } catch { return [] }
   })
+}
+
+export function articleImage(raw: string, articleUrl: string): string | undefined {
+  const document = new DOMParser().parseFromString(raw, 'text/html')
+  const value = document.querySelector('meta[property="og:image"], meta[name="og:image"]')?.getAttribute('content')
+    || document.querySelector('meta[name="twitter:image"], meta[property="twitter:image"]')?.getAttribute('content')
+    || document.querySelector('link[rel="image_src"]')?.getAttribute('href')
+  if (!value) return
+  try { const image = new URL(value, articleUrl); if (image.protocol === 'https:' && !image.username && !image.password) return image.href } catch { /* Missing or invalid images leave the article readable. */ }
 }

@@ -62,4 +62,12 @@ describe('данные и планирование', () => {
     expect(value.spaces[1].checkpoint?.note).toBe('')
     expect(value.spaces[1].checkpointHistory).toHaveLength(1)
   })
+  it('корректно сохраняет и изменяет фоновое изображение в состоянии', () => {
+    const initial = emptyState()
+    const updated = { ...initial, backgroundImage: '/backgrounds/abstract-hills.jpg' }
+    const changes = diffState(initial, updated)
+    expect(changes).toEqual([{ op: 'set', path: ['backgroundImage'], value: '/backgrounds/abstract-hills.jpg' }])
+    const applied = applyChanges(initial, changes)
+    expect(applied.backgroundImage).toBe('/backgrounds/abstract-hills.jpg')
+  })
 })

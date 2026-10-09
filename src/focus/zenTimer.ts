@@ -8,6 +8,7 @@ export interface ZenTimerState {
   durationMinutes: number
   remainingSeconds: number
   progress: number // 0 to 1
+  task?: { id: string; title: string }
 }
 
 class ZenTimerManager {
@@ -19,6 +20,7 @@ class ZenTimerManager {
   private onCompleteCallback?: () => void
   private startedMusic = false
   private endsAt = 0
+  private task?: ZenTimerState['task']
 
   public subscribe(listener: (state: ZenTimerState) => void): () => void {
     this.listeners.add(listener)
@@ -37,7 +39,8 @@ class ZenTimerManager {
       status: this.status,
       durationMinutes: this.durationMinutes,
       remainingSeconds: this.remainingSeconds,
-      progress
+      progress,
+      task: this.task ? { ...this.task } : undefined
     }
   }
 
@@ -46,13 +49,14 @@ class ZenTimerManager {
     this.listeners.forEach(fn => fn(state))
   }
 
-  public start(minutes = 30, withMusic = true) {
+  public start(minutes = 30, withMusic = true, task?: ZenTimerState['task']) {
     if (this.timerId) window.clearInterval(this.timerId)
 
     this.durationMinutes = minutes
     this.remainingSeconds = minutes * 60
     this.endsAt = Date.now() + minutes * 60000
     this.status = 'running'
+    this.task = task ? { ...task } : undefined
     this.startedMusic = withMusic && !audioManager.getIsPlaying()
     this.notify()
 
@@ -77,6 +81,7 @@ class ZenTimerManager {
       this.timerId = null
     }
     this.status = 'idle'
+    this.task = undefined
     if (this.startedMusic) audioManager.pause()
     this.startedMusic = false
     this.remainingSeconds = this.durationMinutes * 60
