@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('dom', {
     configureAI: (value, key) => ipcRenderer.invoke('ai:configure', value, key),
     runAI: request => ipcRenderer.invoke('ai:run', request),
     cancelAI: id => ipcRenderer.invoke('ai:cancel', id),
+    transcribeAudio: (buffer, mimeType) => ipcRenderer.invoke('ai:transcribe', buffer, mimeType),
     onAI: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('ai:event', listener); return () => ipcRenderer.removeListener('ai:event', listener) }
   },
   vault: {
@@ -44,17 +45,46 @@ contextBridge.exposeInMainWorld('dom', {
     park: ids => ipcRenderer.invoke('browser:park', ids),
     action: (id, action) => ipcRenderer.invoke('browser:action', id, action),
     text: id => ipcRenderer.invoke('browser:text', id),
-    onEvent: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('browser:event', listener); return () => ipcRenderer.removeListener('browser:event', listener) }
+    respondPermission: (id, allowed) => ipcRenderer.invoke('browser:respondPermission', id, allowed),
+    onEvent: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('browser:event', listener); return () => ipcRenderer.removeListener('browser:event', listener) },
+    getAdblockStatus: (tabId, hostname) => ipcRenderer.invoke('browser:adblock:status', tabId, hostname),
+    toggleAdblockSite: (hostname, disabled) => ipcRenderer.invoke('browser:adblock:toggle-site', hostname, disabled),
+    toggleAdblockCookies: enabled => ipcRenderer.invoke('browser:adblock:toggle-cookies', enabled),
+    toggleAdblockGlobal: enabled => ipcRenderer.invoke('browser:adblock:toggle-global', enabled),
+    toggleDarkSite: (tabId, hostname, enabled) => ipcRenderer.invoke('browser:dark:toggle', tabId, hostname, enabled),
+    getReaderContent: tabId => ipcRenderer.invoke('browser:reader:content', tabId),
+    translateText: (text, targetLang) => ipcRenderer.invoke('browser:translate:text', text, targetLang),
+    translateTab: tabId => ipcRenderer.invoke('browser:translate:tab', tabId)
   },
   pickResource: kind => ipcRenderer.invoke('resource:pick', kind),
   openResource: resource => ipcRenderer.invoke('resource:open', resource),
+  osWindows: {
+    listOpen: () => ipcRenderer.invoke('windows:list-open'),
+    minimize: (toPark, activeKeep) => ipcRenderer.invoke('windows:minimize', toPark, activeKeep),
+    restore: (hwndList, focusDomWindow) => ipcRenderer.invoke('windows:restore', hwndList, focusDomWindow),
+    focus: hwnd => ipcRenderer.invoke('windows:focus', hwnd)
+  },
   getAutostart: () => ipcRenderer.invoke('settings:getAutostart'),
   setAutostart: value => ipcRenderer.invoke('settings:setAutostart', value),
   fetchCalendar: url => ipcRenderer.invoke('calendar:fetch', url),
+  fetchSuggestions: query => ipcRenderer.invoke('browser:suggest', query),
+  toggleFullScreen: () => ipcRenderer.invoke('window:toggleFullScreen'),
+  isFullScreen: () => ipcRenderer.invoke('window:isFullScreen'),
   onFocusCapture: callback => {
     const listener = () => callback()
     ipcRenderer.on('focus:capture', listener)
     return () => ipcRenderer.removeListener('focus:capture', listener)
+  },
+  onVoiceToggle: callback => {
+    const listener = () => callback()
+    ipcRenderer.on('capture:toggle-voice', listener)
+    return () => ipcRenderer.removeListener('capture:toggle-voice', listener)
+  },
+  getRecentFiles: () => ipcRenderer.invoke('resource:recentFiles'),
+  onToast: callback => {
+    const listener = (_event, message) => callback(message)
+    ipcRenderer.on('toast:show', listener)
+    return () => ipcRenderer.removeListener('toast:show', listener)
   },
   onStateChanged: callback => {
     const listener = (_event, state) => callback(state)

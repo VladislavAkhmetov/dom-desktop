@@ -109,6 +109,9 @@ async function run() {
   ipcMain.handle('settings:getAutostart', () => false)
   ipcMain.handle('google:configured', () => false)
   ipcMain.handle('feed:fetch', () => '')
+  ipcMain.handle('resource:recentFiles', async () => [
+    { name: 'test-document.txt', target: testDocPath, modifiedAt: new Date().toISOString() }
+  ])
 
   let pickedFile = testDocPath
   ipcMain.handle('resource:pick', async (_event, kind) => {
@@ -135,7 +138,36 @@ async function run() {
   ipcMain.handle('browser:close', (_event, id) => manager.close(id))
   ipcMain.handle('browser:park', (_event, ids) => manager.park(ids))
   ipcMain.handle('browser:action', (_event, id, action) => manager.action(id, action))
+  ipcMain.handle('browser:respondPermission', (_event, id, allowed) => manager.respondPermission(id, allowed))
+  ipcMain.handle('browser:adblock:status', (_event, tabId, hostname) => manager.adblock?.getStatus(tabId, hostname) || { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false })
+  ipcMain.handle('browser:adblock:toggle-site', (_event, hostname, disabled) => {
+    manager.adblock?.toggleSite(hostname, disabled)
+    return manager.adblock?.getStatus(null, hostname)
+  })
+  ipcMain.handle('browser:adblock:toggle-cookies', (_event, enabled) => {
+    manager.adblock?.toggleCookies(enabled)
+    return manager.adblock?.getStatus(null, null)
+  })
+  ipcMain.handle('browser:adblock:toggle-global', (_event, enabled) => {
+    manager.adblock?.toggleGlobal(enabled)
+    return manager.adblock?.getStatus(null, null)
+  })
+  ipcMain.handle('browser:dark:toggle', async (_event, tabId, hostname, enabled) => {
+    manager.adblock?.toggleDarkSite(hostname, enabled)
+    await manager.applyDarkMode(tabId, enabled)
+    return manager.adblock?.getStatus(tabId, hostname)
+  })
+  ipcMain.handle('browser:reader:content', async (_event, tabId) => manager.getReaderContent(tabId))
+  ipcMain.handle('browser:translate:text', async (_event, text) => text)
+  ipcMain.handle('browser:translate:tab', async (_event, tabId) => manager.translateTab(tabId))
+  ipcMain.handle('browser:suggest', async () => [])
   ipcMain.on('page:signal', (event, value) => manager.pageSignal(event.sender, value))
+
+  const osWindows = require('../electron/os-windows.cjs')
+  ipcMain.handle('windows:list-open', () => osWindows.getOpenWindows(process.pid))
+  ipcMain.handle('windows:minimize', (_event, toPark, activeKeep) => { osWindows.minimizeWindows(toPark, activeKeep); return true })
+  ipcMain.handle('windows:restore', (_event, hwndList, focusDom) => { osWindows.restoreWindows(hwndList, focusDom); return true })
+  ipcMain.handle('windows:focus', (_event, hwnd) => osWindows.focusWindow(hwnd))
 
   // 5. Load UI with search: 'cabinet=1'
   await window.loadFile(path.join(__dirname, '../dist/index.html'), { search: 'cabinet=1' })
@@ -163,8 +195,8 @@ async function run() {
 
   // Capture dashboard screenshot
   await new Promise(r => setTimeout(r, 600))
-  const dashImg = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, 'cabinet-native-dashboard.png'), dashImg.toPNG())
+  const dashImg = await window.webContents.capturePage().catch(() => null)
+  if (dashImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-dashboard.png'), dashImg.toPNG())
 
   // 9. Verify clicking "+" in dashboard creates an empty cabinet inside dashboard without popup
   const plusBtnExists = await renderer(() => Boolean(document.querySelector('button[aria-label="Создать пространство"], button[aria-label="Новое пространство"], .space-add-trigger')))
@@ -212,8 +244,8 @@ async function run() {
   assert.equal(addedDoc.target, testDocPath, 'Путь документа должен совпадать с выбранным файлом')
 
   // Capture materials panel screenshot
-  const matImg = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, 'cabinet-native-materials.png'), matImg.toPNG())
+  const matImg = await window.webContents.capturePage().catch(() => null)
+  if (matImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-materials.png'), matImg.toPNG())
 
   // 12. Verify opening a document uses bridge.openResource
   openedResource = null
@@ -255,8 +287,66 @@ async function run() {
   await liveTab.view.webContents.executeJavaScript('document.querySelector("#test-input").value = "Продолжаем работу"')
 
   // Capture browser screenshot
-  const browserImg = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, 'cabinet-native-browser.png'), browserImg.toPNG())
+  const browserImg = await window.webContents.capturePage().catch(() => null)
+  if (browserImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-browser.png'), browserImg.toPNG())
+
+  // The island must keep every toolbar action reachable at both densities.
+  const layoutDir = path.join(testDir, 'attention-layout')
+  fs.mkdirSync(layoutDir, { recursive: true })
+  const { diffState } = await import('../shared/state.js')
+  // Hidden windows defer compositor animation frames; measure and capture the settled UI.
+  const snapshotStyle = await window.webContents.insertCSS('.browser-topbar-main, .browser-topbar-main * { transition: none !important; animation: none !important; }')
+  const quickActionX = await renderer(() => document.querySelector('.browser-quick-actions').getBoundingClientRect().x)
+  const notice = { id: 'layout-notice', title: 'Отправить макет', kind: 'task', createdAt: new Date().toISOString(), dueAt: new Date(Date.now() - 2 * 60000).toISOString(), done: false }
+  for (const active of [false, true]) {
+    const current = await storage.get()
+    const reminders = current.reminders.filter(item => item.id !== notice.id)
+    const remote = await storage.apply(diffState(current, { ...current, reminders: active ? [...reminders, notice] : reminders }))
+    window.webContents.send('state:changed', remote)
+    await renderer(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() })
+    try {
+      await waitFor(async () => await renderer(() => document.querySelector('.browser-attention-island').dataset.wide) === String(active), 'плотность острова')
+    } catch (error) {
+      console.error('Attention state:', active, await renderer(() => ({ wide: document.querySelector('.browser-attention-island').dataset.wide, signal: document.querySelector('.browser-attention-island').dataset.signal, text: document.querySelector('.browser-day-pulse').textContent, focus: document.activeElement?.className })))
+      throw error
+    }
+    for (const width of [1440, 1024, 768, 390, 320]) {
+      window.setSize(width, 900)
+      await new Promise(resolve => setTimeout(resolve, 350))
+      const layout = await renderer(() => {
+        const actions = [...document.querySelectorAll('.browser-topbar-main button')].filter(button => button.getClientRects().length).map(button => {
+          const rect = button.getBoundingClientRect()
+          return { label: button.getAttribute('aria-label') || button.title || button.textContent, x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom }
+        })
+        const island = document.querySelector('.browser-attention-island')
+        return { viewport: innerWidth, actions, quickX: document.querySelector('.browser-quick-actions').getBoundingClientRect().x, islandWidth: island.getBoundingClientRect().width, wide: island.dataset.wide }
+      })
+      assert.ok(active ? layout.islandWidth >= 200 : layout.islandWidth <= 50, `${width}px: фактическая ширина острова ${layout.islandWidth}, data-wide=${layout.wide}`)
+      for (const action of layout.actions) assert.ok(action.x >= -1 && action.right <= layout.viewport + 1 && action.right - action.x >= 24, `${width}px: ${action.label} остаётся доступной в окне`)
+      for (let a = 0; a < layout.actions.length; a++) for (let b = a + 1; b < layout.actions.length; b++) {
+        const first = layout.actions[a], second = layout.actions[b]
+        const overlapX = Math.min(first.right, second.right) - Math.max(first.x, second.x)
+        const overlapY = Math.min(first.bottom, second.bottom) - Math.max(first.y, second.y)
+        assert.ok(overlapX <= 1 || overlapY <= 1, `${width}px: ${first.label} не перекрывает ${second.label}`)
+      }
+      if (width === 1440) assert.ok(Math.abs(layout.quickX - quickActionX) <= 1, 'Быстрые действия не сдвигаются при расширении острова')
+      if ([1440, 768, 320].includes(width)) {
+        const height = await renderer(() => Math.ceil(document.querySelector('.browser-topbar').getBoundingClientRect().bottom + 48))
+        const shot = await window.webContents.capturePage({ x: 0, y: 0, width: layout.viewport, height }).catch(() => window.webContents.capturePage().catch(() => null))
+        if (shot) fs.writeFileSync(path.join(layoutDir, `toolbar-${width}-${active ? 'signal' : 'quiet'}.png`), shot.toPNG())
+      }
+    }
+  }
+  window.setSize(1440, 900)
+  await renderer(() => document.querySelector('.browser-day-pulse').click())
+  await waitFor(() => manager.blocked, 'карточка внимания перекрывает нативную страницу')
+  assert.ok(await renderer(() => [...document.querySelectorAll('.island-actions button')].some(button => button.textContent === 'Сделано')), 'Действие напоминания доступно вторым нажатием')
+  await renderer(() => document.querySelector('[aria-label="Свернуть уведомление"]').click())
+  await waitFor(() => !manager.blocked, 'закрытие карточки возвращает нативную страницу')
+  const withoutNotice = await storage.apply([{ op: 'remove', path: ['reminders', '@layout-notice'] }])
+  window.webContents.send('state:changed', withoutNotice)
+  await window.webContents.removeInsertedCSS(snapshotStyle)
+  console.log('Attention layout passed: five widths, two densities, stable quick actions and native overlay. Screenshots: ' + layoutDir)
 
   // 14. Verify WebContentsView is hidden when returning to dashboard
   await renderer(() => document.querySelector('#root .browser-home').click())
@@ -277,13 +367,18 @@ async function run() {
   assert.ok(persistedState.spaces.some(sp => sp.resources.some(r => r.kind === 'file')), 'Документ сохранился после перезапуска')
   await reloadedStorage.close()
 
+  // 16. Verify Windows window management bridge in native renderer
+  const openWindows = await window.webContents.executeJavaScript('window.dom.osWindows.listOpen()')
+  assert.ok(Array.isArray(openWindows), 'window.dom.osWindows.listOpen() должен возвращать массив в Electron')
+  console.log(`[Native Test] osWindows.listOpen() вернул ${openWindows.length} окон`)
+
   server.close()
-  console.log('Cabinet Native Tests passed: isolation, migration, persistence, real tabs, document picking and dashboard rules OK.')
+  console.log('Cabinet Native Tests passed: isolation, migration, persistence, real tabs, document picking, osWindows and dashboard rules OK.')
   app.exit(0)
 }
 
 app.whenReady().then(run).catch(err => {
-  console.error('Cabinet Native Test failure:', err)
+  console.error('Cabinet Native Test failure:', err && err.stack ? err.stack : err)
   if (server) server.close()
   app.exit(1)
 })

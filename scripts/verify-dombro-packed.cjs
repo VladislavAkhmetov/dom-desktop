@@ -12,9 +12,13 @@ if (!fs.existsSync(exePath)) {
 const smokeId = String(Date.now())
 const smokeDir = path.join(process.env.TEMP || 'C:\\Windows\\Temp', `dom-smoke-${smokeId}`)
 
+const env = { ...process.env }
+delete env.ELECTRON_RUN_AS_NODE
+
 const child = spawn(exePath, [`--smoke-test`, `--smoke-id=${smokeId}`], {
-  stdio: 'ignore',
+  stdio: 'inherit',
   windowsHide: true,
+  env,
   detached: false
 })
 

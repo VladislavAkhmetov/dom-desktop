@@ -51,5 +51,30 @@ describe('облачный ИИ', () => {
     const running = ai.run({ id: 'x', prompt: 'Текст', contexts: [], consent: true }); await new Promise(resolve => setTimeout(resolve, 10)); ai.cancel('x'); await running; expect(data.get().aiJournal[0].status).toBe('cancelled')
   })
   it('не выполняет фоновые запросы без выбранных данных', async () => { const data = fixture(), keys = vault(); let calls = 0; const ai = new AI({ ...data, vault: keys, fetcher: async () => { calls++; return stream([]) } }); await ai.configure({ ...configuration, background: { enabled: true, hour: 0, mail: false, news: false } }, 'fixture'); await ai.background(); expect(calls).toBe(0) })
+  it('transcribe отправляет аудио в Whisper API и возвращает текст', async () => {
+    const data = fixture(), keys = vault()
+    let endpointCalled = ''
+    const ai = new AI({
+      ...data,
+      vault: keys,
+      fetcher: async (url: string, options: any) => {
+        endpointCalled = url
+        expect(options.method).toBe('POST')
+        expect(options.headers.Authorization).toBe('Bearer fixture')
+        expect(options.body instanceof FormData).toBe(true)
+        return response({ text: 'Напомни завтра купить хлеб' })
+      }
+    })
+    await ai.configure({ ...configuration, provider: 'openai' }, 'fixture')
+    const result = await ai.transcribe(new Uint8Array([1, 2, 3, 4]))
+    expect(result).toEqual({ text: 'Напомни завтра купить хлеб' })
+    expect(endpointCalled).toBe('https://api.openai.com/v1/audio/transcriptions')
+  })
+  it('transcribe отклоняет неподдерживаемый провайдер без Whisper', async () => {
+    const data = fixture(), keys = vault()
+    const ai = new AI({ ...data, vault: keys, fetcher: async () => response({}) })
+    await ai.configure({ ...configuration, provider: 'anthropic' }, 'fixture')
+    await expect(ai.transcribe(new Uint8Array([1, 2, 3]))).rejects.toThrow('поддерживается для OpenAI')
+  })
 })
 it('ограничивает сетевые ответы и отказывает небезопасным протоколам', async () => { await expect(fetchLimited('file:///private')).rejects.toThrow(); await expect(fetchLimited('https://example.com', {}, 3, async () => new Response('four'))).rejects.toThrow('слишком большой') })

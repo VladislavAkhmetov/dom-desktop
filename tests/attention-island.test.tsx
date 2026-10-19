@@ -15,21 +15,23 @@ const now = new Date(2026, 8, 30, 20, 0)
 let root: Root
 let stored: AppState
 let saveSucceeds: boolean
-const onSpace = vi.fn(), onOpen = vi.fn(), onFocus = vi.fn()
+const onSpace = vi.fn(), onOpen = vi.fn(), onFocus = vi.fn(), onDay = vi.fn()
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now)
   stored = emptyState(); saveSucceeds = true
   timer.state = { status: 'idle', remainingSeconds: 1800, durationMinutes: 30, progress: 0 }
   timer.reset.mockReset(); timer.stop.mockReset(); onSpace.mockReset(); onOpen.mockReset(); onFocus.mockReset()
+  onDay.mockReset()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   document.body.innerHTML = '<div id="test-root"></div>'
   root = createRoot(document.getElementById('test-root')!)
 })
-afterEach(async () => { await act(async () => root.unmount()); vi.useRealTimers() })
+afterEach(async () => { await act(async () => root.unmount()); vi.useRealTimers(); vi.unstubAllGlobals() })
 
-function Surface() {
+function Surface({ browser = false, layoutLocked = false }: { browser?: boolean; layoutLocked?: boolean }) {
   const [state, setState] = useState(stored)
-  return <AttentionIsland state={state} now={now} onOpen={onOpen} onSpace={onSpace} onFocus={onFocus} onChange={async update => {
+  return <AttentionIsland browser={browser} layoutLocked={layoutLocked} onDay={onDay} state={state} now={now} onOpen={onOpen} onSpace={onSpace} onFocus={onFocus} onChange={async update => {
     if (!saveSucceeds) return false
     stored = update(stored); setState(stored); return true
   }} />
@@ -95,5 +97,51 @@ describe('контекстные действия уведомления', () =>
     expect(stored.reminders[0]).toMatchObject({ done: false, dueAt: now.toISOString() })
     expect(stored.dismissedNotices || []).toEqual([])
     expect(document.querySelector('.island-details')).toBeNull()
+  })
+})
+
+describe('динамический остров браузинга', () => {
+  async function render(locked = false) { await act(async () => root.render(<Surface browser layoutLocked={locked} />)) }
+  it('остаётся кругом без срочного и открывает план дня за два нажатия', async () => {
+    await render()
+    expect(document.querySelector('.browser-attention-island')?.getAttribute('data-wide')).toBe('false')
+    expect(document.querySelector('.browser-day-pulse svg')).toBeNull()
+    expect(document.querySelector('.browser-day-pulse')?.textContent).toBe('')
+    await click(document.querySelector<HTMLButtonElement>('.browser-day-pulse')!)
+    expect(document.querySelector('.island-details h2')?.textContent).toBe('Нет срочного')
+    await click(button('План дня'))
+    expect(onDay).toHaveBeenCalledOnce()
+    expect(document.querySelector('.island-details')).toBeNull()
+    expect(document.activeElement).toBe(document.querySelector('.browser-day-pulse'))
+  })
+  it('обозначает новый сигнал сразу, но удерживает ширину до конца взаимодействия', async () => {
+    await render(true)
+    task(); await render(true)
+    expect(document.querySelector('.browser-attention-island')?.getAttribute('data-signal')).toBe('true')
+    expect(document.querySelector('.browser-attention-island')?.getAttribute('data-wide')).toBe('false')
+    expect(document.querySelector('.browser-day-pulse')?.getAttribute('aria-label')).toContain('Забрать заказ')
+    await render(false)
+    expect(document.querySelector('.browser-attention-island')?.getAttribute('data-wide')).toBe('true')
+  })
+  it('завершает дело за два нажатия и сохраняет отмену при смене представления', async () => {
+    task(); await render()
+    await click(document.querySelector<HTMLButtonElement>('.browser-day-pulse')!)
+    await click(button('Сделано'))
+    expect(stored.reminders[0].done).toBe(true)
+    expect(document.querySelector('.browser-attention-island')?.getAttribute('data-wide')).toBe('false')
+    await act(async () => root.render(<Surface />))
+    await click(button('Вернуть'))
+    expect(stored.reminders[0].done).toBe(false)
+    expect(stored.dismissedNotices).toEqual([])
+  })
+  it('не подменяет открытую карточку новым сигналом под рукой пользователя', async () => {
+    meeting(); await render()
+    await click(document.querySelector<HTMLButtonElement>('.browser-day-pulse')!)
+    task(); await render()
+    expect(document.querySelector('.island-details h2')?.textContent).toBe('Обсудить макет')
+    await click(button('Войти во встречу'))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ target: 'https://meet.google.com/abc-defg-hij' }))
+    expect(stored.reminders[0].done).toBe(false)
+    expect(document.querySelector('.browser-day-pulse')?.textContent).toBe('Сейчас · Забрать заказ')
   })
 })

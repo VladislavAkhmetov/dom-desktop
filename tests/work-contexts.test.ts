@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { applyChanges, diffState, migrateState, normalizeSpace } from '../shared/state'
 import { saveCheckpoint } from '../src/checkpoints'
-import { activateContext, contextDocuments, contextSession, createContext, currentContext, latestContinuation, recordDocumentOpen, updateContextSession } from '../src/workContexts'
+import { activateContext, activeOrRecentContinuation, contextDocuments, contextSession, createContext, currentContext, latestContinuation, recordDocumentOpen, updateContextSession } from '../src/workContexts'
 import { resumeDocuments } from '../src/resumeContext'
 import type { AppState, Resource, Space } from '../src/types'
 
@@ -69,6 +69,15 @@ describe('дела и автоматическое сохранение', () => 
     const fresh = recordDocumentOpen({ ...normalizeSpace({ ...legacy(), id: 'study', lastActiveAt: undefined }), activeSession: undefined }, file, undefined, after)
     expect(latestContinuation({ ...state(old), spaces: [old, fresh] })?.space.id).toBe('study')
     expect(latestContinuation({ ...state(old), spaces: [old, { ...fresh, archivedAt: after }] })?.space.id).toBe('work')
+  })
+  it('activeOrRecentContinuation возвращает пространство даже без вкладок и чекпоинтов', () => {
+    const empty = normalizeSpace({ ...legacy(), id: 'empty-space', name: 'Ришат', activeSession: undefined, lastActiveAt: undefined, resources: [] })
+    expect(latestContinuation(state(empty))).toBeUndefined()
+    const active = activeOrRecentContinuation(state(empty))
+    expect(active).toBeDefined()
+    expect(active?.space.name).toBe('Ришат')
+    expect(active?.documents).toEqual([])
+    expect(active?.tabs).toEqual([])
   })
   it('не запускает приложения, исполняемые файлы и завершённые документы; убирает повтор пути', () => {
     const executable = { ...file, id: 'script', target: 'D:\\danger.cmd' }

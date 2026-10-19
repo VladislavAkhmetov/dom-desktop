@@ -13,6 +13,7 @@ import './glass.css'
 import './hub.css'
 import './browser/browsing.css'
 import './browser/browser-shell.css'
+import './browser/browser-attention.css'
 import './motion.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

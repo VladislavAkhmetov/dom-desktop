@@ -198,7 +198,7 @@ describe('новая вкладка без попапа', () => {
     await typeAddress('.browser-omnibox input', 'дизайн вкладок')
     await click(document.querySelector<HTMLButtonElement>('.browser-omnibox [type="submit"]')!)
     expect(contextSession(web()).tabs).toHaveLength(3)
-    expect(contextSession(web()).tabs.at(-1)).toMatchObject({ id: searchTab.id, title: 'Поиск: дизайн вкладок', url: `https://yandex.ru/search/?text=${encodeURIComponent('дизайн вкладок')}` })
+    expect(contextSession(web()).tabs.at(-1)).toMatchObject({ id: searchTab.id, title: 'Поиск: дизайн вкладок', url: `https://www.google.com/search?q=${encodeURIComponent('дизайн вкладок')}` })
   })
 
   it('Ctrl L из сайта выбирает текущий адрес, Escape отменяет ввод, Enter меняет эту же вкладку', async () => {

@@ -70,6 +70,41 @@ export function newCabinet(state: AppState, id: string, tabId: string, tone: Spa
   return { ...state, activeSpaceId: id, spaces: [...state.spaces, space] }
 }
 
+export function formatSpaceDisplayName(space: Space): string {
+  const rawName = space.name?.trim() || ''
+  const isGeneric = !rawName || /^(Поток:\s*\d|Поток$|Новое пространство)/i.test(rawName) || space.nameOrigin === 'temporary' || space.nameOrigin === 'suggested'
+  if (!isGeneric) {
+    return rawName
+  }
+  const session = contextSession(space)
+  const tab = (session?.tabs || []).find(t => t.id === session?.activeTabId && t.url) || (session?.tabs || []).find(t => t.url)
+  if (tab && tab.url) {
+    try {
+      const u = new URL(tab.url)
+      const host = u.hostname.replace(/^www\./, '').toLowerCase()
+      let domainLabel = ''
+      if (host.includes('vk.com')) domainLabel = 'VK'
+      else if (host.includes('figma.com')) domainLabel = 'Figma'
+      else if (host.includes('youtube.com')) domainLabel = 'YouTube'
+      else if (host.includes('github.com')) domainLabel = 'GitHub'
+      else if (host.includes('google.com')) domainLabel = 'Google'
+      else if (host.includes('yandex.ru') || host.includes('ya.ru')) domainLabel = 'Яндекс'
+      else if (tab.title && !/^(Новая вкладка|vk\.com|https?:\/\/)/i.test(tab.title)) {
+        domainLabel = tab.title.slice(0, 24)
+      } else {
+        domainLabel = host
+      }
+      return `Поток · ${domainLabel}`
+    } catch {}
+  }
+  const material = space.resources?.find(r => r.kind !== 'app')
+  if (material) {
+    const label = material.name.replace(/\.[a-z0-9]+$/i, '').trim()
+    if (label) return `Поток · ${label}`
+  }
+  return rawName || 'Новое пространство'
+}
+
 /** A transparent metadata fallback; it does not call or pretend to be AI. */
 export function nameFromMaterials(space: Space): string | undefined {
   const session = contextSession(space)

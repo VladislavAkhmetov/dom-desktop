@@ -23,12 +23,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chrome-button { border-radius: 50%; }
 .chrome-button:has(span) { border-radius: 18px; }
 .chrome-secondary { border-top-color: rgba(255,255,255,.32); }
-.browser-chrome .chrome-spaces { align-items: center; gap: 5px; padding: 4px 0 6px; }
-.chrome-space { min-height: 32px; padding: 6px 13px; border-radius: 18px; color: #587064; font-size: 13px; }
+.browser-chrome .chrome-spaces { align-items: center; gap: 6px; padding: 4px 0 6px; }
+.browser-chrome .chrome-spaces-track { align-items: center; gap: 6px; }
+.browser-chrome .chrome-spaces-actions { align-items: center; gap: 6px; }
+.browser-chrome .chrome-spaces-scroll-arrows { align-items: center; gap: 2px; }
+.browser-chrome .chrome-spaces-scroll-btn { width: 30px; height: 30px; border-radius: 50%; color: #436252; }
+.browser-chrome .chrome-spaces-scroll-btn:hover:not(:disabled) { background: rgba(255,255,255,.5); color: #1e3f30; }
+.chrome-space { min-height: 32px; padding: 6px 13px; border-radius: 18px; color: #587064; font-size: 13px; transition: color 0.2s ease; }
 .chrome-space.selected { background: rgba(255,255,255,.62); box-shadow: 0 2px 5px rgba(51,80,61,.035); }
 .chrome-space.selected::after { display: none; }
 .chrome-space:hover { background: rgba(255,255,255,.36); }
-.chrome-new-space { width: 32px; padding: 0; }
+.chrome-new-space, .chrome-space-search { width: 32px; padding: 0; }
 .browsing .chrome-spaces { padding: 3px 0; }
 .browsing .chrome-space { border-radius: 12px; }
 

@@ -1,13 +1,18 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, Globe2, RotateCw, X } from 'lucide-react'
 import { bridge } from '../bridge'
 import type { BrowserPaneProps } from './BrowserPane'
 import { NewPage } from './NewPage'
 import { isCabinetPreview } from '../cabinetMode'
 
-export function NativePane({ tab, space, isSplit, isPaired, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onNavigate, onFocusAddress }: BrowserPaneProps) {
+export function NativePane({ tab, space, isSplit, isPaired, coverImage, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onNavigate, onFocusAddress }: BrowserPaneProps) {
   const viewport = useRef<HTMLDivElement>(null)
-  const [cover, setCover] = useState('')
+  const reduced = useReducedMotion()
+  const [cover, setCover] = useState(coverImage || '')
+  useLayoutEffect(() => {
+    if (coverImage && !cover) setCover(coverImage)
+  }, [coverImage])
   const prototypeUrl = tab?.url && !bridge.browser && (() => { try { const url = new URL(tab.url); return url.origin === window.location.origin && (url.pathname === '/prototype/weekend.html' || isCabinetPreview && url.pathname === '/assets/moodboard/index.html') ? url.href : null } catch { return null } })()
   useLayoutEffect(() => {
     if (!tab || !bridge.browser || !/^https?:\/\//i.test(tab.url) || tab.error) { if (tab?.error) bridge.browser?.hide(tab.id); return }
@@ -24,7 +29,7 @@ export function NativePane({ tab, space, isSplit, isPaired, onCloseSplit, onOpen
     {(isPaired || isSplit) && <div className="split-label"><span>{tab?.title || 'Страница рядом'}</span>{isSplit && <button onClick={onCloseSplit} aria-label="Закрыть просмотр рядом"><X size={18} /></button>}</div>}
     <div className="native-viewport" ref={viewport} data-workspace-tab-id={tab?.id}>
       {tab?.error ? <div className="browser-handoff"><h2>Не удалось открыть страницу</h2><p>{tab.error}</p><button className="resume-primary" onClick={() => bridge.browser?.action(tab.id, 'reload')}><RotateCw size={16} /> Попробовать снова</button></div>
-      : tab?.url ? bridge.browser ? <>{cover && <img className="native-cover" src={cover} alt="" />}</> : prototypeUrl ? <iframe className="prototype-page" title={tab.title || 'Страница пространства'} src={prototypeUrl} sandbox="allow-same-origin" /> : <div className="browser-handoff"><Globe2 size={32} /><h2>{tab.title}</h2><button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть в браузере <ArrowUpRight size={20} /></button></div>
+      : tab?.url ? bridge.browser ? <>{cover && <motion.img layoutId={reduced ? undefined : `tab-cover-${space.id}-${tab.id}`} className="native-cover" src={cover} alt="" />}</> : prototypeUrl ? <iframe className="prototype-page" title={tab.title || 'Страница пространства'} src={prototypeUrl} sandbox="allow-same-origin" /> : <div className="browser-handoff"><Globe2 size={32} /><h2>{tab.title}</h2><button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть в браузере <ArrowUpRight size={20} /></button></div>
       : <NewPage space={space} autoFocus={!isSplit} onOpen={(address, title) => onNavigate?.(address, title)} onOpenResource={onOpenResource} onAddLink={onAddLink} onFocusAddress={onFocusAddress} />}
     </div>
   </section>

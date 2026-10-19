@@ -86,3 +86,33 @@ export function latestContinuation(state: AppState) {
     })
   }).sort((a, b) => (Date.parse(b.at || '') || 0) - (Date.parse(a.at || '') || 0))[0]
 }
+
+export function activeOrRecentContinuation(state: AppState) {
+  const latest = latestContinuation(state)
+  if (latest) return latest
+
+  const candidateSpaces = state.spaces.filter(space => !space.archivedAt && space.kind !== 'web')
+  if (!candidateSpaces.length) {
+    const anySpaces = state.spaces.filter(space => !space.archivedAt)
+    if (!anySpaces.length) return undefined
+    candidateSpaces.push(anySpaces[0])
+  }
+
+  const activeCandidate = candidateSpaces.find(space => space.id === state.activeSpaceId)
+  const chosenSpace = activeCandidate || [...candidateSpaces].sort((a, b) => (Date.parse(b.lastActiveAt || '') || 0) - (Date.parse(a.lastActiveAt || '') || 0))[0]
+  if (!chosenSpace) return undefined
+
+  const space = normalizeSpace(chosenSpace)
+  const context = currentContext(space)
+  const documents = contextDocuments(space, context)
+  const tabs = contextSession(space, context.id).tabs.filter(tab => tab.url)
+  const at = context.lastActiveAt || space.lastActiveAt || undefined
+  return {
+    space,
+    context,
+    documents,
+    tabs,
+    at,
+    title: contextTitle(space, context) || space.name || 'Пространство'
+  }
+}

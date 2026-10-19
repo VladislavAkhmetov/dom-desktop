@@ -12,6 +12,7 @@ export interface BrowserPaneProps {
   space: Space
   isSplit?: boolean
   isPaired?: boolean
+  coverImage?: string
   onCloseSplit?: () => void
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
   onSaveTab: (tab: BrowserTab) => void

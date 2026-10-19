@@ -48,10 +48,10 @@ svg { flex: none; }
 
 /* APPLE-LIKE INTERACTION PHYSICS (macOS / iOS) */
 button, .card, .schedule-event-pill, .morning-tab-row, .dynamic-island, .status-item-btn {
-  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1), background-color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:active {
-  transform: scale(0.985);
+  opacity: 0.9;
 }
 
 .app-shell {
@@ -64,7 +64,24 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   background-size: cover;
   background-repeat: no-repeat;
   transition: background-image 0.35s ease;
+  animation: app-calm-fade-in 0.35s ease-out both;
 }
+
+@keyframes app-calm-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell {
+    animation: none !important;
+  }
+}
+
 .page-wrap {
   width: 100%;
   height: 100%;
@@ -161,6 +178,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
 
 /* TOPBAR CALM OMNIBOX */
 .calm-omnibox {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;

@@ -1,5 +1,18 @@
-.resume-time { color: var(--muted, #63766a); font-size: 12px; white-space: nowrap; }
-.dashboard-home .context-resume .resume-next-step { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.5; }
+.resume-time { color: rgba(44, 54, 46, 0.55); font-size: 12px; white-space: nowrap; }
+.resume-heading-actions { display: flex; align-items: center; gap: 12px; }
+.resume-space-title { font-size: 18px !important; font-weight: 600 !important; color: #1C241E !important; margin: 0; }
+.resume-space-link { display: inline-flex; align-items: center; gap: 8px; color: #1C241E; text-decoration: none; border: none; background: transparent; cursor: pointer; padding: 0; }
+.resume-space-link:hover { color: #2F4F3E; }
+.resume-body-content { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex: 1; min-height: 0; }
+.resume-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.resume-subtitle-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.resume-subtitle { font-size: 14px; font-weight: 500; color: #2C362E; }
+.resume-center-covers { flex: none; display: flex; align-items: center; justify-content: center; padding: 0 16px 0 8px; }
+.resume-cover-stack { position: relative; width: 72px; height: 46px; user-select: none; pointer-events: none; flex: none; }
+.resume-cover-stack-img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.14); border: 1px solid rgba(0,0,0,0.08); background: #fdfdfc; }
+.dashboard-home .context-resume .resume-next-step { margin: 0; color: #2C362E; font-size: 14px; line-height: 1.5; }
+.resume-primary { background: #2F4F3E !important; color: #ffffff !important; border: none !important; border-radius: 10px; font-size: 14px; font-weight: 600; padding: 10px 20px; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 2px 8px rgba(47,79,62,0.25); }
+.resume-primary:hover:not(:disabled) { background: #243e31 !important; }
 .resume-contents { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-width: 0; }
 .resume-material { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; min-height: 34px; color: #496456; font-size: 13px; text-align: left; }
 .resume-material svg { flex: none; }

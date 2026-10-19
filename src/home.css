@@ -262,7 +262,7 @@
 
 .calm-apps { display: flex; gap: 10px; align-items: center; }
 .calm-app-wrapper { position: relative; display: inline-flex; align-items: center; }
-.calm-apps > button, .calm-app-btn {
+.calm-apps > button:not(.quick-app-add), .calm-app-btn {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -279,7 +279,7 @@
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.calm-apps > button:hover, .calm-app-btn:hover { background: rgba(238, 245, 232, 0.95); }
+.calm-apps > button:not(.quick-app-add):hover, .calm-app-btn:hover { background: rgba(238, 245, 232, 0.95); }
 .calm-app-btn.active { background: #e2ece0; color: #1f3525; }
 .calm-app-icon { display: grid; place-items: center; width: 22px; height: 24px; }
 .calm-app-icon .figma-mark { transform: none; }

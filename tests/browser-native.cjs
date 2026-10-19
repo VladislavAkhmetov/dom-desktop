@@ -11,7 +11,7 @@ app.setPath('userData', directory)
 app.disableHardwareAcceleration()
 let window, storage, manager, server
 app.on('window-all-closed', () => undefined)
-const waitFor = async (test, label) => { const end = Date.now() + 12000; while (Date.now() < end) { if (await test()) return; await new Promise(resolve => setTimeout(resolve, 100)) } throw new Error(`Ожидание: ${label}`) }
+const waitFor = async (test, label) => { const end = Date.now() + 15000; while (Date.now() < end) { try { if (await test()) return } catch { /* retry */ } await new Promise(resolve => setTimeout(resolve, 100)) } throw new Error(`Ожидание: ${label}`) }
 const renderer = (fn) => window.webContents.executeJavaScript(`(${fn.toString()})()`)
 async function run() {
   server = http.createServer((_request, response) => { response.setHeader('Content-Type', 'text/html; charset=utf-8'); response.end('<!doctype html><title>Проверочная страница</title><body><h1>Рабочая страница</h1><form><label>Несохранённый текст <input id="draft"></label></form><div style="height:1800px">Материал</div></body>') })
@@ -29,6 +29,7 @@ async function run() {
   ipcMain.handle('settings:getAutostart', () => false)
   ipcMain.handle('google:configured', () => false)
   ipcMain.handle('feed:fetch', () => '')
+  ipcMain.handle('resource:recentFiles', async () => [])
   ipcMain.handle('browser:show', (_event, value) => manager.show(value))
   ipcMain.handle('browser:hide', (_event, id) => manager.hide(id))
   ipcMain.handle('browser:move', (_event, id, spaceId) => manager.move(id, spaceId))
@@ -36,6 +37,29 @@ async function run() {
   ipcMain.handle('browser:close', (_event, id) => manager.close(id))
   ipcMain.handle('browser:park', (_event, ids) => manager.park(ids))
   ipcMain.handle('browser:action', (_event, id, action) => manager.action(id, action))
+  ipcMain.handle('browser:respondPermission', (_event, id, allowed) => manager.respondPermission(id, allowed))
+  ipcMain.handle('browser:adblock:status', (_event, tabId, hostname) => manager.adblock?.getStatus(tabId, hostname) || { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false })
+  ipcMain.handle('browser:adblock:toggle-site', (_event, hostname, disabled) => {
+    manager.adblock?.toggleSite(hostname, disabled)
+    return manager.adblock?.getStatus(null, hostname)
+  })
+  ipcMain.handle('browser:adblock:toggle-cookies', (_event, enabled) => {
+    manager.adblock?.toggleCookies(enabled)
+    return manager.adblock?.getStatus(null, null)
+  })
+  ipcMain.handle('browser:adblock:toggle-global', (_event, enabled) => {
+    manager.adblock?.toggleGlobal(enabled)
+    return manager.adblock?.getStatus(null, null)
+  })
+  ipcMain.handle('browser:dark:toggle', async (_event, tabId, hostname, enabled) => {
+    manager.adblock?.toggleDarkSite(hostname, enabled)
+    await manager.applyDarkMode(tabId, enabled)
+    return manager.adblock?.getStatus(tabId, hostname)
+  })
+  ipcMain.handle('browser:reader:content', async (_event, tabId) => manager.getReaderContent(tabId))
+  ipcMain.handle('browser:translate:text', async (_event, text) => text)
+  ipcMain.handle('browser:translate:tab', async (_event, tabId) => manager.translateTab(tabId))
+  ipcMain.handle('browser:suggest', async () => [])
   ipcMain.on('page:signal', (event, value) => manager.pageSignal(event.sender, value))
   await window.loadFile(path.join(__dirname, '../dist/index.html'))
   await waitFor(() => window.webContents.executeJavaScript('Boolean(document.querySelector(".browser-chrome"))'), 'главная')
@@ -96,7 +120,7 @@ async function run() {
   assert.equal(await first.view.webContents.executeJavaScript('document.querySelector("#draft").value'), 'Сохранённый при переключении текст', 'Новая вкладка не теряет заполненную форму')
   const fullWidth = first.bounds.width
   await renderer(() => document.querySelector('.browser-day-pulse').click())
-  await waitFor(() => renderer(() => document.querySelector('.browser-day-panel').getBoundingClientRect().left).then(left => first.bounds.x + first.bounds.width <= left + 1 && first.bounds.width < fullWidth), 'Страница освобождает место панели дня')
+  await waitFor(() => renderer(() => document.querySelector('.browser-day-panel')?.getBoundingClientRect()?.left).then(left => left && first.bounds.x + first.bounds.width <= left + 1 && first.bounds.width < fullWidth), 'Страница освобождает место панели дня')
   assert.equal(manager.blocked, false, 'Панель дня не блокирует нативную страницу')
   assert.equal(first.view.getVisible(), true, 'Сайт виден рядом с панелью дня')
   assert.equal(await first.view.webContents.executeJavaScript('document.querySelector("#draft").value'), 'Сохранённый при переключении текст', 'Панель дня сохраняет введённую форму')

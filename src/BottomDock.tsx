@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PenLine, Pin, Plus, Sparkles, Timer, X } from 'lucide-react'
-import type { AppState, Resource } from './types'
+import type { AppState, RecentFile, Resource } from './types'
 import { zenTimer } from './focus/zenTimer'
 import { PlayerIsland } from './player/PlayerIsland'
 import { AppLauncherPopover } from './AppLauncherPopover'
@@ -14,6 +14,7 @@ interface Props {
   state: AppState
   now: Date
   currentSpaceId?: string
+  recentFiles?: RecentFile[]
   appIcon: (name: string) => ReactNode
   onCapture: () => void
   onFocus: () => void
@@ -27,7 +28,7 @@ interface Props {
   onAddApp: (spaceId?: string) => void
 }
 
-export function BottomDock({ state, now, currentSpaceId, appIcon, onFocus, onSaveThought, onAssistant, onOpenResource, onAddLink, onAddFile, onOpenSettings, onChange, onAddApp }: Props) {
+export function BottomDock({ state, now, currentSpaceId, recentFiles, appIcon, onFocus, onSaveThought, onAssistant, onOpenResource, onAddLink, onAddFile, onOpenSettings, onChange, onAddApp }: Props) {
   const [entryMode, setEntryMode] = useState<'note' | 'ai' | null>(null)
   const entryAnchor = useRef<HTMLDivElement>(null)
   const noteButton = useRef<HTMLButtonElement>(null)
@@ -76,7 +77,33 @@ export function BottomDock({ state, now, currentSpaceId, appIcon, onFocus, onSav
       if (/powerpoint/i.test(app.name)) return doc.kind === 'file' && /\.pptx?$/i.test(doc.target)
       return doc.target.toLowerCase().includes(app.name.toLowerCase())
     })
-    return matches.sort((a, b) => Date.parse(b.lastOpenedAt || b.createdAt) - Date.parse(a.lastOpenedAt || a.createdAt))
+    const extraDocs: Array<Resource & { spaceName?: string }> = []
+    if (recentFiles?.length) {
+      for (const rf of recentFiles) {
+        const ext = rf.target.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || ''
+        let match = false
+        if (/photoshop/i.test(app.name) && ['psd', 'psb', 'png', 'jpg', 'jpeg'].includes(ext)) match = true
+        else if (/illustrator/i.test(app.name) && ['ai', 'eps', 'svg'].includes(ext)) match = true
+        else if (/word/i.test(app.name) && ['doc', 'docx', 'rtf'].includes(ext)) match = true
+        else if (/excel/i.test(app.name) && ['xls', 'xlsx', 'csv'].includes(ext)) match = true
+        else if (/powerpoint/i.test(app.name) && ['ppt', 'pptx'].includes(ext)) match = true
+        else if (/indesign/i.test(app.name) && ['indd', 'idml'].includes(ext)) match = true
+        else if (rf.target.toLowerCase().includes(app.name.toLowerCase())) match = true
+        if (match && !docs.some(d => d.target.toLowerCase() === rf.target.toLowerCase())) {
+          extraDocs.push({
+            id: `recent:${rf.target}`,
+            name: rf.name,
+            kind: 'file',
+            target: rf.target,
+            createdAt: rf.modifiedAt,
+            lastOpenedAt: rf.modifiedAt,
+            spaceName: 'Недавний в системе'
+          })
+        }
+      }
+    }
+    const combined = [...matches, ...extraDocs]
+    return combined.sort((a, b) => Date.parse(b.lastOpenedAt || b.createdAt) - Date.parse(a.lastOpenedAt || a.createdAt))
   }
 
   function newDocument(app: Resource) {
@@ -92,10 +119,13 @@ export function BottomDock({ state, now, currentSpaceId, appIcon, onFocus, onSav
     else onAddFile(currentSpace?.id)
   }
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+  const captureShortcut = isMac ? 'Cmd + Shift + Space' : 'Ctrl + Shift + Space'
+
   return <footer className="hub-bottom" aria-label="Быстрые действия"><div className="calm-dock">
     <div className="calm-dock-left">
       <div className="dock-entry-anchor" ref={entryAnchor}>
-        <FluidButton ref={noteButton} className="calm-capture dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'note' ? null : 'note') }} title="Записать · Ctrl + Alt + Space" aria-expanded={entryMode === 'note'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><PenLine size={19} /><span>Записать</span></FluidButton>
+        <FluidButton ref={noteButton} className="calm-capture dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'note' ? null : 'note') }} title={`Записать · ${captureShortcut}`} aria-expanded={entryMode === 'note'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><PenLine size={19} /><span>Записать</span></FluidButton>
         <FluidButton ref={aiButton} className="dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'ai' ? null : 'ai') }} aria-expanded={entryMode === 'ai'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><Sparkles size={19} /><span>Спросить ИИ</span></FluidButton>
         <AnimatePresence>{entryMode && <FluidSurface key="quick-entry" className="dock-entry-popover" id="dock-quick-entry" role="dialog" aria-label={entryMode === 'note' ? 'Быстрая запись' : 'Вопрос ИИ'} style={{ x: '-50%', transformOrigin: 'bottom center' }}>
           <button className="dock-entry-close calm-icon" aria-label="Закрыть быстрый ввод" onClick={() => closeEntry(true)}><X size={20} /></button>
@@ -125,7 +155,7 @@ export function BottomDock({ state, now, currentSpaceId, appIcon, onFocus, onSav
           onClose={() => setActiveAppId(null)}
         />}
       </div>)}
-      <button className="quick-app-add" aria-label="Настроить быстрые приложения" title="Добавить или закрепить приложение" onClick={() => { setActiveAppId(null); setEditingApps(true) }}><Plus size={19} /></button>
+      <button className="quick-app-add" aria-label="Настроить быстрые приложения" title="Добавить или закрепить приложение" onClick={() => { setActiveAppId(null); setEditingApps(true) }}><Plus size={18} strokeWidth={2} /></button>
     </div>
     {editingApps && <QuickAppsSettings state={state} onChange={onChange} currentSpaceId={currentSpace?.id} appIcon={appIcon} onPick={() => onAddApp(currentSpace?.id)} onClose={() => setEditingApps(false)} />}
   </footer>

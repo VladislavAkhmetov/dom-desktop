@@ -381,6 +381,19 @@ describe('браузерный пилот кабинетов', () => {
     expect(current.spaces[0].activeSession!.tabs.map(tab => tab.id).sort()).toEqual(['brief', 'ref'])
     expect(current.spaces[0].activeSession!.tabs.find(tab => tab.id === 'brief')).toMatchObject({ protected: true, scrollY: 150 })
   })
+  it('сохраняет отмену завершения из острова при возвращении в дашборд', async () => {
+    const now = new Date().toISOString()
+    initial.reminders = [{ id: 'send', title: 'Отправить макет', createdAt: now, dueAt: now, kind: 'task', done: false }]
+    await mount(); await continueWork()
+    await click(document.querySelector('.browser-day-pulse'))
+    await click(button('Сделано'))
+    expect(current.reminders[0].done).toBe(true)
+    await click(labelled('Вернуться в дашборд'))
+    expect(document.querySelector('.browser-topbar')).toBeNull()
+    await click(button('Вернуть'))
+    expect(current.reminders[0].done).toBe(false)
+    expect(current.dismissedNotices).toEqual([])
+  })
   it('удаляет кабинет с явным описанием и восстанавливает его через отмену', async () => {
     await mount(); await click(button('Все пространства'))
     await click(labelled('Действия с пространством «Логотип»')); await click(button('Удалить пространство'))

@@ -1,7 +1,7 @@
 const { spawnSync } = require('node:child_process')
 const path = require('node:path')
 const fs = require('node:fs')
-const executable = path.resolve(process.argv[2] || 'release/review-ready/win-unpacked/Дом.exe')
+const executable = path.resolve(process.argv[2] || 'release/win-unpacked/dombro.exe')
 if (!fs.existsSync(executable)) throw new Error('Сначала упакуйте приложение')
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE
 const id = String(Date.now())

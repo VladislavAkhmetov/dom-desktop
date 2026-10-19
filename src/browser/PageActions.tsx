@@ -110,11 +110,11 @@ export function PageActions({ spaceId, spaces, tab, onFavorite, onRemoveFavorite
         setKind('favorite'); setQuery(''); setError('')
         if (tab && !favorite) void perform(() => onFavorite(tab, {}), false)
       }}><Star size={17} /></button>
-    <button ref={moveButton} type="button" className={`browser-move-page ${kind === 'move' ? 'is-selected' : ''}`} disabled={!tab?.url} aria-label="Перенести в другое пространство" title="Перенести вкладку в другое пространство"
+    <button ref={moveButton} type="button" className={`browser-move-page ${kind === 'move' ? 'is-selected' : ''}`} disabled={!tab?.url} aria-label="Перенести в другое пространство" title="Перенести в другое пространство"
       aria-haspopup="dialog" aria-expanded={kind === 'move'} aria-controls={kind === 'move' ? id : undefined} onClick={() => {
         if (kind === 'move') { close(); return }
         setKind('move'); setQuery(''); setError('')
-      }}><FolderInput size={17} /><span>Перенести</span></button>
+      }}><FolderInput size={17} /></button>
     {createPortal(<AnimatePresence>{kind && <FluidSurface key={id} ref={popover} id={id} role="dialog" aria-labelledby={`${id}-heading`}
       className="browser-menu action-menu-popover browser-destination-popover" style={{ position: 'fixed', ...position, right: 'auto', zIndex: 120, transformOrigin: 'top right' }} onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return }

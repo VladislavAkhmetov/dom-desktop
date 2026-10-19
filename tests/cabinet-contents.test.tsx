@@ -26,3 +26,31 @@ it('показывает верхний фрагмент только по за�
     expect(space).toEqual(before)
   } finally { await act(async () => root.unmount()); container.remove() }
 })
+
+it('отображает чип недавнего файла и позволяет добавить его в материалы в 1 клик', async () => {
+  const space = normalizeSpace({ id: 'brand', name: 'Бренд', tone: 'sage', resources: [], activeSession: { tabs: [], activeTabId: '' } })
+  const addRecent = vi.fn(), dismissRecent = vi.fn()
+  const recent = { name: 'макет.psd', target: 'D:\\designs\\макет.psd', modifiedAt: new Date().toISOString() }
+  const container = document.createElement('div'); document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(<CabinetContents space={space} destinations={[]} covers={{}} drag={null}
+      onSelectTab={vi.fn()} onCloseTab={vi.fn()} onSaveTab={vi.fn()} onMoveTab={vi.fn()} onReorderTab={vi.fn()}
+      onOpen={vi.fn()} onRemove={vi.fn()} onCopy={vi.fn()} onAddDocument={vi.fn()} onAddLink={vi.fn()}
+      onStartDrag={vi.fn()} onFinishDrag={vi.fn()}
+      suggestedRecentFile={recent} onAddRecentFile={addRecent} onDismissRecentFile={dismissRecent} />))
+
+    const chip = container.querySelector('.cabinet-recent-chip')
+    expect(chip).not.toBeNull()
+    expect(chip?.textContent).toContain('макет.psd')
+
+    const addBtn = chip?.querySelector<HTMLButtonElement>('.cabinet-recent-chip-btn')
+    await act(async () => addBtn?.click())
+    expect(addRecent).toHaveBeenCalledWith(recent)
+
+    const dismissBtn = chip?.querySelector<HTMLButtonElement>('.cabinet-recent-chip-dismiss')
+    await act(async () => dismissBtn?.click())
+    expect(dismissRecent).toHaveBeenCalledWith(recent.target)
+  } finally { await act(async () => root.unmount()); container.remove() }
+})
+

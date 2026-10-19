@@ -1,4 +1,7 @@
-const { app, BrowserWindow, dialog, shell, ipcMain, globalShortcut, Notification, Tray, Menu, nativeImage, safeStorage } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, globalShortcut, Notification, Tray, Menu, nativeImage, safeStorage, session, components } = require('electron')
+
+app.commandLine.appendSwitch('enable-features', 'WinSystemLocationProvider')
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 const fs = require('node:fs')
 const path = require('node:path')
 const { createStorage } = require('./storage.cjs')
@@ -8,6 +11,7 @@ const { Gmail } = require('./gmail.cjs')
 const { AI } = require('./ai.cjs')
 const { fetchLimited } = require('./network.cjs')
 const { pathToFileURL } = require('node:url')
+const osWindows = require('./os-windows.cjs')
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173'
 const isDev = process.argv.includes('--dev')
@@ -43,7 +47,14 @@ let browser
 let captureWindow
 let vault, gmail, ai
 function trustedURL(value) {
-  try { const url = new URL(value); return isDev ? url.origin === new URL(DEV_URL).origin && url.pathname === '/' : url.href.split(/[?#]/)[0] === pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href } catch { return false }
+  try {
+    const url = new URL(value)
+    if (isDev) return url.origin === new URL(DEV_URL).origin && url.pathname === '/'
+    const expected = pathToFileURL(path.resolve(__dirname, '..', 'dist', 'index.html')).href.toLowerCase()
+    return url.href.split(/[?#]/)[0].toLowerCase() === expected
+  } catch {
+    return false
+  }
 }
 function trustedHandle(channel, handler) {
   ipcMain.handle(channel, (event, ...args) => {
@@ -99,6 +110,12 @@ trustedHandle('calendar:remove', async (_event, id) => { vault.set(`calendar:${i
 trustedHandle('ai:configure', (_event, value, key) => ai.configure(value, key))
 trustedHandle('ai:run', (event, request) => ai.run(request, value => { if (!event.sender.isDestroyed()) event.sender.send('ai:event', value) }))
 trustedHandle('ai:cancel', (_event, id) => ai.cancel(id))
+trustedHandle('ai:transcribe', async (_event, buffer, mimeType) => {
+  if (!buffer || typeof buffer !== 'object') throw new Error('Некорректный аудио-буфер')
+  const uint8 = Buffer.isBuffer(buffer) ? buffer : new Uint8Array(buffer)
+  if (uint8.byteLength > 15_000_000) throw new Error('Аудиозапись слишком большая')
+  return ai.transcribe(uint8, typeof mimeType === 'string' ? mimeType : 'audio/webm')
+})
 trustedHandle('vault:credentials:list', (_event, origin) => vault.getCredentials(origin))
 trustedHandle('vault:credentials:save', (_event, cred) => vault.saveCredential(cred))
 trustedHandle('vault:credentials:remove', (_event, id) => vault.removeCredential(id))
@@ -113,13 +130,104 @@ async function showCapture() {
     if (isDev) await captureWindow.loadURL(isCabinetPilot ? `${DEV_URL}/?cabinet=1#capture` : `${DEV_URL}/#capture`)
     else await captureWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), isCabinetPilot ? { search: 'cabinet=1', hash: 'capture' } : { hash: 'capture' })
   }
-  if (!isSmoke) { captureWindow.show(); captureWindow.focus() }
+  if (!isSmoke) {
+    if (captureWindow.isVisible() && captureWindow.isFocused()) {
+      captureWindow.webContents.send('capture:toggle-voice')
+      return
+    }
+    captureWindow.show(); captureWindow.focus()
+  }
+}
+
+let splashWindow = null
+let splashStartTime = 0
+
+function createSplash() {
+  if (isSmoke || splashWindow) return
+  splashStartTime = Date.now()
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 230,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true
+    }
+  })
+  splashWindow.loadFile(path.join(__dirname, 'splash.html')).catch(() => undefined)
+  splashWindow.once('ready-to-show', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.setOpacity(0)
+      splashWindow.show()
+      fadeInWindow(splashWindow, 200)
+    }
+  })
+}
+
+function fadeInWindow(win, duration = 300) {
+  if (!win || win.isDestroyed()) return
+  win.setOpacity(0)
+  win.show()
+  win.focus()
+  const startTime = Date.now()
+  const timer = setInterval(() => {
+    if (!win || win.isDestroyed()) {
+      clearInterval(timer)
+      return
+    }
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(1, elapsed / duration)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    win.setOpacity(eased)
+    if (progress >= 1) {
+      clearInterval(timer)
+      win.setOpacity(1)
+    }
+  }, 16)
+}
+
+function fadeOutWindow(win, duration = 200, callback) {
+  if (!win || win.isDestroyed()) {
+    if (callback) callback()
+    return
+  }
+  const startTime = Date.now()
+  const initialOpacity = win.getOpacity() || 1
+  const timer = setInterval(() => {
+    if (!win || win.isDestroyed()) {
+      clearInterval(timer)
+      if (callback) callback()
+      return
+    }
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(1, elapsed / duration)
+    const opacity = initialOpacity * (1 - Math.pow(progress, 2))
+    win.setOpacity(Math.max(0, opacity))
+    if (progress >= 1) {
+      clearInterval(timer)
+      win.setOpacity(0)
+      if (callback) callback()
+    }
+  }, 16)
 }
 
 function showWindow() {
-  if (!mainWindow) return
-  mainWindow.show()
-  mainWindow.focus()
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isMaximized()) mainWindow.maximize()
+  if (!mainWindow.isVisible()) {
+    fadeInWindow(mainWindow, 250)
+  } else {
+    mainWindow.focus()
+  }
 }
 
 function getAssetPath(filename) {
@@ -138,7 +246,7 @@ function getAssetPath(filename) {
 function createWindow() {
   const appIcon = getAssetPath('icon.ico')
   mainWindow = new BrowserWindow({
-    show: !isSmoke,
+    show: false,
     width: 1440,
     height: 920,
     minWidth: 900,
@@ -157,6 +265,48 @@ function createWindow() {
       additionalArguments: isCabinetPilot ? ['--cabinet-pilot'] : []
     }
   })
+
+  const MIN_SPLASH_DURATION = 900
+  let revealed = false
+  const reveal = () => {
+    if (revealed || !mainWindow || mainWindow.isDestroyed()) return
+    revealed = true
+
+    if (isSmoke) {
+      mainWindow.maximize()
+      mainWindow.show()
+      return
+    }
+
+    const elapsed = Date.now() - (splashStartTime || Date.now())
+    const delay = Math.max(0, MIN_SPLASH_DURATION - elapsed)
+
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        fadeOutWindow(splashWindow, 200, () => {
+          if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.destroy()
+            splashWindow = null
+          }
+        })
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.maximize()
+        fadeInWindow(mainWindow, 300)
+      }
+    }, delay)
+  }
+
+  mainWindow.once('ready-to-show', reveal)
+  setTimeout(reveal, 2500)
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      event.preventDefault()
+      mainWindow.setFullScreen(!mainWindow.isFullScreen())
+    }
+  })
+
   browser = new BrowserManager(mainWindow, isCabinetPilot ? 'persist:dom-cabinet-browser' : 'persist:dom-browser')
   mainWindow.on('close', event => {
     if (!quitting) {
@@ -230,7 +380,18 @@ trustedHandle('resource:pick', async (_event, kind) => {
   return result.canceled ? null : result.filePaths[0]
 })
 trustedHandle('resource:open', async (_event, resource) => {
-  if (!resource || !['app', 'file', 'link'].includes(resource.kind)) return { ok: false, error: 'Некорректный ресурс' }
+  if (!resource || !['app', 'file', 'link', 'window'].includes(resource.kind)) return { ok: false, error: 'Некорректный ресурс' }
+  if (resource.kind === 'window') {
+    if (resource.windowHwnd && osWindows.isWindowAlive(resource.windowHwnd)) {
+      osWindows.focusWindow(resource.windowHwnd)
+      return { ok: true }
+    }
+    if (resource.target && fs.existsSync(resource.target)) {
+      const error = await shell.openPath(resource.target)
+      return error ? { ok: false, error } : { ok: true }
+    }
+    return { ok: false, error: 'Окно закрыто, а файл программы не найден.' }
+  }
   if (resource.kind === 'link') {
     try {
       const url = new URL(resource.target)
@@ -245,6 +406,70 @@ trustedHandle('resource:open', async (_event, resource) => {
   const error = await shell.openPath(resource.target)
   return error ? { ok: false, error } : { ok: true }
 })
+async function getRecentFiles() {
+  if (process.platform !== 'win32') return []
+  try {
+    const recentDir = path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Recent')
+    if (!fs.existsSync(recentDir)) return []
+    const entries = fs.readdirSync(recentDir)
+    const links = []
+    const now = Date.now()
+    const maxAge = 48 * 60 * 60 * 1000
+    for (const name of entries) {
+      if (!name.toLowerCase().endsWith('.lnk')) continue
+      try {
+        const fullPath = path.join(recentDir, name)
+        const stat = fs.statSync(fullPath)
+        if (now - stat.mtimeMs > maxAge) continue
+        links.push({ fullPath, mtimeMs: stat.mtimeMs })
+      } catch { /* skip inaccessible */ }
+    }
+    links.sort((a, b) => b.mtimeMs - a.mtimeMs)
+    const results = []
+    const seen = new Set()
+    for (const item of links.slice(0, 40)) {
+      try {
+        const shortcut = shell.readShortcutLink(item.fullPath)
+        const target = shortcut.target
+        if (!target || seen.has(target.toLowerCase())) continue
+        if (!path.isAbsolute(target) || !fs.existsSync(target)) continue
+        const stat = fs.statSync(target)
+        if (!stat.isFile()) continue
+        const ext = path.extname(target).toLowerCase()
+        if (['.exe', '.lnk', '.url', '.dll', '.bat', '.cmd', '.msi', '.bin', '.sys'].includes(ext)) continue
+        seen.add(target.toLowerCase())
+        results.push({
+          name: path.basename(target),
+          target,
+          modifiedAt: new Date(item.mtimeMs).toISOString()
+        })
+        if (results.length >= 8) break
+      } catch { /* skip unreadable */ }
+    }
+    return results
+  } catch {
+    return []
+  }
+}
+trustedHandle('resource:recentFiles', () => getRecentFiles())
+trustedHandle('windows:list-open', () => osWindows.getOpenWindows(process.pid))
+trustedHandle('windows:minimize', (_event, toPark, activeKeep) => {
+  osWindows.minimizeWindows(toPark, activeKeep)
+  return true
+})
+trustedHandle('windows:restore', (_event, hwndList, focusDomWindow) => {
+  let domHwnd = null
+  if (focusDomWindow && mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      domHwnd = '0x' + mainWindow.getNativeWindowHandle().readBigInt64LE().toString(16)
+    } catch {
+      // fallback
+    }
+  }
+  osWindows.restoreWindows(hwndList, domHwnd)
+  return true
+})
+trustedHandle('windows:focus', (_event, hwnd) => osWindows.focusWindow(hwnd))
 trustedHandle('settings:getAutostart', () => app.getLoginItemSettings().openAtLogin)
 trustedHandle('settings:setAutostart', (_event, value) => {
   app.setLoginItemSettings({ openAtLogin: Boolean(value) })
@@ -259,6 +484,13 @@ trustedHandle('calendar:fetch', async (_event, url) => {
   return fetchLimited(targetUrl)
 })
 trustedHandle('window:show', () => { showWindow(); return true })
+trustedHandle('window:toggleFullScreen', () => {
+  if (!mainWindow) return false
+  const next = !mainWindow.isFullScreen()
+  mainWindow.setFullScreen(next)
+  return next
+})
+trustedHandle('window:isFullScreen', () => Boolean(mainWindow?.isFullScreen()))
 trustedHandle('capture:close', () => captureWindow?.hide())
 trustedHandle('browser:show', (_event, value) => browser.show(value))
 trustedHandle('browser:hide', (_event, id) => browser.hide(id))
@@ -268,6 +500,46 @@ trustedHandle('browser:close', (_event, id) => browser.close(id))
 trustedHandle('browser:park', (_event, ids) => browser.park(ids))
 trustedHandle('browser:action', (_event, id, action) => browser.action(id, action))
 trustedHandle('browser:text', (_event, id) => browser.text(id))
+trustedHandle('browser:respondPermission', (_event, id, allowed) => browser?.respondPermission(id, allowed))
+trustedHandle('browser:adblock:status', (_event, tabId, hostname) => browser.adblock.getStatus(tabId, hostname))
+trustedHandle('browser:adblock:toggle-site', (_event, hostname, disabled) => {
+  browser.adblock.toggleSite(hostname, disabled)
+  return browser.adblock.getStatus(null, hostname)
+})
+trustedHandle('browser:adblock:toggle-cookies', (_event, enabled) => {
+  browser.adblock.toggleCookies(enabled)
+  return browser.adblock.getStatus(null, null)
+})
+trustedHandle('browser:adblock:toggle-global', (_event, enabled) => {
+  browser.adblock.toggleGlobal(enabled)
+  return browser.adblock.getStatus(null, null)
+})
+trustedHandle('browser:dark:toggle', async (_event, tabId, hostname, enabled) => {
+  browser.adblock.toggleDarkSite(hostname, enabled)
+  await browser.applyDarkMode(tabId, enabled)
+  return browser.adblock.getStatus(tabId, hostname)
+})
+trustedHandle('browser:reader:content', async (_event, tabId) => browser.getReaderContent(tabId))
+trustedHandle('browser:translate:text', async (_event, text, targetLang) => {
+  const { translateText } = require('./translate.cjs')
+  return translateText(text, targetLang)
+})
+trustedHandle('browser:translate:tab', async (_event, tabId) => browser.translateTab(tabId))
+trustedHandle('browser:suggest', async (_event, query) => {
+  if (!query || typeof query !== 'string') return []
+  const q = query.trim().slice(0, 100)
+  if (!q) return []
+  try {
+    const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data[1]) ? data[1].slice(0, 8) : []
+  } catch {
+    return []
+  }
+})
 ipcMain.on('page:signal', (event, value) => browser?.pageSignal(event.sender, value))
 ipcMain.on('page:password-offer', (event, value) => browser?.passwordOffer(event.sender, value))
 
@@ -284,6 +556,17 @@ if (!gotTheLock) {
   })
 
   app.whenReady().then(async () => {
+    if (components && typeof components.whenReady === 'function') {
+      try { await components.whenReady() } catch (err) { console.warn('[DRM] components.whenReady() warning:', err.message) }
+    }
+    if (!isSmoke) createSplash()
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (['geolocation', 'notifications'].includes(permission)) return callback(true)
+      callback(false)
+    })
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+      return ['geolocation', 'notifications'].includes(permission)
+    })
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ label: 'Дом', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] }] : []),
       { label: 'Правка', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
@@ -297,9 +580,42 @@ if (!gotTheLock) {
     setInterval(() => gmail.sync().catch(() => undefined), 120000)
     setInterval(() => ai.background().catch(() => undefined), 60000)
     gmail.sync().catch(() => undefined)
-    if (!isSmoke) globalShortcut.register(process.platform === 'darwin' ? 'Command+Option+Space' : 'Control+Alt+Space', () => {
-      showCapture().catch(error => console.error('Capture failed:', error.message))
-    })
+    if (!isSmoke) {
+      globalShortcut.register(process.platform === 'darwin' ? 'Command+Shift+Space' : 'Control+Shift+Space', () => {
+        showCapture().catch(error => console.error('Capture failed:', error.message))
+      })
+      globalShortcut.register(process.platform === 'darwin' ? 'Command+Shift+S' : 'Control+Shift+S', async () => {
+        try {
+          const recents = await getRecentFiles()
+          const top = recents[0]
+          if (!top) return
+          const current = await storage.get()
+          const spaceId = current.activeSpaceId || current.spaces.find(s => !s.archivedAt && s.kind !== 'web')?.id
+          if (!spaceId) return
+          const space = current.spaces.find(s => s.id === spaceId)
+          if (!space) return
+          const already = space.resources.some(r => r.kind === 'file' && r.target.toLowerCase() === top.target.toLowerCase())
+          if (already) {
+            mainWindow?.webContents.send('toast:show', `«${top.name}» уже в «${space.name}»`)
+            return
+          }
+          const resource = {
+            id: crypto.randomUUID(),
+            name: top.name,
+            kind: 'file',
+            target: top.target,
+            createdAt: new Date().toISOString()
+          }
+          const { diffState } = await import('../shared/state.js')
+          const next = { ...current, spaces: current.spaces.map(s => s.id === spaceId ? { ...s, resources: [...s.resources, resource] } : s) }
+          const applied = await storage.apply(diffState(current, next))
+          broadcastState(applied)
+          mainWindow?.webContents.send('toast:show', `«${top.name}» добавлен в «${space.name}»`)
+        } catch (error) {
+          console.error('Capture shortcut failed:', error)
+        }
+      })
+    }
     checkReminders()
     setInterval(checkReminders, 15_000)
     if (isSmoke) require('./smoke.cjs')({ window: mainWindow, storage, vault, showCapture, getCapture: () => captureWindow, browser }).then(async () => { quitting = true; await storage.close(); app.exit(0) }).catch(async error => { console.error(error); quitting = true; await storage.close(); app.exit(1) })

@@ -5,6 +5,9 @@ export function recentMaterials(resources: Resource[]): Resource[] {
 }
 
 export function resourceAppLabel(resource: Resource): string {
+  if (resource.kind === 'window') {
+    return resource.exeName ? resource.exeName.replace(/\.exe$/i, '') : 'Окно Windows'
+  }
   if (resource.kind === 'app') return 'Приложение'
   if (resource.kind === 'link') {
     try {

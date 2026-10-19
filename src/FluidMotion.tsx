@@ -49,14 +49,25 @@ export function FluidGroup({ as: Tag = 'div', axis = 'x', itemSelector = ':scope
     root.querySelectorAll(itemSelector).forEach(element => resize?.observe(element))
     const mutations = new MutationObserver(schedule)
     mutations.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-selected', 'aria-pressed', 'aria-current', 'disabled', 'hidden'] })
+    const parent = root.parentElement
+    parent?.addEventListener('scroll', schedule, { passive: true })
+    root.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', schedule)
     document.fonts?.ready.then(() => { if (!disposed) schedule() })
-    return () => { disposed = true; cancelAnimationFrame(frame); resize?.disconnect(); mutations.disconnect(); window.removeEventListener('resize', schedule) }
+    return () => { disposed = true; cancelAnimationFrame(frame); resize?.disconnect(); mutations.disconnect(); parent?.removeEventListener('scroll', schedule); root.removeEventListener('scroll', schedule); window.removeEventListener('resize', schedule) }
   }, [children, itemSelector, selectedSelector])
 
   const selected = items.find(item => item.selected)
-  const hover = items.find(item => item.element === hovered) || selected
-  const preview = hover && hover !== selected && hovered !== null
+  const lastHovered = useRef<Item | null>(null)
+  const currentHoveredItem = hovered ? items.find(item => item.element === hovered) : null
+  if (currentHoveredItem) {
+    lastHovered.current = currentHoveredItem
+  } else if (lastHovered.current) {
+    const updated = items.find(item => item.element === lastHovered.current?.element)
+    if (updated) lastHovered.current = updated
+  }
+  const hover = currentHoveredItem || lastHovered.current || selected
+  const preview = Boolean(currentHoveredItem && currentHoveredItem !== selected)
   const target = (item: Rect) => ({ x: item.x, y: item.y, width: item.width, height: item.height })
 
   return <Tag {...props} ref={ref as Ref<HTMLElement & HTMLDivElement>} className={`fluid-group ${className}`} onPointerMove={event => {
@@ -66,14 +77,36 @@ export function FluidGroup({ as: Tag = 'div', axis = 'x', itemSelector = ':scope
     const bounds = event.currentTarget.getBoundingClientRect()
     const horizontal = axis === 'x'
     const scale = horizontal ? bounds.width / (event.currentTarget.offsetWidth || 1) : bounds.height / (event.currentTarget.offsetHeight || 1)
+    const crossScale = horizontal ? bounds.height / (event.currentTarget.offsetHeight || 1) : bounds.width / (event.currentTarget.offsetWidth || 1)
     const point = (horizontal ? event.clientX - bounds.left : event.clientY - bounds.top) / (scale || 1)
       + (horizontal ? event.currentTarget.scrollLeft - event.currentTarget.clientLeft : event.currentTarget.scrollTop - event.currentTarget.clientTop)
-    let closest: Item | undefined, distance = Infinity
+    const crossPoint = (horizontal ? event.clientY - bounds.top : event.clientX - bounds.left) / (crossScale || 1)
+      + (horizontal ? event.currentTarget.scrollTop - event.currentTarget.clientTop : event.currentTarget.scrollLeft - event.currentTarget.clientLeft)
+
+    let closest: Item | undefined
     for (const item of items) {
       const start = horizontal ? item.x : item.y, size = horizontal ? item.width : item.height
-      if (point >= start && point <= start + size) { closest = item; break }
-      const next = Math.abs(point - start - size / 2)
-      if (next < distance) { distance = next; closest = item }
+      const crossStart = horizontal ? item.y : item.x, crossSize = horizontal ? item.height : item.width
+      if (point >= start && point <= start + size && crossPoint >= crossStart && crossPoint <= crossStart + crossSize) {
+        closest = item
+        break
+      }
+    }
+    if (!closest) {
+      let minDistance = Infinity
+      for (const item of items) {
+        const start = horizontal ? item.x : item.y, size = horizontal ? item.width : item.height
+        const crossStart = horizontal ? item.y : item.x, crossSize = horizontal ? item.height : item.width
+        const inCross = crossPoint >= crossStart - 6 && crossPoint <= crossStart + crossSize + 6
+        const inNearMain = point >= start - 10 && point <= start + size + 10
+        if (inCross && inNearMain) {
+          const dist = Math.abs(point - (start + size / 2))
+          if (dist < minDistance) {
+            minDistance = dist
+            closest = item
+          }
+        }
+      }
     }
     setHovered(closest?.element || null)
   }} onPointerLeave={event => { onPointerLeave?.(event); pointerInside.current = false; setHovered(null) }} onFocus={event => {
@@ -84,15 +117,15 @@ export function FluidGroup({ as: Tag = 'div', axis = 'x', itemSelector = ':scope
     onBlur?.(event)
     if (!event.currentTarget.contains(event.relatedTarget as Node) && !pointerInside.current) setHovered(null)
   }}>
-    {selected && <motion.span aria-hidden="true" className="fluid-selection" initial={false} animate={{ ...target(selected), opacity: preview ? .85 : 1 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: { duration: .08 } }} />}
-    {hover && <motion.span aria-hidden="true" className="fluid-hover" initial={false} animate={{ ...target(hover), opacity: preview ? 1 : 0 }} transition={reduced ? fluidInstant : { ...fluidSpring.fast, opacity: { duration: .08 } }} />}
+    {selected && <motion.span aria-hidden="true" className="fluid-selection" initial={false} animate={{ ...target(selected), opacity: preview ? .85 : 1 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: { duration: .2, ease: 'easeOut' } }} />}
+    {hover && <motion.span aria-hidden="true" className="fluid-hover" initial={false} animate={{ ...target(hover), opacity: preview ? 1 : 0 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: { duration: .2, ease: 'easeOut' } }} />}
     {children}
   </Tag>
 }
 
 export function FluidButton({ className = '', ...props }: HTMLMotionProps<'button'>) {
   const reduced = useFluidReducedMotion()
-  return <motion.button initial={false} whileHover={reduced || props.disabled ? undefined : { scale: 1.006 }} whileTap={reduced || props.disabled ? undefined : { scale: .985 }} transition={reduced ? fluidInstant : fluidSpring.fast} {...props} className={`fluid-button ${className}`} />
+  return <motion.button initial={false} whileHover={undefined} whileTap={reduced || props.disabled ? undefined : { opacity: 0.88 }} transition={reduced ? fluidInstant : fluidSpring.fast} {...props} className={`fluid-button ${className}`} />
 }
 
 /** Exiting panels become inert immediately while their visual exit completes. */

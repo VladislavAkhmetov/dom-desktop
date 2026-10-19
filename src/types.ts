@@ -1,5 +1,6 @@
-export type ResourceKind = 'app' | 'file' | 'link'
+export type ResourceKind = 'app' | 'file' | 'link' | 'window'
 export type SpaceTone = 'sage' | 'lilac' | 'sand' | 'blue'
+export type SupportedLocale = 'ru' | 'en' | 'de' | 'es' | 'fr' | 'zh'
 
 export interface Resource {
   id: string
@@ -11,12 +12,29 @@ export interface Resource {
   pinnedToDock?: boolean
   completedAt?: string
   bookmarkGroupId?: string
+  windowHwnd?: string
+  windowTitle?: string
+  exeName?: string
+}
+
+export interface OpenWindowItem {
+  hwnd: string
+  title: string
+  exeName: string
+  exePath: string
+  isMinimized: boolean
 }
 
 export interface BookmarkGroup { id: string; name: string }
 export interface BookmarkDestination { spaceId: string; groupId?: string }
 
 export type SpaceKind = 'base' | 'stream' | 'web'
+
+export interface RecentFile {
+  name: string
+  target: string
+  modifiedAt: string
+}
 
 export interface BrowserTab {
   id: string
@@ -32,6 +50,9 @@ export interface BrowserTab {
   protected?: boolean
   error?: string
   closedIndex?: number
+  readerable?: boolean
+  lang?: string
+  blockedCount?: number
 }
 
 export interface BrowserSession {
@@ -206,13 +227,26 @@ export interface HistoryItem {
   spaceId?: string
 }
 
+export interface DashboardCustomPreset {
+  id: string
+  name: string
+  widgets: WidgetConfig[]
+  createdAt: string
+}
+
 export interface AppState {
   version: 1 | 2
   revision?: number
   cabinetVersion?: 1
+  locale?: SupportedLocale
   userProfile?: UserProfile
   backgroundImage?: string
-  dashboard?: { preset: 'overview' | 'quiet'; widgets: WidgetConfig[] }
+  dashboard?: {
+    preset: string
+    widgets: WidgetConfig[]
+    gridVersion?: number
+    customPresets?: DashboardCustomPreset[]
+  }
   liveHints?: boolean
   dismissedNotices?: string[]
   notifiedNotices?: string[]
@@ -243,6 +277,8 @@ export interface AppState {
     nextStep: string
     savedAt: string
   }
+  scratchpadNote?: string
+  habitsState?: HabitsState
 }
 
 export interface SavedCredential {
@@ -285,6 +321,7 @@ export interface DomBridge {
     configureAI(configuration: AIConfiguration, key?: string): Promise<void>
     runAI(request: AIRequest): Promise<void>
     cancelAI(id: string): Promise<void>
+    transcribeAudio?(buffer: Uint8Array | ArrayBuffer, mimeType?: string): Promise<{ text: string }>
     onAI(callback: (event: AIEvent) => void): () => void
   }
   browser?: {
@@ -293,22 +330,90 @@ export interface DomBridge {
     move?(id: string, spaceId: string): Promise<void>
     block(value: boolean): Promise<void>
     close(id: string): Promise<boolean>
-    park(ids: string[]): Promise<{ protectedCount: number }>
+    park(ids: string[]): Promise<{ protectedCount: number; freedMB?: number }>
     action(id: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'zoomIn' | 'zoomOut' | 'zoomReset'): Promise<void>
     text(id: string): Promise<{ url: string; title: string; text: string }>
+    respondPermission?(id: string, allowed: boolean | null): Promise<boolean | void>
     onEvent(callback: (value: NativeBrowserEvent) => void): () => void
+    getAdblockStatus?(tabId?: string, hostname?: string): Promise<AdblockStatus>
+    toggleAdblockSite?(hostname: string, disabled: boolean): Promise<AdblockStatus>
+    toggleAdblockCookies?(enabled: boolean): Promise<AdblockStatus>
+    toggleAdblockGlobal?(enabled: boolean): Promise<AdblockStatus>
+    toggleDarkSite?(tabId: string, hostname: string, enabled: boolean): Promise<AdblockStatus>
+    getReaderContent?(tabId: string): Promise<ReaderArticle | null>
+    translateText?(text: string, targetLang?: string): Promise<string>
+    translateTab?(tabId: string): Promise<{ ok: boolean; count?: number; error?: string }>
   }
   pickResource(kind: 'app' | 'file'): Promise<string | null>
   openResource(resource: Resource): Promise<OpenResult>
+  osWindows?: {
+    listOpen(): Promise<OpenWindowItem[]>
+    minimize(toPark: string[], activeKeep?: string[]): Promise<boolean>
+    restore(hwndList: string[], focusDomWindow?: boolean): Promise<boolean>
+    focus(hwnd: string): Promise<boolean>
+  }
   getAutostart(): Promise<boolean>
   setAutostart(value: boolean): Promise<boolean>
   fetchCalendar?(url: string): Promise<string>
+  fetchSuggestions?(query: string): Promise<string[]>
+  toggleFullScreen?(): Promise<boolean>
+  isFullScreen?(): Promise<boolean>
+  getRecentFiles?(): Promise<RecentFile[]>
+  onToast?(callback: (message: string) => void): () => void
   onFocusCapture(callback: () => void): () => void
+  onVoiceToggle?(callback: () => void): () => void
   onStateChanged(callback: (state: AppState) => void): () => void
 }
 
-export type WidgetType = 'resume' | 'day' | 'capture' | 'spaces' | 'mail' | 'news' | 'focus'
-export interface WidgetConfig { id: string; type: WidgetType; size: 'S' | 'M' | 'L'; detail?: 'titles' | 'short' | 'full' }
+export interface ReaderArticle {
+  title: string
+  byline: string
+  content: string
+  textContent: string
+  excerpt: string
+  siteName: string
+  length: number
+  readingTimeMinutes: number
+}
+
+export interface AdblockStatus {
+  enabled: boolean
+  siteDisabled: boolean
+  blockedCount: number
+  blockCookies: boolean
+  isDark: boolean
+}
+
+export type WidgetType = 'resume' | 'day' | 'capture' | 'spaces' | 'mail' | 'news' | 'focus' | 'reading' | 'notes' | 'weather' | 'map' | 'habits'
+export type WidgetSize = 'S' | 'M' | 'L'
+export interface WidgetConfig {
+  id: string
+  type: WidgetType
+  size?: WidgetSize
+  colSpan?: number
+  rowSpan?: number
+  detail?: 'titles' | 'short' | 'full'
+}
+
+export type HabitKind = 'counter' | 'checkbox' | 'timer'
+
+export interface HabitItem {
+  id: string
+  title: string
+  description?: string
+  kind: HabitKind
+  targetCount?: number
+  currentCount?: number
+  completedToday?: boolean
+  unit?: string
+  custom?: boolean
+  timerMinutes?: number
+}
+
+export interface HabitsState {
+  date: string
+  items: HabitItem[]
+}
 
 export type NativeBrowserEvent =
   | { type: 'update'; tabId: string; spaceId: string; updates: Partial<BrowserTab> }
@@ -316,3 +421,6 @@ export type NativeBrowserEvent =
   | { type: 'shortcut'; key: string; shift: boolean; alt: boolean }
   | { type: 'cover'; tabId: string; image: string }
   | { type: 'password-offer'; origin: string; username: string; password: string; title?: string }
+  | { type: 'permission-request'; id: string; tabId?: string; hostname: string; origin: string; permission: string; details?: string }
+  | { type: 'adblock-stats'; tabId: string; count: number }
+

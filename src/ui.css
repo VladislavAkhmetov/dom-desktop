@@ -29,12 +29,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .chrome-tab-count { font-size: var(--text-meta); color: #708476; }
 .chrome-assistant { margin-left: 6px; }
 .chrome-secondary { display: flex; align-items: stretch; justify-content: space-between; gap: 24px; padding: 0 20px; border-top: 1px solid rgba(71,96,81,.08); min-height: 42px; }
-.chrome-spaces { display: flex; align-items: stretch; gap: 25px; min-width: 0; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #b9c7bc transparent; }
-.chrome-space { position: relative; color: #6b7e72; font-size: var(--text-ui); white-space: nowrap; padding: 0 0 2px; flex: none; }
+.chrome-spaces { display: flex; align-items: stretch; gap: 20px; min-width: 0; width: 100%; position: relative; }
+.chrome-spaces-viewport { display: flex; align-items: stretch; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
+.chrome-spaces-viewport::-webkit-scrollbar { display: none; }
+.chrome-spaces-viewport.has-before {
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+}
+.chrome-spaces-viewport.has-after {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+.chrome-spaces-viewport.has-before.has-after {
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+.chrome-spaces-track { display: inline-flex; align-items: stretch; gap: 25px; min-width: 0; white-space: nowrap; }
+.chrome-spaces-scroll-arrows { display: flex; align-items: center; gap: 2px; flex: none; }
+.chrome-spaces-scroll-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; color: #556e5d; background: transparent; border: none; cursor: pointer; padding: 0; transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease; }
+.chrome-spaces-scroll-btn:hover:not(:disabled) { background: rgba(63, 94, 72, .1); color: #214330; }
+.chrome-spaces-scroll-btn:active:not(:disabled) { background: rgba(63, 94, 72, .18); }
+.chrome-spaces-scroll-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+.chrome-spaces-actions { display: flex; align-items: stretch; gap: 20px; flex: none; }
+.chrome-space { position: relative; color: #6b7e72; font-size: var(--text-ui); white-space: nowrap; padding: 0 0 2px; flex: none; transition: color 0.2s ease; display: inline-flex; align-items: center; gap: 6px; }
 .chrome-space:hover { color: #264c38; }
 .chrome-space.selected { color: #294c39; font-weight: 700; }
 .chrome-space.selected::after { content: ''; position: absolute; bottom: 0; height: 2px; left: 0; right: 0; background: #476e55; }
-.chrome-new-space { color: #657c6c; display: grid; place-items: center; min-width: 27px; }
+.chrome-new-space, .chrome-space-search { color: #657c6c; display: grid; place-items: center; min-width: 27px; }
+.chrome-new-space:hover, .chrome-space-search:hover { color: #264c38; }
 .chrome-status { display: flex; align-items: center; gap: 20px; flex: none; font-size: var(--text-meta); color: var(--muted); }
 .chrome-status time { font-variant-numeric: tabular-nums; }
 .chrome-demo { color: #738276; font-size: var(--text-meta); text-decoration: none; display: flex; align-items: center; gap: 5px; }

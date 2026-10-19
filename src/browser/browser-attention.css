@@ -1,0 +1,70 @@
+/* A fixed action cluster lets attention expand towards the address, not under its buttons. */
+.browser-topbar .browser-topbar-main { gap: 8px; }
+.browser-context-controls { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; }
+.browser-topbar .browser-home { width: 36px; height: 40px; }
+.browser-topbar .browser-home > span:last-child { display: none; }
+.browser-topbar .browser-context-menu { max-width: 170px; }
+.browser-topbar .browser-context-menu > .menu-trigger { gap: 6px; padding: 7px 8px; }
+.browser-topbar .browser-new-cabinet { justify-content: center; width: 36px; height: 40px; padding: 0; }
+.browser-topbar .browser-materials-toggle { height: 40px; padding: 0 8px; gap: 0; }
+.browser-materials-label { display: inline-block; overflow: hidden; white-space: nowrap; width: 73px; padding-left: 7px; transition: width .22s cubic-bezier(.22,.68,.24,1), opacity .22s, padding .22s; }
+.browser-topbar-main:has(.browser-attention-island[data-wide="true"]) .browser-materials-label { width: 0; padding-left: 0; opacity: 0; }
+.browser-quick-actions { display: flex; align-items: center; flex: none; gap: 2px; }
+.browser-quick-actions button { display: grid; place-items: center; width: 38px; height: 40px; border-radius: 12px; color: var(--muted); }
+.browser-quick-actions button:hover { color: var(--ink); background: rgba(255,255,255,.65); }
+.browser-topbar .browser-profile-btn { display: grid; place-items: center; flex: none; width: 36px; height: 40px; padding: 0; }
+.browsing .browser-topbar .browser-profile-btn > .profile-avatar-pill { display: flex; }
+.browser-attention-island { width: 42px; flex: none; justify-self: auto; transition: width .22s cubic-bezier(.22,.68,.24,1); }
+.browser-attention-island[data-wide="true"] { width: clamp(220px, 20vw, 340px); }
+.browser-attention-island .browser-day-pulse { position: relative; display: flex; justify-content: center; width: 100%; min-width: 0; height: 42px; min-height: 42px; padding: 0; flex: none; gap: 0; border-radius: 24px; background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.85); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); color: var(--ink); overflow: hidden; }
+.browser-attention-island .browser-day-pulse:hover, .browser-attention-island.is-expanded .browser-day-pulse { background: #fff; }
+.browser-attention-island.is-expanded .browser-day-pulse { box-shadow: 0 0 0 2px #648f7d55; }
+.browser-island-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: opacity .16s; }
+.browser-attention-island[data-signal="true"] .browser-island-dot { background: var(--accent); width: 8px; height: 8px; }
+.browser-attention-island[data-wide="true"] .browser-island-dot { opacity: 0; }
+.browser-island-line { position: absolute; inset: 0 14px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; font-size: 13px; font-weight: 500; pointer-events: none; transition: opacity .16s; }
+.browser-attention-island[data-wide="true"] .browser-island-line { display: block; line-height: 40px; opacity: 1; }
+.browser-island-details { width: 390px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); z-index: 125; }
+.browser-island-day { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid #dce6dc; min-height: 40px; font-size: 13px; color: #36534a; }
+.browser-island-day:hover { color: #284c38; }
+.browser-island-undo { max-width: calc(100vw - 24px); flex-wrap: wrap; gap: 12px; }
+@media(max-width:1100px) {
+  .browser-topbar .browser-topbar-main { flex-wrap: wrap; }
+  .browser-context-controls { flex: 1 1 auto; }
+  .browser-topbar .browser-context-menu { max-width: 160px; margin-right: 0; }
+  .browser-topbar .browser-omnibox { order: 6; flex: 1 1 calc(100% - 110px); }
+  .browser-topbar .browser-topbar-navigation { order: 5; }
+  .browser-topbar .browser-main-menu { margin-left: 0; }
+  .browser-topbar .browser-materials-label { display: none; }
+  .browser-attention-island[data-wide="true"] { width: 240px; }
+  .app-shell.desktop:not(.platform-mac) .browser-topbar-main { padding-right: 13px; padding-top: 40px; }
+}
+@media(max-width:760px) {
+  .browser-context-controls { flex-basis: calc(100% - 92px); }
+  .browser-topbar .browser-context-menu { max-width: 210px; flex: 1; }
+  .browser-quick-actions { order: 3; margin-left: auto; }
+  .browser-topbar .browser-profile-btn { order: 1; }
+  .browser-topbar .browser-main-menu { order: 2; }
+  .browser-attention-island { order: 3; }
+  .browser-attention-island[data-wide="true"] { width: min(340px, calc(100% - 90px)); }
+}
+@media(max-width:420px) {
+  .browser-context-controls { flex-basis: 100%; }
+  .browser-topbar .browser-context-menu { max-width: none; }
+  .browser-quick-actions { margin-left: 0; }
+  .browser-topbar .browser-profile-btn { order: 3; }
+  .browser-topbar .browser-main-menu { order: 3; margin-left: auto; }
+  .browser-attention-island { order: 4; }
+  .browser-attention-island[data-wide="true"] { width: 100%; }
+  .browser-topbar .browser-topbar-navigation { flex: 1 0 100%; }
+  .browser-topbar .browser-omnibox { flex-basis: 100%; }
+}
+@media(pointer:coarse) {
+  .browser-topbar .browser-new-cabinet, .browser-topbar .browser-materials-toggle, .browser-quick-actions button { min-width: 44px; min-height: 44px; }
+  .browser-attention-island { width: 44px; }
+  .browser-attention-island .browser-day-pulse { height: 44px; min-height: 44px; }
+  .browser-attention-island[data-wide="true"] .browser-island-line { line-height: 42px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .browser-attention-island, .browser-materials-label, .browser-island-line, .browser-island-dot { transition: none; }
+}

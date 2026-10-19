@@ -1,6 +1,6 @@
-import { useEffect, useState, type CSSProperties } from 'react'
-import { ArrowRight, ArrowUpRight, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pencil, Plus, Timer, Video } from 'lucide-react'
-import type { AppState, AIContext, CalendarEvent, Reminder, Resource, WidgetType } from './types'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pencil, Plus, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
+import type { AppState, AIContext, CalendarEvent, Reminder, Resource, WidgetConfig, WidgetType } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
 import { isRealReminder, postponeReminder, realEvents, remindersForDay } from './dayModel'
 import './home.css'
@@ -11,7 +11,13 @@ import { latestContinuation } from './workContexts'
 import { ResumeCard } from './ResumeCard'
 import type { ResumeResult } from './resumeContext'
 import { localDate } from '../shared/state'
-import { dashboardWidgets, defaultWidgets } from './dashboard'
+import { computeWidgetPositions, dashboardWidgets, widgetNames, widgetSpan } from './dashboard'
+import { ScratchpadWidget } from './ScratchpadWidget'
+import { ReadingShelfWidget } from './ReadingShelfWidget'
+import { WeatherWidget } from './WeatherWidget'
+import { MapWidget } from './MapWidget'
+import { HabitsWidget } from './HabitsWidget'
+import { useDashboardDrag } from './useDashboardDrag'
 import { CalendarView, eventInDay } from './calendar/CalendarView'
 import type { CalendarMode } from './calendar/model'
 import { zenTimer } from './focus/zenTimer'
@@ -47,12 +53,14 @@ interface Props {
   onImport: () => void
   onNewTab: () => void
   onSettings: () => void
+  onDashboardSettings?: (tab?: 'widgets' | 'presets' | 'wallpaper') => void
   onNewsRefresh?: () => unknown
   newsRefreshing?: boolean
   onCalendarRange: (date: Date) => void
+  covers?: Record<string, string>
 }
 
-export function Home({ viewportWidth, viewportHeight, calendarRequested, onCalendarHandled, initialReminderId, onSearchHandled, state, now, onChange, onCapture, onFocus, onPlan, onCreateAt, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant, onSaveThought, onImport, onNewTab, onSettings, onNewsRefresh, newsRefreshing, onCalendarRange, onResume, onOpenContext, onEditContext, onCompleteContext, onOpenDocument, resumeStatus }: Props) {
+export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarRequested, onCalendarHandled, initialReminderId, onSearchHandled, state, now, onChange, onCapture, onFocus, onPlan, onCreateAt, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant, onSaveThought, onImport, onNewTab, onSettings, onDashboardSettings, onNewsRefresh, newsRefreshing, onCalendarRange, onResume, onOpenContext, onEditContext, onCompleteContext, onOpenDocument, resumeStatus, covers }: Props) {
   const [day, setDay] = useState(0)
   const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null)
   useEffect(() => { if (!undo) return; const timer = window.setTimeout(() => setUndo(null), 8000); return () => window.clearTimeout(timer) }, [undo])
@@ -65,15 +73,186 @@ export function Home({ viewportWidth, viewportHeight, calendarRequested, onCalen
   const [reminderDeadline, setReminderDeadline] = useState('')
   const [focus, setFocus] = useState(zenTimer.getState())
   useEffect(() => zenTimer.subscribe(setFocus), [])
-  const widgets = dashboardWidgets(state.dashboard?.widgets)
-  const [widgetPage, setWidgetPage] = useState(0)
+  const widgets = dashboardWidgets(state.dashboard?.widgets, state.dashboard?.gridVersion)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const scrollWrapRef = useRef<HTMLDivElement>(null)
+  const [scrollEdges, setScrollEdges] = useState({ before: false, after: false })
+  const [showAddPicker, setShowAddPicker] = useState(false)
+
+  const setWidgets = (next: WidgetConfig[]) => {
+    onChange(previous => ({
+      ...previous,
+      dashboard: {
+        preset: previous.dashboard?.preset || 'custom',
+        widgets: next,
+        gridVersion: 2,
+        customPresets: previous.dashboard?.customPresets
+      }
+    }))
+  }
+  const {
+    isEditing,
+    setIsEditing,
+    cancelEditing,
+    saveEditing,
+    draggingId,
+    dragOffset,
+    isLandingId,
+    resizingId,
+    resizingEdge,
+    resizeShiftX,
+    isSnappingId,
+    livePixelSizes,
+    ghostSpans,
+    liveSpans,
+    onCardPointerDown,
+    onResizePointerDown,
+    removeWidget,
+    addWidget
+  } = useDashboardDrag({ widgets, onWidgetsChange: setWidgets, gridRef })
+
+  useEffect(() => {
+    const el = scrollWrapRef.current
+    if (!el) return
+    const measure = () => {
+      const max = Math.max(0, el.scrollHeight - el.clientHeight)
+      const offset = Math.max(0, Math.min(max, el.scrollTop))
+      setScrollEdges({
+        before: offset > 4,
+        after: offset < max - 4
+      })
+    }
+    measure()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    if (observer) {
+      observer.observe(el)
+      if (gridRef.current) observer.observe(gridRef.current)
+    }
+    el.addEventListener('scroll', measure, { passive: true })
+    return () => {
+      observer?.disconnect()
+      el.removeEventListener('scroll', measure)
+    }
+  }, [widgets, isEditing])
+
   const narrow = viewportWidth < 760
-  const standardLayout = !narrow && viewportHeight >= 340 && widgets.length >= 3 && defaultWidgets.every((widget, index) => widget.type === widgets[index].type && widget.size === widgets[index].size)
-  const visible = (type: WidgetType) => widgetPages[visibleWidgetPage].includes(type)
-  const widgetStyle = (type: WidgetType): CSSProperties => {
-    const widget = widgets.find(item => item.type === type)
-    const columns = narrow ? 6 : widget?.size === 'S' ? 2 : widget?.size === 'L' ? 6 : 3
-    return { order: widgets.findIndex(item => item.type === type), '--widget-span': columns } as CSSProperties
+  const positions = useMemo(() => computeWidgetPositions(widgets, liveSpans), [widgets, liveSpans])
+  const getWidget = (type: WidgetType) => widgets.find(item => item.type === type)
+  const visible = (type: WidgetType) => Boolean(getWidget(type))
+  const widgetStyle = (typeOrWidget: WidgetType | WidgetConfig): CSSProperties => {
+    const widget = typeof typeOrWidget === 'string' ? getWidget(typeOrWidget) : typeOrWidget
+    if (!widget) return { display: 'none' }
+    const pos = positions[widget.id] || { colStart: 1, colSpan: 6, rowSpan: 4 }
+    const order = widgets.findIndex(item => item.id === widget.id)
+    const columns = narrow ? 12 : pos.colSpan
+    const colStart = narrow ? 1 : pos.colStart
+    const rows = narrow ? 2 : pos.rowSpan
+    const liveSize = livePixelSizes[widget.id]
+    const base: CSSProperties & Record<string, any> = {
+      order,
+      '--widget-col-start': colStart,
+      '--widget-col-span': columns,
+      '--widget-row-span': rows,
+      '--widget-span': columns
+    }
+
+    if (liveSize) {
+      base.width = `${liveSize.width}px`
+      base.height = `${liveSize.height}px`
+      base.maxWidth = 'none'
+      base.maxHeight = 'none'
+    }
+
+    if (resizingId === widget.id && resizingEdge === 'left' && resizeShiftX) {
+      base.transform = `translateX(${resizeShiftX}px)`
+    }
+
+    if (draggingId === widget.id && dragOffset) {
+      base['--drag-x'] = `${dragOffset.x}px`
+      base['--drag-y'] = `${dragOffset.y}px`
+    }
+
+    return base
+  }
+  const cardWrapClass = (typeOrWidget: WidgetType | WidgetConfig) => {
+    const widget = typeof typeOrWidget === 'string' ? getWidget(typeOrWidget) : typeOrWidget
+    if (!widget) return ''
+    const isDragging = draggingId === widget.id
+    const isLanding = isLandingId === widget.id
+    const isResizing = resizingId === widget.id
+    const isSnapping = isSnappingId === widget.id
+    return `dashboard-card-wrap ${isEditing ? 'is-editing' : ''} ${isDragging ? 'is-dragging' : ''} ${isLanding ? 'is-landing' : ''} ${isResizing ? 'is-resizing' : ''} ${isSnapping ? 'is-snapping' : ''}`
+  }
+  const renderCardControls = (typeOrWidget: WidgetType | WidgetConfig) => {
+    const widget = typeof typeOrWidget === 'string' ? getWidget(typeOrWidget) : typeOrWidget
+    if (!isEditing || !widget) return null
+    const isBeingResized = resizingId === widget.id || isSnappingId === widget.id
+    const ghost = ghostSpans[widget.id]
+
+    return (
+      <>
+        <button
+          type="button"
+          className="widget-remove-btn"
+          onClick={e => {
+            e.stopPropagation()
+            removeWidget(widget.id)
+          }}
+          aria-label={`Убрать виджет ${widgetNames[widget.type]}`}
+          title="Убрать виджет"
+        >
+          <X size={15} />
+        </button>
+
+        {isBeingResized && ghost && (
+          <div
+            className={`widget-ghost-snap-outline ${resizingEdge === 'left' ? 'ghost-from-right' : ''}`}
+            style={{
+              width: `${ghost.width}px`,
+              height: `${ghost.height}px`
+            }}
+            aria-hidden="true"
+          >
+            <span className="ghost-snap-badge">
+              {ghost.colSpan} × {ghost.rowSpan}
+            </span>
+          </div>
+        )}
+
+        <div
+          className="widget-edge-handle widget-edge-left"
+          onPointerDown={e => onResizePointerDown(e, widget.id, 'left')}
+          title="Потяните за левый край для изменения ширины"
+          aria-label="Изменить ширину слева"
+        />
+
+        <div
+          className="widget-edge-handle widget-edge-right"
+          onPointerDown={e => onResizePointerDown(e, widget.id, 'right')}
+          title="Потяните за правый край для изменения ширины"
+          aria-label="Изменить ширину"
+        />
+
+        <div
+          className="widget-edge-handle widget-edge-bottom"
+          onPointerDown={e => onResizePointerDown(e, widget.id, 'bottom')}
+          title="Потяните за нижний край для изменения высоты"
+          aria-label="Изменить высоту"
+        />
+
+        <div
+          className="widget-corner-handle widget-resize-handle"
+          onPointerDown={e => onResizePointerDown(e, widget.id, 'corner')}
+          title="Потяните за угол для изменения размера"
+          aria-label="Изменить размер"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="10" y1="2" x2="2" y2="10" />
+            <line x1="10" y1="6" x2="6" y2="10" />
+          </svg>
+        </div>
+      </>
+    )
   }
   const [digestTab, setDigestTab] = useState<'notes' | 'reading' | 'events'>('notes')
   const [page, setPage] = useState(0)
@@ -85,19 +264,6 @@ export function Home({ viewportWidth, viewportHeight, calendarRequested, onCalen
   const resources = state.spaces.flatMap(space => space.resources.map(resource => ({ ...resource, spaceId: space.id })))
   const continuation = latestContinuation(state)
   const hasResume = Boolean(continuation)
-  const isAvailable = (type: WidgetType) => type !== 'resume' || hasResume
-  const widgetPages: WidgetType[][] = standardLayout ? [widgets.slice(0, 3).filter(widget => isAvailable(widget.type)).map(widget => widget.type)] : []
-  let row: WidgetType[] = [], usedColumns = 0
-  for (const widget of widgets.slice(standardLayout ? 3 : 0).filter(widget => isAvailable(widget.type))) {
-    const columns = narrow ? 6 : widget.size === 'S' ? 2 : widget.size === 'L' ? 6 : 3
-    if (usedColumns + columns > 6) { widgetPages.push(row); row = []; usedColumns = 0 }
-    row.push(widget.type)
-    usedColumns += columns
-  }
-  if (row.length) widgetPages.push(row)
-  if (!widgetPages.length) widgetPages.push([])
-  const visibleWidgetPage = Math.min(widgetPage, widgetPages.length - 1)
-  const isStandardPage = standardLayout && visibleWidgetPage === 0
   const selectedDay = new Date(now)
   selectedDay.setDate(selectedDay.getDate() + day)
   const plan = remindersForDay(state, selectedDay)
@@ -147,65 +313,444 @@ export function Home({ viewportWidth, viewportHeight, calendarRequested, onCalen
   function openCalendar(mode: CalendarMode) { setCalendarMode(mode); setCalendarOpen(true) }
 
   return <>
-    <main className="calm-home dashboard-home" aria-label="Ваш день">
-      {widgetPages.length > 1 && <div className="calm-heading"><nav className="widget-pagination" aria-label="Страницы виджетов"><button className="calm-icon" aria-label="Предыдущие виджеты" disabled={visibleWidgetPage === 0} onClick={() => setWidgetPage(visibleWidgetPage - 1)}><ChevronLeft size={17} /></button><span aria-live="polite">{visibleWidgetPage + 1} / {widgetPages.length}</span><button className="calm-icon" aria-label="Следующие виджеты" disabled={visibleWidgetPage === widgetPages.length - 1} onClick={() => setWidgetPage(visibleWidgetPage + 1)}><ChevronRight size={17} /></button></nav></div>}
-      <div className={`calm-grid dashboard-grid ${isStandardPage ? `standard-grid ${!hasResume ? 'starter-grid' : ''}` : 'paged-grid'} ${narrow ? 'narrow-grid' : ''}`}>
-        {continuation && <ResumeCard continuation={continuation} now={now} hidden={!visible('resume')} style={widgetStyle('resume')}
-          pending={resumeStatus?.contextId === continuation.context.id && resumeStatus.pending}
-          result={resumeStatus?.contextId === continuation.context.id ? resumeStatus.result : undefined}
-          onResume={retry => onResume(continuation.space.id, continuation.context.id, retry)}
-          onSpace={() => onSpace(continuation.space.id)} onEdit={() => onEditContext(continuation.space.id, continuation.context.id)} onComplete={() => onCompleteContext(continuation.space.id, continuation.context.id)}
-          onDocument={document => onOpenDocument(document, continuation.context.id)} onTabs={() => onOpenContext(continuation.space.id, continuation.context.id)} />}
-
-
-        <section className="calm-card plan-card" data-widget="day" hidden={!visible('day')} style={widgetStyle('day')} aria-label="План дня">
-          <div className="calm-card-heading"><div className="calm-tabs" aria-label="День плана"><button aria-pressed={day === 0} className={day === 0 ? 'selected' : ''} onClick={() => setDay(0)}>Сегодня</button><button aria-pressed={day === 1} className={day === 1 ? 'selected' : ''} onClick={() => setDay(1)}>Завтра</button>{day !== 0 && day !== 1 && <button className="selected" onClick={() => openCalendar('day')}>{selectedDay.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</button>}</div><button className="calm-icon" aria-label="Добавить дело" title="Добавить дело" onClick={() => onPlan(day)}><Plus size={22} /></button></div>
-          <div className="plan-view-switch" aria-label="Открыть календарь">{([['day', 'День'], ['week', 'Неделя'], ['month', 'Месяц']] as const).map(([mode, label]) => <button key={mode} aria-haspopup="dialog" onClick={() => openCalendar(mode)}>{label}</button>)}</div>
-          <div className="calm-plan-list">
-            {schedule.slice(0, 3).map(item => (
-              <div key={item.id} className={`calm-plan-item task-row ${state.liveHints && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 5 * 60000 ? 'live-hint' : ''}`}>
-                {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
-                <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
-                {item.event?.meetingUrl ? (
-                  <button
-                    className="plan-meeting-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpen({ id: item.id, name: item.title, kind: 'link', target: item.event!.meetingUrl!, createdAt: new Date().toISOString() })
+    <main className={`calm-home dashboard-home ${isEditing ? 'is-editing' : ''}`} aria-label="Ваш день">
+      <div className="dashboard-layout-wrap">
+        <div
+          ref={scrollWrapRef}
+          className={`dashboard-scroll-wrap ${scrollEdges.before ? 'has-before' : ''} ${scrollEdges.after ? 'has-after' : ''} ${isEditing ? 'is-editing' : ''} ${draggingId ? 'is-dragging' : ''}`}
+        >
+          <div
+            ref={gridRef}
+            className={`calm-grid dashboard-grid ${isEditing ? 'editing-grid' : 'custom-grid'} ${narrow ? 'narrow-grid' : ''} ${resizingEdge ? `resizing-${resizingEdge}` : ''} ${draggingId ? 'grid-is-dragging' : ''}`}
+          >
+        {widgets.map(widget => {
+          switch (widget.type) {
+            case 'resume':
+              if (!continuation) return null
+              return (
+                <ResumeCard
+                  key={widget.id}
+                  continuation={continuation}
+                  now={now}
+                  hidden={!visible('resume')}
+                  style={widgetStyle(widget)}
+                  className={cardWrapClass(widget)}
+                  dataWidgetId={widget.id}
+                  colSpan={liveSpans[widget.id]?.colSpan ?? widgetSpan(widget).colSpan}
+                  rowSpan={liveSpans[widget.id]?.rowSpan ?? widgetSpan(widget).rowSpan}
+                  size={widget.size}
+                  covers={covers}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  pending={resumeStatus?.contextId === continuation.context.id && resumeStatus.pending}
+                  result={resumeStatus?.contextId === continuation.context.id ? resumeStatus.result : undefined}
+                  onResume={retry => onResume(continuation.space.id, continuation.context.id, retry)}
+                  onSpace={() => onSpace(continuation.space.id)}
+                  onEdit={() => onEditContext(continuation.space.id, continuation.context.id)}
+                  onComplete={() => onCompleteContext(continuation.space.id, continuation.context.id)}
+                  onDocument={document => onOpenDocument(document, continuation.context.id)}
+                  onTabs={() => onOpenContext(continuation.space.id, continuation.context.id)}
+                >
+                  {renderCardControls(widget)}
+                </ResumeCard>
+              )
+            case 'day':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card plan-card ${cardWrapClass(widget)}`}
+                  data-widget="day"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('day')}
+                  style={widgetStyle(widget)}
+                  aria-label="План дня"
+                >
+                  <div className="calm-card-heading">
+                    <div className="calm-tabs" aria-label="День плана">
+                      <button aria-pressed={day === 0} className={day === 0 ? 'selected' : ''} onClick={() => setDay(0)}>Сегодня</button>
+                      <button aria-pressed={day === 1} className={day === 1 ? 'selected' : ''} onClick={() => setDay(1)}>Завтра</button>
+                      {day !== 0 && day !== 1 && <button className="selected" onClick={() => openCalendar('day')}>{selectedDay.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</button>}
+                    </div>
+                    <div className="calm-card-heading-actions">
+                      <button className="calm-icon" aria-label="Открыть календарь" title="Календарь" onClick={() => openCalendar('week')}><CalendarDays size={18} /></button>
+                      <button className="calm-icon" aria-label="Добавить дело" title="Добавить дело" onClick={() => onPlan(day)}><Plus size={18} /></button>
+                    </div>
+                  </div>
+                  <div className="calm-plan-list">
+                    {schedule.slice(0, 3).map(item => (
+                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 5 * 60000 ? 'live-hint' : ''}`}>
+                        {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
+                        <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
+                        {item.event?.meetingUrl ? (
+                          <button
+                            className="plan-meeting-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onOpen({ id: item.id, name: item.title, kind: 'link', target: item.event!.meetingUrl!, createdAt: new Date().toISOString() })
+                            }}
+                            title={item.event.meetingUrl}
+                          >
+                            <Video size={13} />
+                            <span>Войти</span>
+                            <ArrowUpRight size={13} />
+                          </button>
+                        ) : item.reminder ? <ActionMenu label={`Действия: ${item.title}`} actions={[
+                          { label: focus.status === 'idle' ? 'Сосредоточиться' : 'К сессии фокуса', icon: <Timer size={16} />, onSelect: () => onFocus(item.id) },
+                          { label: 'Завтра', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
+                          { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
+                          { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
+                          , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null }, 'Убрано из сегодняшнего') }
+                        ]} /> : null}
+                      </div>
+                    ))}
+                    {!schedule.length && (
+                      <div className="calm-plan-empty-wrap">
+                        {day === 0 && earlier.length > 0 ? (
+                          <div className="plan-earlier-section">
+                            <div className="plan-earlier-list">
+                              {earlier.slice(0, 2).map(task => (
+                                <div key={task.id} className="calm-plan-item task-row is-overdue-row">
+                                  <button className="task-check" aria-label={`Завершить: ${task.title}`} title="Отметить сделанным" onClick={() => changeTask(task, { done: true }, 'Дело завершено')}><Check size={14} /></button>
+                                  <button className="plan-item-title" onClick={() => editReminder(task)}>
+                                    <span>{task.title}</span>
+                                    <time className="calm-time">С прошлых дней</time>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="plan-move-today-btn"
+                                    onClick={() => changeTask(task, { plannedDate: localDate(new Date()) }, 'Перенесено на сегодня')}
+                                    title="Перенести дело на сегодня"
+                                  >
+                                    <span>→ На сегодня</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button type="button" className="calm-plan-empty-placeholder" onClick={() => onPlan(day)}>
+                              На этот день нет дел — нажмите, чтобы записать…
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" className="calm-plan-empty-placeholder" onClick={() => onPlan(day)}>
+                            На этот день нет дел — нажмите, чтобы записать…
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="plan-bottom">
+                    {schedule.length > 3 && <button className="calm-text-button" onClick={() => setDialog('today')}>Все дела на этот день · {schedule.length}<ArrowRight size={16} /></button>}
+                    {schedule.length > 0 && earlier.length > 0 && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}
+                    <button className="plan-undated-pill" onClick={() => showDigest('notes')} title="Открыть мысли и дела без даты">
+                      <span>💭 Мысли без даты · {state.reminders.filter(item => !item.done && !item.plannedDate && !item.dueAt).length}</span>
+                    </button>
+                  </div>
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'capture':
+              return (
+                <div
+                  key={widget.id}
+                  className={`quick-widget ${cardWrapClass(widget)}`}
+                  data-widget="capture"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('capture')}
+                  style={widgetStyle(widget)}
+                >
+                  {!hasResume && <div className="first-run-actions"><button onClick={onNewTab}>Открыть сайт</button><button onClick={onImport}>Перенести вкладки</button></div>}
+                  <QuickEntry onSave={onSaveThought} onAssistant={onAssistant} />
+                  {renderCardControls(widget)}
+                </div>
+              )
+            case 'spaces':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card simple-widget ${cardWrapClass(widget)}`}
+                  data-widget="spaces"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('spaces')}
+                  style={widgetStyle(widget)}
+                >
+                  <h2>Пространства</h2>
+                  {state.spaces.filter(space => !space.archivedAt && space.kind !== 'web').slice(0, 5).map(space => (
+                    <button className="widget-resource" key={space.id} onClick={() => onOpenWorkstage?.(space.id)}>
+                      <span>{space.name}<small>{space.checkpoint?.nextStep || `Вкладок: ${space.activeSession?.tabs.length || 0}`}</small></span>
+                      <ArrowRight size={17} />
+                    </button>
+                  ))}
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'mail':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card simple-widget ${cardWrapClass(widget)}`}
+                  data-widget="mail"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('mail')}
+                  style={widgetStyle(widget)}
+                >
+                  <MailWidget state={state} widget={widget} onSettings={onSettings} onOpen={onOpen} onChange={onChange} onAssistant={onAssistant} />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'news':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card news-card ${cardWrapClass(widget)}`}
+                  data-widget="news"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('news')}
+                  style={widgetStyle(widget)}
+                  aria-label="Дайджест новостей"
+                >
+                  <NewsWidget state={state} widget={widget} onSettings={onSettings} onOpen={onOpen} onChange={onChange} onAssistant={onAssistant} onRefresh={onNewsRefresh} refreshing={newsRefreshing} />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'focus':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card simple-widget ${cardWrapClass(widget)}`}
+                  data-widget="focus"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('focus')}
+                  style={widgetStyle(widget)}
+                >
+                  <h2>Фокус</h2>
+                  {focus.status === 'running' && <p>{focus.task?.title}{focus.task && <br />}Осталось {Math.ceil(focus.remainingSeconds / 60)} мин</p>}
+                  <button className="calm-primary" onClick={() => onFocus()}>{focus.status === 'running' ? 'Открыть таймер' : 'Выбрать дело'}</button>
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'reading':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card ${cardWrapClass(widget)}`}
+                  data-widget="reading"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('reading')}
+                  style={widgetStyle(widget)}
+                  aria-label="Почитать"
+                >
+                  <ReadingShelfWidget
+                    state={state}
+                    onChange={onChange}
+                    onOpen={onOpen}
+                    onAddLink={onAddLink}
+                    colSpan={liveSpans[widget.id]?.colSpan ?? widgetSpan(widget).colSpan}
+                  />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'notes':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card ${cardWrapClass(widget)}`}
+                  data-widget="notes"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('notes')}
+                  style={widgetStyle(widget)}
+                  aria-label="Заметки"
+                >
+                  <ScratchpadWidget state={state} onChange={onChange} onSaveThought={onSaveThought} />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'weather':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card ${cardWrapClass(widget)}`}
+                  data-widget="weather"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('weather')}
+                  style={widgetStyle(widget)}
+                  aria-label="Подробная погода"
+                >
+                  <WeatherWidget
+                    onOpenTraffic={() => {
+                      const mapWidget = widgets.find(w => w.type === 'map')
+                      if (mapWidget) {
+                        const el = document.querySelector(`[data-widget-id="${mapWidget.id}"]`)
+                        el?.scrollIntoView({ behavior: 'smooth' })
+                      } else {
+                        onOpen({
+                          id: 'traffic',
+                          name: 'Пробки',
+                          kind: 'link',
+                          target: 'https://yandex.ru/maps/?l=trf%2Ctrfe',
+                          createdAt: new Date().toISOString()
+                        })
+                      }
                     }}
-                    title={item.event.meetingUrl}
-                  >
-                    <Video size={13} />
-                    <span>Войти</span>
-                    <ArrowUpRight size={13} />
-                  </button>
-                ) : item.reminder ? <ActionMenu label={`Действия: ${item.title}`} actions={[
-                  { label: focus.status === 'idle' ? 'Сосредоточиться' : 'К сессии фокуса', icon: <Timer size={16} />, onSelect: () => onFocus(item.id) },
-                  { label: 'Завтра', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
-                  { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
-                  { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
-                  , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null }, 'Убрано из сегодняшнего') }
-                ]} /> : null}
-              </div>
-            ))}
-            {!schedule.length && <div className="calm-plan-empty"><h2>На этот день нет дел</h2><button className="calm-text-button" onClick={() => onPlan(day)}>Добавить дело <Plus size={17} /></button></div>}
+                  />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'map':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card ${cardWrapClass(widget)}`}
+                  data-widget="map"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('map')}
+                  style={widgetStyle(widget)}
+                  aria-label="Карты и дорожная обстановка"
+                >
+                  <MapWidget
+                    onOpenInTab={url =>
+                      onOpen({
+                        id: 'map-link',
+                        name: 'Карта',
+                        kind: 'link',
+                        target: url,
+                        createdAt: new Date().toISOString()
+                      })
+                    }
+                  />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            case 'habits':
+              return (
+                <section
+                  key={widget.id}
+                  className={`calm-card ${cardWrapClass(widget)}`}
+                  data-widget="habits"
+                  data-widget-id={widget.id}
+                  onPointerDown={e => onCardPointerDown(e, widget.id)}
+                  hidden={!visible('habits')}
+                  style={widgetStyle(widget)}
+                  aria-label="Забота и привычки"
+                >
+                  <HabitsWidget state={state} onChange={onChange} />
+                  {renderCardControls(widget)}
+                </section>
+              )
+            default:
+              return null
+          }
+        })}
           </div>
-          <div className="plan-bottom">{schedule.length > 3 && <button className="calm-text-button" onClick={() => setDialog('today')}>Все дела на этот день · {schedule.length}<ArrowRight size={16} /></button>}{earlier.length > 0 && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}</div>
-          <div className="plan-saved" aria-label="Сохранённое">
-            <div className="plan-saved-heading"><span>Сохранённое</span></div>
-            <div className="plan-saved-links">
-              <button onClick={() => showDigest('notes')}><FileText size={16} /><span>Мысли и дела</span><small>{realReminders.length}</small></button>
-              <button onClick={() => showDigest('reading')}><Bookmark size={16} /><span>Почитать</span><small>{links.length}</small></button>
-              <button onClick={() => showDigest('events')}><Clock3 size={16} /><span>События</span><small>{events.length}</small></button>
-            </div>
-          </div>
-        </section>
+        </div>
 
-        <div className="quick-widget" data-widget="capture" hidden={!visible('capture')} style={widgetStyle('capture')}>{!hasResume && <div className="first-run-actions"><button onClick={onNewTab}>Открыть сайт</button><button onClick={onImport}>Перенести вкладки</button></div>}<QuickEntry onSave={onSaveThought} onAssistant={onAssistant} /></div>
-        <section className="calm-card simple-widget" data-widget="spaces" hidden={!visible('spaces')} style={widgetStyle('spaces')}><h2>Пространства</h2>{state.spaces.filter(space => !space.archivedAt && space.kind !== 'web').slice(0, 5).map(space => <button className="widget-resource" key={space.id} onClick={() => onOpenWorkstage?.(space.id)}><span>{space.name}<small>{space.checkpoint?.nextStep || `Вкладок: ${space.activeSession?.tabs.length || 0}`}</small></span><ArrowRight size={17} /></button>)}</section>
-        <section className="calm-card simple-widget" data-widget="mail" hidden={!visible('mail')} style={widgetStyle('mail')}><MailWidget state={state} widget={widgets.find(item => item.type === "mail")} onSettings={onSettings} onOpen={onOpen} onChange={onChange} onAssistant={onAssistant} /></section>
-        <section className="calm-card news-card" data-widget="news" hidden={!visible('news')} style={widgetStyle('news')} aria-label="Дайджест новостей"><NewsWidget state={state} widget={widgets.find(item => item.type === "news")} onSettings={onSettings} onOpen={onOpen} onChange={onChange} onAssistant={onAssistant} onRefresh={onNewsRefresh} refreshing={newsRefreshing} /></section>
-        <section className="calm-card simple-widget" data-widget="focus" hidden={!visible('focus')} style={widgetStyle('focus')}><h2>Фокус</h2>{focus.status === 'running' && <p>{focus.task?.title}{focus.task && <br />}Осталось {Math.ceil(focus.remainingSeconds / 60)} мин</p>}<button className="calm-primary" onClick={() => onFocus()}>{focus.status === 'running' ? 'Открыть таймер' : 'Выбрать дело'}</button></section>
+        <aside className="dashboard-floating-controls" role="toolbar" aria-label="Управление дашбордом">
+          {!isEditing ? (
+            <button
+              type="button"
+              className="edit-fab edit-fab-toggle dashboard-edit-toggle"
+              onClick={() => setIsEditing(true)}
+              title="Настроить виджеты (или удерживайте карточку)"
+              aria-label="Настроить виджеты"
+            >
+              <SlidersHorizontal size={17} />
+            </button>
+          ) : (
+            <>
+              {/* На месте кнопки настроек — крестик закрытия/отмены! */}
+              <button
+                type="button"
+                className="edit-fab edit-fab-cancel edit-cancel-btn"
+                onClick={() => {
+                  cancelEditing()
+                  setShowAddPicker(false)
+                }}
+                title="Закрыть (отменить изменения)"
+                aria-label="Закрыть настройки"
+              >
+                <X size={17} />
+              </button>
+
+              {/* Добавить виджет */}
+              <div className="edit-fab-wrap">
+                <button
+                  type="button"
+                  className={`edit-fab edit-fab-add edit-add-btn ${showAddPicker ? 'is-active' : ''}`}
+                  onClick={() => setShowAddPicker(v => !v)}
+                  title="Добавить виджет"
+                  aria-label="Добавить виджет"
+                >
+                  <Plus size={18} />
+                </button>
+                {showAddPicker && (
+                  <div className="dashboard-add-floating-picker" role="menu">
+                    <div className="picker-header">Добавить виджет</div>
+                    {(Object.keys(widgetNames) as WidgetType[])
+                      .filter(type => !widgets.some(w => w.type === type))
+                      .map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          className="picker-item"
+                          onClick={() => {
+                            addWidget(type)
+                            setShowAddPicker(false)
+                          }}
+                        >
+                          <Plus size={15} /> <span>{widgetNames[type]}</span>
+                        </button>
+                      ))}
+                    {(Object.keys(widgetNames) as WidgetType[]).every(type => widgets.some(w => w.type === type)) && (
+                      <span className="picker-empty">Все виджеты уже добавлены</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Готово / сохранить */}
+              <button
+                type="button"
+                className="edit-fab edit-fab-done edit-done-btn"
+                onClick={() => {
+                  saveEditing()
+                  setShowAddPicker(false)
+                }}
+                title="Готово (сохранить)"
+                aria-label="Готово"
+              >
+                <Check size={18} />
+              </button>
+
+              {/* Пресеты опущены ниже всего и визуально отделены */}
+              <div className="edit-fab-presets-wrap">
+                <div className="dashboard-floating-divider" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="edit-fab edit-fab-presets dashboard-presets-quick-btn"
+                  onClick={() => {
+                    if (onDashboardSettings) {
+                      onDashboardSettings('presets')
+                    } else {
+                      onSettings()
+                    }
+                  }}
+                  title="Пресеты дашборда"
+                  aria-label="Пресеты дашборда"
+                >
+                  <BookmarkPlus size={16} />
+                </button>
+              </div>
+            </>
+          )}
+        </aside>
       </div>
     </main>
 

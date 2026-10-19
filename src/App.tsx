@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type HTMLAttributes } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type HTMLAttributes } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, History, Pencil,
   ExternalLink, FileText, Folder, Globe2, Link2,
-  LayoutGrid, Pin, Plus, Search, Settings2, Sparkles, Trash2, X
+  Bookmark, LayoutGrid, Pin, Plus, Search, Settings2, Sparkles, SquarePlus, Trash2, X
 } from 'lucide-react'
 import { bridge, isDesktop } from './bridge'
 import { Home } from './Home'
@@ -10,7 +11,7 @@ import { Capture } from './Capture'
 import { planTime } from './dayModel'
 import { isDemo } from './demo'
 import { formatDue, toLocalInput } from './reminders'
-import type { AppState, BrowserSession, BrowserTab, CalendarEvent, CalendarSubscription, OpenResult, Reminder, ResearchSource, Resource, ResourceKind, Space, SpaceTone } from './types'
+import type { AppState, BrowserSession, BrowserTab, CalendarEvent, CalendarSubscription, OpenResult, OpenWindowItem, ReaderArticle, RecentFile, Reminder, ResearchSource, Resource, ResourceKind, Space, SpaceTone } from './types'
 import { localDate, normalizeSpace } from '../shared/state'
 import { activateContext, contextDocuments, contextSession, contextTitle, createContext, currentContext, documentPathKey, recordDocumentOpen, updateContextSession } from './workContexts'
 import { resumeDocuments, type ResumeResult } from './resumeContext'
@@ -37,11 +38,14 @@ import { createSpaceAndMoveTab, ensureWebSpace, moveBrowserTab, orderedTabs, rem
 import { Settings, type SettingsSectionId } from './Settings'
 import { ProfilePopover } from './ProfilePopover'
 import { getUserProfile, updateUserProfile } from './userProfile'
+import { I18nProvider, translate } from './i18n'
+import type { PermissionRequestInfo } from './browser/PermissionPrompt'
 import './profile.css'
 import { useNews } from './news'
 import { ContextSearch } from './ContextSearch'
 import { ChangesOverview } from './ChangesOverview'
 import { BrowserChrome } from './browser/BrowserChrome'
+import { buildOmniboxSuggestions, type OmniboxSuggestionItem } from './browser/omniboxSuggestions'
 import { BrowserHistory } from './browser/BrowserHistory'
 import { clearHistory, isValidHistoryUrl, recordHistory, removeHistoryItem } from './browser/historyModel'
 import { BrowserDayPanel } from './browser/BrowserDayPanel'
@@ -54,15 +58,18 @@ import { ActionMenu, type MenuAction } from './ActionMenu'
 import { SpacePreview, spaceContents } from './SpacePreview'
 import { SpacesOverview } from './SpacesOverview'
 import { DEFAULT_WALLPAPER, resolveWallpaperUrl } from './WallpaperPicker'
+import { sound } from './sound'
 import { DashboardSettings } from './DashboardSettings'
 import { dashboardWidgets } from './dashboard'
+import { CalmTooltip } from './CalmTooltip'
 import { isCabinetPreview } from './cabinetMode'
-import { cabinetFromTabs, copyMaterial, hasCabinetWork, nameFromMaterials, newCabinet, suggestInitialName } from './cabinetModel'
+import { cabinetFromTabs, copyMaterial, formatSpaceDisplayName, hasCabinetWork, nameFromMaterials, newCabinet, suggestInitialName } from './cabinetModel'
 import { SpacePanel } from './browser/SpacePanel'
 import { CabinetContents } from './CabinetContents'
 import { useContextMenu } from './ContextMenu'
 import { readCabinetDrag, reorderCabinets, writeCabinetDrag, type CabinetDrag } from './cabinetInteractions'
 import { useCabinetPointerDrag } from './useCabinetPointerDrag'
+import { OpenWindowPickerModal } from './browser/OpenWindowPickerModal'
 import './cabinet.css'
 import type { AIContext } from './types'
 
@@ -73,7 +80,7 @@ function addressToUrl(input: string): string {
   if (/^https?:\/\//i.test(value)) return new URL(value).toString()
   if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value)) return new URL(`http://${value}`).toString()
   if (/^[^\s]+\.[^\s]+$/.test(value)) return new URL(`https://${value}`).toString()
-  return `https://yandex.ru/search/?text=${encodeURIComponent(value)}`
+  return `https://www.google.com/search?q=${encodeURIComponent(value)}`
 }
 
 type Modal = 'capture' | 'newSpace' | 'newStream' | 'renameSpace' | 'newLink' | 'settings' | 'dashboard' | 'focus' | 'weather' | 'import' | 'search' | 'changes' | 'archive' | 'context' | 'splitSpace' | 'documentReference' | 'deleteSpace' | 'history' | null
@@ -94,7 +101,7 @@ function shortName(target: string, kind: ResourceKind) {
   return target.split(/[\\/]/).pop()?.replace(/\.(exe|lnk)$/i, '') || 'Ресурс'
 }
 
-function productIcon(name: string) {
+export function productIcon(name: string) {
   if (/figma/i.test(name)) return <span className="figma-mark" aria-hidden="true"><i /><i /><i /><i /><i /></span>
   if (/illustrator/i.test(name)) return <span className="illustrator-mark" aria-hidden="true">Ai</span>
   if (/photoshop/i.test(name)) return <span className="photoshop-mark" aria-hidden="true">Ps</span>
@@ -110,8 +117,34 @@ function productIcon(name: string) {
   return <AppWindow size={22} strokeWidth={1.5} />
 }
 
+export function CalmWindSvgFilter() {
+  return (
+    <svg
+      width="0"
+      height="0"
+      style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none', opacity: 0 }}
+      aria-hidden="true"
+    >
+      <defs>
+        <filter id="calm-wind-dissolve" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04 0.08" numOctaves="2" result="noise" />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="38"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+  )
+}
+
 function App() {
   const [time, setTime] = useState(new Date())
+  const [memoryRelief, setMemoryRelief] = useState<{ freedMB: number; id: string } | null>(null)
+  const [reliefWave, setReliefWave] = useState(false)
   const [route, setRouteState] = useState<AppRoute>({ type: 'home' })
   const routeRef = useRef(route)
   routeRef.current = route
@@ -125,10 +158,12 @@ function App() {
   const showSpaces = route.type === 'spaces'
   const [resourcePage, setResourcePage] = useState(0)
   const [modal, setModal] = useState<Modal>(null)
+  const [dashboardSettingsTab, setDashboardSettingsTab] = useState<'widgets' | 'presets' | 'wallpaper'>('widgets')
   const [profileOpen, setProfileOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId | undefined>(undefined)
   const profileAnchorRef = useRef<HTMLButtonElement>(null)
   function openSettings(section?: SettingsSectionId) { setSettingsSection(section); setModal('settings') }
+  function openDashboardSettings(tab: 'widgets' | 'presets' | 'wallpaper' = 'widgets') { setDashboardSettingsTab(tab); setModal('dashboard') }
   const [focusTaskId, setFocusTaskId] = useState<string | undefined>()
   const [searchReminderId, setSearchReminderId] = useState('')
   const [calendarRequested, setCalendarRequested] = useState(false)
@@ -137,6 +172,7 @@ function App() {
   const [browserDayOpen, setBrowserDayOpen] = useState(false)
   const [spacePanelOpen, setSpacePanelOpen] = useState(false)
   const [spaceActionId, setSpaceActionId] = useState('')
+  const [windowPickerSpaceId, setWindowPickerSpaceId] = useState<string | null>(null)
   const [splitTabIds, setSplitTabIds] = useState<string[]>([])
   const [documentTarget, setDocumentTarget] = useState('')
   const [documentName, setDocumentName] = useState('')
@@ -203,6 +239,28 @@ function App() {
   const [newCalendarName, setNewCalendarName] = useState('')
   const [newCalendarUrl, setNewCalendarUrl] = useState('')
   const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
+  const [dismissedRecentTargets, setDismissedRecentTargets] = useState<Set<string>>(new Set())
+
+  const refreshRecentFiles = useCallback(() => {
+    if (bridge.getRecentFiles) {
+      bridge.getRecentFiles().then(files => {
+        if (Array.isArray(files)) setRecentFiles(files)
+      }).catch(() => undefined)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshRecentFiles()
+    window.addEventListener('focus', refreshRecentFiles)
+    return () => window.removeEventListener('focus', refreshRecentFiles)
+  }, [refreshRecentFiles])
+
+  useEffect(() => {
+    if (!bridge.onToast) return
+    return bridge.onToast(message => setToast(message))
+  }, [])
+
   const isWorkstageOpen = route.type === 'browse'
   useLayoutEffect(() => {
     const viewport = contentViewport.current
@@ -222,7 +280,43 @@ function App() {
   const [assistantPreferences, setAssistantPreferences] = useState(defaultAssistantPreferences)
   useEffect(() => { const role = state?.aiConfiguration?.role; if (role) setAssistantPreferences(previous => previous.role === role ? previous : { ...previous, role }) }, [state?.aiConfiguration?.role])
   const [omniboxUrl, setOmniboxUrl] = useState('')
+  const [homeSuggestions, setHomeSuggestions] = useState<string[]>([])
+  const [showHomeSuggestions, setShowHomeSuggestions] = useState(false)
+  const [homeSelectedIndex, setHomeSelectedIndex] = useState(-1)
+  const homeDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const homeOmniboxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!omniboxUrl.trim()) {
+      setHomeSuggestions([])
+      return
+    }
+    if (homeDebounceTimer.current) clearTimeout(homeDebounceTimer.current)
+    homeDebounceTimer.current = setTimeout(() => {
+      bridge.fetchSuggestions?.(omniboxUrl.trim())
+        .then(results => {
+          setHomeSuggestions(results || [])
+        })
+        .catch(() => setHomeSuggestions([]))
+    }, 150)
+    return () => {
+      if (homeDebounceTimer.current) clearTimeout(homeDebounceTimer.current)
+    }
+  }, [omniboxUrl])
+
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent) => {
+      if (!homeOmniboxRef.current?.contains(event.target as Node)) {
+        setShowHomeSuggestions(false)
+        setHomeSelectedIndex(-1)
+      }
+    }
+    window.addEventListener('pointerdown', handleOutside)
+    return () => window.removeEventListener('pointerdown', handleOutside)
+  }, [])
   const [passwordOffer, setPasswordOffer] = useState<{ origin: string; username: string; password: string; title?: string } | null>(null)
+  const [permissionRequest, setPermissionRequest] = useState<PermissionRequestInfo | null>(null)
+  const [readerArticle, setReaderArticle] = useState<ReaderArticle | null>(null)
   const targetWorkstageSpace = state?.spaces.find(space => space.id === (workstageSpaceId || state.activeSpaceId)) || state?.spaces[0]
   const session = targetWorkstageSpace ? contextSession(targetWorkstageSpace) : emptySession()
   const tabs = session.tabs
@@ -314,7 +408,7 @@ function App() {
 
   useEffect(() => {
     if (!bridge.browser) return
-    const observer = new MutationObserver(() => bridge.browser!.block(Boolean(document.querySelector('[role="dialog"], [role="menu"], [data-browser-drag-layer], [data-workspace-transition]'))).catch(() => undefined))
+    const observer = new MutationObserver(() => bridge.browser!.block(Boolean(document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-browser-drag-layer], [data-workspace-transition]'))).catch(() => undefined))
     observer.observe(document.body, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [])
@@ -362,8 +456,64 @@ function App() {
           title: event.title
         })
       }
+      else if (event.type === 'permission-request') {
+        setPermissionRequest({
+          id: event.id,
+          tabId: event.tabId,
+          hostname: event.hostname,
+          origin: event.origin,
+          permission: event.permission,
+          details: event.details
+        })
+      }
+      else if (event.type === 'adblock-stats') {
+        commit(previous => ({
+          ...previous,
+          spaces: previous.spaces.map(space => {
+            if (!space.activeSession?.tabs.some(tab => tab.id === event.tabId)) return space
+            const value = normalizeSpace(space)
+            return updateContextSession(
+              value,
+              session => ({
+                ...session,
+                tabs: session.tabs.map(tab => tab.id === event.tabId ? { ...tab, blockedCount: event.count } : tab)
+              }),
+              new Date().toISOString(),
+              undefined,
+              false
+            )
+          })
+        }))
+      }
     })
   }, [state, activeTabId, splitTabId, isWorkstageOpen])
+
+  useEffect(() => {
+    setReaderArticle(null)
+  }, [activeTabId])
+
+  const handleToggleReader = async () => {
+    if (readerArticle) {
+      setReaderArticle(null)
+      return
+    }
+    if (!activeTabId || !bridge.browser?.getReaderContent) return
+    try {
+      const article = await bridge.browser.getReaderContent(activeTabId)
+      if (article) {
+        setReaderArticle(article)
+      } else {
+        setToast('Не удалось выделить статью со страницы.')
+      }
+    } catch {
+      setToast('Не удалось загрузить режим чтения.')
+    }
+  }
+
+  const handlePermissionResponse = (id: string, allowed: boolean | null) => {
+    setPermissionRequest(null)
+    bridge.browser?.respondPermission?.(id, allowed).catch(() => undefined)
+  }
 
   useEffect(() => {
     zenTimer.setOnComplete(() => setToast('Сессия фокуса завершена.'))
@@ -480,6 +630,12 @@ function App() {
         return { ...previousSession, tabs: existing ? previousSession.tabs : [...previousSession.tabs, researchTab], activeTabId: existing?.id || researchTab.id }
       })
     }) }))
+    const windowHwnds = selected.resources
+      .filter(r => r.kind === 'window' && r.windowHwnd)
+      .map(r => r.windowHwnd!)
+    if (windowHwnds.length > 0 && bridge.osWindows?.restore) {
+      bridge.osWindows.restore(windowHwnds, true).catch(() => undefined)
+    }
     setRoute({ type: 'browse', spaceId: selected.id })
   }
 
@@ -547,6 +703,84 @@ function App() {
       : suggestInitialName({ ...space, resources: [...space.resources, resource] })) }))
     if (saved) { setModal(null); setToast('Ссылка на документ сохранена в пространстве') }
   }
+
+  const suggestedRecentFile = useMemo(() => {
+    const space = targetWorkstageSpace || currentSpace
+    if (!space) return null
+    return recentFiles.find(file =>
+      !dismissedRecentTargets.has(file.target.toLowerCase()) &&
+      !space.resources.some(r => r.kind === 'file' && documentPathKey(r.target) === documentPathKey(file.target))
+    ) || null
+  }, [targetWorkstageSpace, currentSpace, recentFiles, dismissedRecentTargets])
+
+  async function addRecentDocument(file: RecentFile, spaceId?: string) {
+    const targetId = spaceId || targetWorkstageSpace?.id || currentSpace?.id
+    if (!targetId) return
+    const resource: Resource = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      kind: 'file',
+      target: file.target,
+      createdAt: new Date().toISOString()
+    }
+    const saved = await commit(previous => ({
+      ...previous,
+      spaces: previous.spaces.map(space => space.id === targetId
+        ? suggestInitialName({ ...space, resources: [...space.resources, resource] })
+        : space
+      )
+    }))
+    if (saved) {
+      setToast(`«${file.name}» сохранён в материалы`)
+      setDismissedRecentTargets(prev => new Set(prev).add(file.target.toLowerCase()))
+    }
+  }
+
+  function dismissRecentDocument(target: string) {
+    setDismissedRecentTargets(prev => new Set(prev).add(target.toLowerCase()))
+  }
+
+  function openWindowPicker(spaceId?: string) {
+    const target = spaceId || targetWorkstageSpace?.id || currentSpace?.id
+    if (!target) {
+      setToast('Сначала создайте пространство.')
+      return
+    }
+    setWindowPickerSpaceId(target)
+  }
+
+  async function handleSelectWindow(win: OpenWindowItem) {
+    if (!windowPickerSpaceId) return
+    const targetSpaceId = windowPickerSpaceId
+    const resource: Resource = {
+      id: crypto.randomUUID(),
+      name: win.title,
+      kind: 'window',
+      target: win.exePath,
+      exeName: win.exeName,
+      windowHwnd: win.hwnd,
+      windowTitle: win.title,
+      createdAt: new Date().toISOString()
+    }
+    const saved = await commit(previous => ({
+      ...previous,
+      spaces: previous.spaces.map(space => space.id !== targetSpaceId
+        ? space
+        : {
+            ...space,
+            resources: [
+              ...space.resources.filter(r => r.kind !== 'window' || r.windowHwnd?.toLowerCase() !== win.hwnd.toLowerCase()),
+              resource
+            ]
+          }
+      )
+    }))
+    if (saved) {
+      setWindowPickerSpaceId(null)
+      setToast(`«${win.title}» привязано к материалам`)
+    }
+  }
+
 
   async function copyToCabinet(resource: Resource, destinationId: string) {
     const destination = state?.spaces.find(space => space.id === destinationId)
@@ -645,6 +879,15 @@ function App() {
     setCaptureDefaultWhen('')
     setCaptureTimed(false)
     setModal('capture')
+  }
+
+  function registerIslandUndo(taskId: string, noticeId: string) {
+    const action = { label: 'Дело завершено', restore: () => {
+      const failed = () => { setToast('Не удалось вернуть дело. Попробуйте ещё раз.'); setUndoAction(action) }
+      void Promise.resolve(commit(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === taskId ? { ...item, done: false } : item), dismissedNotices: previous.dismissedNotices?.filter(item => item !== noticeId) })))
+        .then(saved => { if (!saved) failed() }).catch(failed)
+    } }
+    setUndoAction(action)
   }
 
   function planCapture(offset: number) {
@@ -893,12 +1136,65 @@ function App() {
     input?.select()
   }
 
+  const homeComputedSuggestions = useMemo(() => {
+    if (!showHomeSuggestions || !state) return []
+    return buildOmniboxSuggestions({
+      query: omniboxUrl,
+      spaces: state.spaces,
+      history: state.history,
+      googleSuggestions: homeSuggestions
+    })
+  }, [showHomeSuggestions, state, omniboxUrl, homeSuggestions])
+
+  function handleSelectHomeSuggestion(item: OmniboxSuggestionItem) {
+    setShowHomeSuggestions(false)
+    setHomeSelectedIndex(-1)
+    setOmniboxUrl('')
+    if (item.type === 'tab' && item.spaceId && item.tabId) {
+      selectExistingTab(item.spaceId, item.tabId)
+    } else {
+      openAddress(item.value, item.title, undefined, true)
+    }
+  }
+
   function handleOmniboxKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      if (homeSelectedIndex >= 0 && homeComputedSuggestions[homeSelectedIndex]) {
+        e.preventDefault()
+        handleSelectHomeSuggestion(homeComputedSuggestions[homeSelectedIndex])
+        return
+      }
       const val = omniboxUrl.trim()
       if (!val) return
+      setShowHomeSuggestions(false)
+      setHomeSelectedIndex(-1)
       openAddress(val, undefined, isWorkstageOpen ? targetWorkstageSpace?.id : currentSpace?.id, !isWorkstageOpen)
       e.currentTarget.blur()
+      return
+    }
+    if (e.key === 'ArrowDown') {
+      if (homeComputedSuggestions.length > 0) {
+        e.preventDefault()
+        if (!showHomeSuggestions) {
+          setShowHomeSuggestions(true)
+          setHomeSelectedIndex(0)
+        } else {
+          setHomeSelectedIndex(prev => (prev + 1) % homeComputedSuggestions.length)
+        }
+      }
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      if (homeComputedSuggestions.length > 0 && showHomeSuggestions) {
+        e.preventDefault()
+        setHomeSelectedIndex(prev => (prev - 1 + homeComputedSuggestions.length) % homeComputedSuggestions.length)
+      }
+      return
+    }
+    if (e.key === 'Escape') {
+      setShowHomeSuggestions(false)
+      setHomeSelectedIndex(-1)
+      return
     }
   }
 
@@ -909,7 +1205,8 @@ function App() {
     catch { setToast('Не удалось распознать адрес.'); return }
     const webId = webSpaceId(state)
     const destinationId = requestedSpaceId || state.spaces.find(space => space.kind === 'web')?.id || webId
-    const tab: BrowserTab = { id: crypto.randomUUID(), title: title || (url.startsWith('https://yandex.ru/search/') ? `Поиск: ${address}` : new URL(url).hostname), url }
+    const isSearch = url.startsWith('https://www.google.com/search?') || url.startsWith('https://yandex.ru/search/')
+    const tab: BrowserTab = { id: crypto.randomUUID(), title: title || (isSearch ? `Поиск: ${address}` : new URL(url).hostname), url }
     const now = new Date().toISOString()
     commit(previous => {
       const draft = requestedSpaceId ? previous : ensureWebSpace(previous, webId).state
@@ -991,10 +1288,39 @@ function App() {
 
   async function parkSpace() {
     if (!targetWorkstageSpace) return
-    commit(previous => saveCheckpoint(previous, targetWorkstageSpace.id))
+    const spaceToPark = targetWorkstageSpace
+    commit(previous => saveCheckpoint(previous, spaceToPark.id))
+    const currentTabIds = tabs.map(tab => tab.id)
+    sound.playPaperFold()
     returnHome()
     await Promise.all(tabs.map(tab => bridge.browser?.hide(tab.id).catch(() => undefined)))
-    setToast(isCabinetPreview ? 'Пространство сохранено. Можно вернуться позже.' : 'Дело сохранено. Вкладки остаются открытыми.')
+    let freedMB = 0
+    if (bridge.browser?.park) {
+      const result = await bridge.browser.park(currentTabIds).catch(() => ({ protectedCount: 0, freedMB: 0 }))
+      freedMB = result.freedMB || 0
+      if (result.protectedCount > 0) {
+        setToast(`Пространство сохранено. Вкладок с активной работой в памяти: ${result.protectedCount}.`)
+      } else {
+        setToast(isCabinetPreview ? 'Пространство сохранено. Вкладки выгружены из памяти.' : 'Дело сохранено. Вкладки остаются открытыми.')
+      }
+    } else {
+      setToast(isCabinetPreview ? 'Пространство сохранено. Вкладки выгружены из памяти.' : 'Дело сохранено. Вкладки остаются открытыми.')
+    }
+    if (freedMB > 0) {
+      const reliefId = crypto.randomUUID()
+      setMemoryRelief({ freedMB, id: reliefId })
+      setReliefWave(true)
+      window.setTimeout(() => setReliefWave(false), 650)
+      window.setTimeout(() => {
+        setMemoryRelief(current => current?.id === reliefId ? null : current)
+      }, 7000)
+    }
+    const windowHwnds = spaceToPark.resources
+      .filter(r => r.kind === 'window' && r.windowHwnd)
+      .map(r => r.windowHwnd!)
+    if (windowHwnds.length > 0 && bridge.osWindows?.minimize) {
+      bridge.osWindows.minimize(windowHwnds).catch(() => undefined)
+    }
   }
 
   function importTabs(groups: ImportGroup[]) {
@@ -1220,6 +1546,124 @@ function App() {
     commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id === spaceId ? updateContextSession({ ...space, resources: space.resources.map(item => item.id === resource.id ? { ...item, lastOpenedAt: openedAt } : item) }, session => ({ ...session, tabs: session.tabs.map(item => item.id === tab.id ? { ...item, lastAccessedAt: openedAt } : item) }), openedAt) : space) }))
   }
 
+  const spacesViewportRef = useRef<HTMLDivElement>(null)
+  const [spacesEdges, setSpacesEdges] = useState({ before: false, after: false, hasOverflow: false })
+  const spacesHoldInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const spacesHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const stopSpacesHoldScroll = useCallback(() => {
+    if (spacesHoldTimeout.current) clearTimeout(spacesHoldTimeout.current)
+    if (spacesHoldInterval.current) clearInterval(spacesHoldInterval.current)
+    spacesHoldTimeout.current = null
+    spacesHoldInterval.current = null
+  }, [])
+
+  const scrollSpaces = useCallback((direction: -1 | 1) => {
+    const el = spacesViewportRef.current
+    if (!el) return
+    const step = 200
+    const smooth = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? !window.matchMedia('(prefers-reduced-motion: reduce)').matches : false
+    if (typeof el.scrollBy === 'function') {
+      el.scrollBy({
+        left: direction * step,
+        behavior: smooth ? 'smooth' : 'instant'
+      })
+    } else {
+      el.scrollLeft += direction * step
+    }
+  }, [])
+
+  const startSpacesHoldScroll = useCallback((direction: -1 | 1) => {
+    stopSpacesHoldScroll()
+    scrollSpaces(direction)
+    spacesHoldTimeout.current = setTimeout(() => {
+      spacesHoldInterval.current = setInterval(() => {
+        scrollSpaces(direction)
+      }, 100)
+    }, 280)
+  }, [scrollSpaces, stopSpacesHoldScroll])
+
+  useEffect(() => {
+    return () => stopSpacesHoldScroll()
+  }, [stopSpacesHoldScroll])
+
+  const activeTopSpaceId = currentSpace?.id || targetWorkstageSpace?.id
+  const availableTopSpaces = state ? state.spaces.filter(space => !space.archivedAt && space.kind !== 'web') : []
+  const visibleTopSpaces = useMemo(() => {
+    if (availableTopSpaces.length <= 4) return availableTopSpaces
+    const sorted = [...availableTopSpaces].sort((a, b) => {
+      const timeA = Date.parse(a.lastActiveAt || a.checkpoint?.savedAt || '') || 0
+      const timeB = Date.parse(b.lastActiveAt || b.checkpoint?.savedAt || '') || 0
+      return timeB - timeA
+    })
+    const top4 = sorted.slice(0, 4)
+    if (activeTopSpaceId && !top4.some(s => s.id === activeTopSpaceId)) {
+      const activeSpace = availableTopSpaces.find(s => s.id === activeTopSpaceId)
+      if (activeSpace) top4[3] = activeSpace
+    }
+    return availableTopSpaces.filter(space => top4.some(s => s.id === space.id))
+  }, [availableTopSpaces, activeTopSpaceId])
+
+  useLayoutEffect(() => {
+    const el = spacesViewportRef.current
+    if (!el) return
+
+    const measure = () => {
+      const max = Math.max(0, el.scrollWidth - el.clientWidth)
+      const offset = Math.max(0, Math.min(max, el.scrollLeft))
+      const before = offset > 2
+      const after = offset < max - 2
+      const hasOverflow = max > 2
+      setSpacesEdges(prev => prev.before === before && prev.after === after && prev.hasOverflow === hasOverflow ? prev : { before, after, hasOverflow })
+    }
+
+    measure()
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
+    observer?.observe(el)
+    if (el.firstElementChild) observer?.observe(el.firstElementChild)
+    el.addEventListener('scroll', measure, { passive: true })
+    window.addEventListener('resize', measure)
+
+    const wheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX) || event.ctrlKey) return
+      if (el.scrollWidth <= el.clientWidth) return
+      const distance = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? el.clientWidth : 1)
+      if (distance > 0 ? el.scrollLeft >= el.scrollWidth - el.clientWidth - 1 : el.scrollLeft <= 0) return
+      event.preventDefault()
+      if (typeof el.scrollBy === 'function') el.scrollBy({ left: distance, behavior: 'auto' })
+      else el.scrollLeft += distance
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+
+    return () => {
+      observer?.disconnect()
+      el.removeEventListener('scroll', measure)
+      el.removeEventListener('wheel', wheel)
+      window.removeEventListener('resize', measure)
+    }
+  }, [visibleTopSpaces.length])
+
+  useLayoutEffect(() => {
+    const el = spacesViewportRef.current
+    if (!el) return
+    const smooth = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? !window.matchMedia('(prefers-reduced-motion: reduce)').matches : false
+    if (!activeTopSpaceId) {
+      if (!isWorkstageOpen && !currentSpace && !showSpaces) {
+        if (typeof el.scrollTo === 'function') el.scrollTo({ left: 0, behavior: smooth ? 'smooth' : 'instant' })
+        else el.scrollLeft = 0
+      }
+      return
+    }
+    const targetTab = el.querySelector<HTMLElement>(`[data-space-id="${activeTopSpaceId}"]`)
+    if (targetTab && typeof targetTab.scrollIntoView === 'function') {
+      targetTab.scrollIntoView({
+        behavior: smooth ? 'smooth' : 'instant',
+        block: 'nearest',
+        inline: 'nearest'
+      })
+    }
+  }, [activeTopSpaceId, currentSpace?.id, visibleTopSpaces.length, isWorkstageOpen, showSpaces])
+
   if (!state) return <div className="loading-screen"><span className="brand-mark">✳</span><span>{toast || 'Загрузка…'}</span></div>
 
   const collectionColumns = hubBounds.width > 1000 ? 3 : hubBounds.width > 600 ? 2 : 1
@@ -1229,31 +1673,43 @@ function App() {
   const visibleResourcePage = Math.min(resourcePage, resourcePages - 1)
   const sortedResources = recentMaterials(currentSpace?.resources || [])
   const browserDay = browserDayModel(state, time, browserFocus)
-  const activeTopSpaceId = currentSpace?.id || targetWorkstageSpace?.id
-  const availableTopSpaces = state.spaces.filter(space => !space.archivedAt && space.kind !== 'web')
-  const visibleTopSpaces = isCabinetPreview ? availableTopSpaces.filter(space => space.pinned) : availableTopSpaces.slice(0, 3)
-  if (activeTopSpaceId && !visibleTopSpaces.some(space => space.id === activeTopSpaceId)) {
-    const activeSpace = availableTopSpaces.find(space => space.id === activeTopSpaceId)
-    if (activeSpace) { if (isCabinetPreview) visibleTopSpaces.push(activeSpace); else visibleTopSpaces.splice(2, 1, activeSpace) }
-  }
+  const currentLocale = state?.locale || 'ru'
+  const t = (key: any, params?: any) => translate(currentLocale, key, params)
   return (
-    <div
-      ref={shellRef}
-      className={`app-shell ${bridge.platform === "darwin" ? "platform-mac" : ""} ${isWorkstageOpen ? 'browsing' : ''} ${isDesktop ? 'desktop' : ''}`}
-      style={{ '--app-bg': `url("${resolveWallpaperUrl(state?.backgroundImage || DEFAULT_WALLPAPER)}")` } as React.CSSProperties}
-    >
+    <I18nProvider locale={state?.locale} onLocaleChange={newLocale => commit(prev => ({ ...prev, locale: newLocale }))}>
+      <div
+        ref={shellRef}
+        className={`app-shell ${bridge.platform === "darwin" ? "platform-mac" : ""} ${isWorkstageOpen ? 'browsing' : ''} ${isDesktop ? 'desktop' : ''}`}
+        style={{ '--app-bg': `url("${resolveWallpaperUrl(state?.backgroundImage || DEFAULT_WALLPAPER)}")` } as React.CSSProperties}
+      >
+        <CalmWindSvgFilter />
+        <AnimatePresence>
+          {reliefWave && (
+            <motion.div
+              key="relief-wave"
+              className="dashboard-relief-wave"
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.35, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: [0.2, 0, 0, 1] }}
+            />
+          )}
+        </AnimatePresence>
       <div className="page-wrap">
         {!isWorkstageOpen && <div className="hub-ambient">
           <AmbientDate now={time} onOpenCalendar={() => { returnHome(); setCalendarRequested(true) }} />
-          <AttentionIsland state={state} now={time} onChange={commit} onOpen={openResource} onSpace={openSpace} onFocus={openFocus} compact={isWorkstageOpen} />
+          <AttentionIsland state={state} now={time} onChange={commit} onOpen={openResource} onSpace={openSpace} onFocus={openFocus} onDay={() => { returnHome(); setCalendarRequested(true) }} onUndo={registerIslandUndo} compact={isWorkstageOpen} memoryRelief={memoryRelief} />
           <div className="hub-status">
             <time dateTime={time.toLocaleTimeString('ru-RU', { hour12: false })} aria-label={`Время ${time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}>{time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</time>
             <AmbientWeather weather={weather} now={time} onOpenForecast={() => setModal('weather')} />
           </div>
         </div>}
         {isWorkstageOpen && targetWorkstageSpace ? <BrowserChrome
-          space={targetWorkstageSpace} spaces={state.spaces} tab={activeTab} pulse={browserDay.pulse}
-          dayOpen={browserDayOpen} nativeNavigation={Boolean(bridge.browser)}
+          space={targetWorkstageSpace} spaces={state.spaces} tab={activeTab} history={state.history} nativeNavigation={Boolean(bridge.browser)}
+          attentionIsland={layoutLocked => <AttentionIsland browser layoutLocked={layoutLocked} state={state} now={time} onChange={commit} onOpen={openResource} onSpace={openSpace} onFocus={openFocus} onUndo={registerIslandUndo}
+            onDay={() => { setSpacePanelOpen(false); browserDayOpen ? closeBrowserDay() : setBrowserDayOpen(true) }}
+            onAssistant={() => { setAssistantContexts([]); setAssistantOpen(true) }} />}
           onHome={returnToDashboard} onSpace={id => openWorkstage(id)} onSpaceDashboard={() => isCabinetPreview ? (setBrowserDayOpen(false), setSpacePanelOpen(value => !value)) : openSpace(targetWorkstageSpace.id)} onWeb={openWeb} onAllSpaces={() => setRoute({ type: 'spaces' })}
           onNewSpace={() => void createEmptyCabinet('browser')} onPinSpace={() => toggleSpacePin(targetWorkstageSpace)} onRenameSpace={() => renameCabinet(targetWorkstageSpace)} onArchiveSpace={() => archiveSpace(targetWorkstageSpace)} materialsOpen={spacePanelOpen}
           onNavigate={address => openAddress(address, undefined, targetWorkstageSpace.id, false)}
@@ -1262,29 +1718,82 @@ function App() {
           pageActions={<PageActions spaceId={targetWorkstageSpace.id} spaces={state.spaces} tab={activeTab} onFavorite={saveFavorite} onRemoveFavorite={removeFavorite}
             onMove={(tabId, destination, name) => moveTab(targetWorkstageSpace.id, tabId, destination, name)} />}
           onDay={() => { setSpacePanelOpen(false); browserDayOpen ? closeBrowserDay() : setBrowserDayOpen(true) }}
-          onCapture={openCapture} onAssistant={() => { setAssistantContexts([]); setAssistantOpen(true) }}
+          onCapture={openCapture} onAssistant={() => { setAssistantContexts([]); setAssistantOpen(true) }} onFocus={openFocus}
           profile={state?.userProfile}
           onProfile={anchor => { profileAnchorRef.current = anchor as HTMLButtonElement; setProfileOpen(prev => !prev) }}
           onSearch={() => setModal('search')} onHistory={() => setModal('history')} onSettings={() => openSettings()} onPark={parkSpace}
+          permissionRequest={permissionRequest && (!permissionRequest.tabId || permissionRequest.tabId === activeTabId) ? permissionRequest : null}
+          onPermissionResponse={handlePermissionResponse}
+          onReaderMode={handleToggleReader}
+          isReaderActive={Boolean(readerArticle)}
         /> : <header className="browser-chrome">
           <div className="chrome-main">
             <button className="brand" onClick={isWorkstageOpen ? returnToDashboard : returnHome} aria-label={isWorkstageOpen ? 'Вернуться в дашборд' : 'На главную dombro'}>
               <span className="brand-mark">✳</span><span>dombro<span className="brand-dot">.</span></span>
             </button>
             {isWorkstageOpen && targetWorkstageSpace && targetWorkstageSpace.kind !== 'web' && <button className="browser-space-chip" onClick={() => openSpace(targetWorkstageSpace.id)} aria-label={`Вернуться в пространство ${targetWorkstageSpace.name}`} title={targetWorkstageSpace.name}><Folder size={16} /><span>{targetWorkstageSpace.name}</span></button>}
-            {!isWorkstageOpen && <div className="calm-omnibox">
+            {!isWorkstageOpen && <div className="calm-omnibox" ref={homeOmniboxRef}>
               <Globe2 size={17} className="omnibox-icon" />
               <input type="text" className="omnibox-input" value={omniboxUrl}
-                onChange={e => setOmniboxUrl(e.target.value)} onKeyDown={handleOmniboxKeyDown}
-                placeholder="Поиск или адрес сайта" aria-label="Поиск или адрес сайта" />
+                onFocus={() => { if (omniboxUrl.trim()) setShowHomeSuggestions(true) }}
+                onChange={e => {
+                  setOmniboxUrl(e.target.value)
+                  setShowHomeSuggestions(true)
+                  setHomeSelectedIndex(-1)
+                }}
+                onKeyDown={handleOmniboxKeyDown}
+                placeholder="Поиск или адрес сайта" aria-label="Поиск или адрес сайта"
+                aria-autocomplete="list" aria-controls="home-omnibox-dropdown"
+                aria-activedescendant={homeSelectedIndex >= 0 ? `home-suggestion-${homeSelectedIndex}` : undefined} />
               <kbd>Ctrl L</kbd>
+              {showHomeSuggestions && homeComputedSuggestions.length > 0 && (
+                <div className="omnibox-dropdown" id="home-omnibox-dropdown" role="listbox" aria-label="Подсказки адресной строки">
+                  {homeComputedSuggestions.map((item, index) => {
+                    const isSelected = index === homeSelectedIndex
+                    return (
+                      <button
+                        key={item.id}
+                        id={`home-suggestion-${index}`}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`omnibox-suggestion-item ${isSelected ? 'is-selected' : ''}`}
+                        onMouseDown={event => {
+                          event.preventDefault()
+                          handleSelectHomeSuggestion(item)
+                        }}
+                        onMouseEnter={() => setHomeSelectedIndex(index)}
+                      >
+                        <span className="omnibox-suggestion-icon" aria-hidden="true">
+                          {item.type === 'search' && <Search size={15} />}
+                          {item.type === 'url' && <Globe2 size={15} />}
+                          {item.type === 'tab' && <SquarePlus size={15} />}
+                          {item.type === 'bookmark' && <Bookmark size={15} />}
+                          {item.type === 'history' && <History size={15} />}
+                        </span>
+                        <span className="omnibox-suggestion-content">
+                          <span className="omnibox-suggestion-title">{item.title}</span>
+                          {item.subtitle && <span className="omnibox-suggestion-subtitle">{item.subtitle}</span>}
+                        </span>
+                        <span className="omnibox-suggestion-badge">
+                          {item.type === 'search' && 'Google'}
+                          {item.type === 'url' && 'Сайт'}
+                          {item.type === 'tab' && 'Вкладка'}
+                          {item.type === 'bookmark' && 'Избранное'}
+                          {item.type === 'history' && 'История'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>}
             <div className="chrome-actions">
-              <button className={`chrome-button chrome-browser ${isWorkstageOpen && targetWorkstageSpace?.kind === 'web' ? 'selected' : ''}`} onClick={openWeb} aria-label="Браузер" aria-pressed={isWorkstageOpen && targetWorkstageSpace?.kind === 'web'} title="Браузер"><Globe2 size={18} /><span>Браузер</span></button>
+              <button className={`chrome-button chrome-browser ${isWorkstageOpen && targetWorkstageSpace?.kind === 'web' ? 'selected' : ''}`} onClick={openWeb} aria-label={t('nav.browser')} aria-pressed={isWorkstageOpen && targetWorkstageSpace?.kind === 'web'} title={t('nav.browser')}><Globe2 size={18} /><span>{t('nav.browser')}</span></button>
               <button className="chrome-button chrome-tab-desk" onClick={() => openTabsOverview()} title="Стол · Ctrl Shift A" aria-label="Обзор и поиск вкладок"><LayoutGrid size={18} /></button>
-              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => { setAssistantContexts([]); setAssistantOpen(true) }} aria-label="ИИ в Доме" title={`ИИ · ${assistantRoles[assistantPreferences.role].label}`}><Sparkles size={19} strokeWidth={1.7} /></button>
-              <button className="chrome-button" onClick={() => setModal('search')} title="Поиск в Доме · Ctrl K" aria-label="Поиск в Доме"><Search size={19} /></button>
-              <button className="chrome-button" onClick={() => openSettings()} aria-label="Настройки"><Settings2 size={19} /></button>
+              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => { setAssistantContexts([]); setAssistantOpen(true) }} aria-label={t('nav.assistant')} title={`ИИ · ${assistantRoles[assistantPreferences.role].label}`}><Sparkles size={19} strokeWidth={1.7} /></button>
+              <button className="chrome-button" onClick={() => setModal('search')} title={`${t('nav.search_dom')} · Ctrl K`} aria-label={t('nav.search_dom')}><Search size={19} /></button>
+              <button className="chrome-button" onClick={() => openSettings()} aria-label={t('nav.settings')}><Settings2 size={19} /></button>
               {(() => {
                 const userProfile = getUserProfile(state)
                 return (
@@ -1304,14 +1813,57 @@ function App() {
             </div>
           </div>
           {!isWorkstageOpen && <div className="chrome-secondary">
-            <FluidGroup as="nav" className="chrome-spaces" aria-label="Пространства" itemSelector=":scope > .chrome-space">
-              <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
-              {visibleTopSpaces.map(space => <button {...spaceInteractions(space, true)} key={space.id} data-space-id={space.id} data-cabinet-space-target={isCabinetPreview || undefined}
-                className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}${cabinetDrop?.id === space.id ? ' is-drop-target' : ''}`}
-                onClick={() => openSpace(space.id)} title={`Продолжить: ${space.name}`}>{space.name}</button>)}
-              <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => setRoute({ type: 'spaces' })}>Все пространства</button>
-              <button className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Создать пространство"><Plus size={17} /></button>
-            </FluidGroup>
+            <nav className="chrome-spaces" aria-label="Пространства">
+              <div
+                className={`chrome-spaces-viewport ${spacesEdges.before ? 'has-before' : ''} ${spacesEdges.after ? 'has-after' : ''}`}
+                ref={spacesViewportRef}
+              >
+                <FluidGroup as="div" className="chrome-spaces-track" itemSelector=":scope > .chrome-space">
+                  <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
+                  {visibleTopSpaces.map(space => {
+                    const displayName = formatSpaceDisplayName(space)
+                    return <button {...spaceInteractions(space, true)} key={space.id} data-space-id={space.id} data-cabinet-space-target={isCabinetPreview || undefined}
+                      className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}${cabinetDrop?.id === space.id ? ' is-drop-target' : ''}${space.pinned ? ' is-pinned' : ''}`}
+                      onClick={() => openSpace(space.id)} title={`Продолжить: ${displayName}`}>{displayName}</button>
+                  })}
+                </FluidGroup>
+              </div>
+              {(spacesEdges.hasOverflow || spacesEdges.before || spacesEdges.after) && (
+                <div className="chrome-spaces-scroll-arrows" aria-label="Прокрутка вкладок">
+                  <button
+                    type="button"
+                    className="chrome-spaces-scroll-btn chrome-scroll-left"
+                    disabled={!spacesEdges.before}
+                    onPointerDown={() => startSpacesHoldScroll(-1)}
+                    onPointerUp={stopSpacesHoldScroll}
+                    onPointerLeave={stopSpacesHoldScroll}
+                    onPointerCancel={stopSpacesHoldScroll}
+                    aria-label="Прокрутить вкладки влево"
+                    title="Влево"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="chrome-spaces-scroll-btn chrome-scroll-right"
+                    disabled={!spacesEdges.after}
+                    onPointerDown={() => startSpacesHoldScroll(1)}
+                    onPointerUp={stopSpacesHoldScroll}
+                    onPointerLeave={stopSpacesHoldScroll}
+                    onPointerCancel={stopSpacesHoldScroll}
+                    aria-label="Прокрутить вкладки вправо"
+                    title="Вправо"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+              <div className="chrome-spaces-actions">
+                <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => setRoute({ type: 'spaces' })}>Все пространства</button>
+                <button className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Создать пространство"><Plus size={17} /></button>
+                <button className="chrome-space-search" onClick={() => setModal('search')} aria-label="Поиск по пространствам" title="Поиск по пространствам · Ctrl K"><Search size={16} /></button>
+              </div>
+            </nav>
           </div>}
         </header>}
 
@@ -1347,9 +1899,11 @@ function App() {
               onImport={() => setModal('import')}
               onNewTab={() => handleAddTab()}
               onSettings={() => setModal('settings')}
+              onDashboardSettings={openDashboardSettings}
               onNewsRefresh={news.refresh}
               newsRefreshing={news.refreshing}
               onCalendarRange={date => syncCalendars(undefined, date, true)}
+              covers={tabCovers}
             />
           ) : (
             <Workstage
@@ -1357,6 +1911,7 @@ function App() {
               tabs={tabs}
               activeTabId={activeTabId}
               splitTabId={splitTabId}
+              covers={tabCovers}
               onSelectTab={tabId => updateSession(previous => tabId === previous.splitTabId
                 ? { ...previous, activeTabId: tabId, splitTabId: previous.activeTabId }
                 : { ...previous, activeTabId: tabId })}
@@ -1369,7 +1924,9 @@ function App() {
                 space={targetWorkstageSpace!} onClose={() => { setSpacePanelOpen(false); document.querySelector<HTMLButtonElement>('.browser-materials-toggle')?.focus() }}
                 onOpen={openResource} onEdit={() => editContext(targetWorkstageSpace!.id)} onPin={() => toggleSpacePin(targetWorkstageSpace!)}
                 onAddLink={() => startLink(targetWorkstageSpace!.id)} onAddDocument={() => addDocumentReference(targetWorkstageSpace!.id)}
+                onAddWindow={() => openWindowPicker(targetWorkstageSpace!.id)}
                 onRemove={removeResource} onCopy={copyToCabinet} destinations={availableTopSpaces.filter(space => space.id !== targetWorkstageSpace!.id)}
+                suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, targetWorkstageSpace!.id)} onDismissRecentFile={dismissRecentDocument}
               /> : browserDayOpen ? <BrowserDayPanel
                 state={state} model={browserDay} now={time} focus={browserFocus} pinned={browserDayPinned}
                 onPin={() => setBrowserDayPinned(value => !value)} onClose={closeBrowserDay}
@@ -1396,6 +1953,8 @@ function App() {
               onReorderTab={(tabId, targetId, after) => reorderTab(targetWorkstageSpace!.id, currentContext(targetWorkstageSpace!).id, tabId, targetId, after)}
               onMoveTab={(tabId, spaceId) => moveTab(targetWorkstageSpace!.id, tabId, spaceId)}
               onSplitTab={tabId => splitExistingTab(targetWorkstageSpace!.id, tabId)}
+              readerArticle={readerArticle}
+              onCloseReader={() => setReaderArticle(null)}
             />
           )
         ) : showSpaces && !currentSpace ? (
@@ -1419,6 +1978,7 @@ function App() {
                 <ActionMenu label="Добавить в пространство" triggerContent={<><Plus size={18} />Добавить<ChevronDown size={14} /></>} actions={[
                   { label: 'Сайт', icon: <Link2 size={17} />, onSelect: () => startLink(currentSpace.id) },
                   { label: 'Документ', icon: <FileText size={17} />, onSelect: () => addDocumentReference(currentSpace.id) },
+                  { label: 'Открытое окно', icon: <AppWindow size={17} />, onSelect: () => openWindowPicker(currentSpace.id) },
                   { label: 'Приложение', icon: <AppWindow size={17} />, onSelect: () => addPicked('app', currentSpace.id) }
                 ]} />
                 <ActionMenu label="Действия с пространством" actions={[
@@ -1442,7 +2002,8 @@ function App() {
               onSelectTab={id => selectExistingTab(currentSpace.id, id)} onCloseTab={id => handleCloseTab(id, currentSpace.id)} onSaveTab={tab => requestSaveTab(tab, currentSpace.id)}
               onMoveTab={(id, destination) => moveTab(currentSpace.id, id, destination)} onReorderTab={(id, target, after) => reorderTab(currentSpace.id, currentContext(currentSpace).id, id, target, after)}
               onOpen={resource => { void openResource(resource) }} onRemove={removeResource} onCopy={copyToCabinet} onAddDocument={() => addDocumentReference(currentSpace.id)} onAddLink={() => startLink(currentSpace.id)}
-              onStartDrag={startCabinetDrag} onFinishDrag={finishCabinetDrag} /> : currentSpace.resources.length ? <><div className="resource-grid" style={{ '--resource-rows': resourceRows, gridTemplateColumns: `repeat(${collectionColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${resourceRows}, minmax(0, 1fr))` } as React.CSSProperties}>{sortedResources.slice(visibleResourcePage * resourcePageSize, visibleResourcePage * resourcePageSize + resourcePageSize).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name" title={resource.name}>{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div></> : <div className="empty-space card"><span className="empty-space-icon"><Folder size={28} strokeWidth={1.3} /></span><div className="empty-space-copy"><h2>Нет материалов</h2></div><div className="empty-space-actions"><button onClick={() => startLink(currentSpace.id)}><Link2 size={17} />Сохранить сайт</button><button onClick={() => addDocumentReference(currentSpace.id)}><Plus size={17} />Документ</button></div></div>}
+              onStartDrag={startCabinetDrag} onFinishDrag={finishCabinetDrag}
+              suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, currentSpace.id)} onDismissRecentFile={dismissRecentDocument} /> : currentSpace.resources.length ? <><div className="resource-grid" style={{ '--resource-rows': resourceRows, gridTemplateColumns: `repeat(${collectionColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${resourceRows}, minmax(0, 1fr))` } as React.CSSProperties}>{sortedResources.slice(visibleResourcePage * resourcePageSize, visibleResourcePage * resourcePageSize + resourcePageSize).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name" title={resource.name}>{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div></> : <div className="empty-space card"><span className="empty-space-icon"><Folder size={28} strokeWidth={1.3} /></span><div className="empty-space-copy"><h2>Нет материалов</h2></div><div className="empty-space-actions"><button onClick={() => startLink(currentSpace.id)}><Link2 size={17} />Сохранить сайт</button><button onClick={() => addDocumentReference(currentSpace.id)}><Plus size={17} />Документ</button></div></div>}
             {!isCabinetPreview && currentSpace.resources.length > resourcePageSize && <div className="page-controls"><div><button onClick={() => setResourcePage(visibleResourcePage - 1)} disabled={visibleResourcePage === 0} aria-label="Предыдущая страница"><ChevronLeft size={20} /></button><span>{visibleResourcePage + 1} / {resourcePages}</span><button onClick={() => setResourcePage(visibleResourcePage + 1)} disabled={visibleResourcePage >= resourcePages - 1} aria-label="Следующая страница"><ChevronRight size={20} /></button></div></div>}
           </main>
         )}
@@ -1452,6 +2013,7 @@ function App() {
           onChange={commit}
           onAddApp={spaceId => addPicked('app', spaceId)}
           now={time}
+          recentFiles={recentFiles}
           currentSpaceId={currentSpace?.id || targetWorkstageSpace?.id}
           appIcon={productIcon}
           onCapture={openCapture}
@@ -1511,7 +2073,61 @@ function App() {
         <div className="calm-dialog-actions"><button className="calm-primary" disabled={contextEditor.isNew && !contextName.trim()} onClick={saveContext}>Сохранить <ArrowRight size={17} /></button></div>
       </Dialog>}
       {modal === 'archive' && <Dialog title="Архив пространств" onClose={() => setModal(null)}><div className="archive-list">{state.spaces.filter(space => space.archivedAt).map(space => <button className="soft-button" key={space.id} onClick={() => commit(previous => ({ ...previous, spaces: previous.spaces.map(item => item.id === space.id ? { ...item, archivedAt: null } : item) }))}>Вернуть «{space.name}»</button>)}{!state.spaces.some(space => space.archivedAt) && <p>Все пространства возвращены.</p>}</div></Dialog>}
-      {modal === 'dashboard' && <DashboardSettings widgets={dashboardWidgets(state.dashboard?.widgets)} backgroundImage={state.backgroundImage} onBackgroundChange={url => commit(previous => ({ ...previous, backgroundImage: url }))} onChange={widgets => commit(previous => ({ ...previous, dashboard: { preset: 'overview', widgets } }))} onClose={() => setModal('settings')} />}
+      {modal === 'dashboard' && (
+        <DashboardSettings
+          initialTab={dashboardSettingsTab}
+          widgets={dashboardWidgets(state.dashboard?.widgets, state.dashboard?.gridVersion)}
+          preset={state.dashboard?.preset || 'overview'}
+          customPresets={state.dashboard?.customPresets || []}
+          backgroundImage={state.backgroundImage}
+          onBackgroundChange={url => commit(previous => ({ ...previous, backgroundImage: url }))}
+          onChange={widgets => commit(previous => ({
+            ...previous,
+            dashboard: {
+              preset: previous.dashboard?.preset || 'custom',
+              widgets,
+              gridVersion: 2,
+              customPresets: previous.dashboard?.customPresets
+            }
+          }))}
+          onPresetChange={(presetId, presetWidgets) => commit(previous => ({
+            ...previous,
+            dashboard: {
+              preset: presetId,
+              widgets: presetWidgets,
+              gridVersion: 2,
+              customPresets: previous.dashboard?.customPresets
+            }
+          }))}
+          onSaveCustomPreset={(name, presetWidgets) => {
+            const newPreset = {
+              id: `custom-${Date.now()}`,
+              name,
+              widgets: presetWidgets,
+              createdAt: new Date().toISOString()
+            }
+            commit(previous => ({
+              ...previous,
+              dashboard: {
+                preset: newPreset.id,
+                widgets: presetWidgets,
+                gridVersion: 2,
+                customPresets: [...(previous.dashboard?.customPresets || []), newPreset]
+              }
+            }))
+          }}
+          onDeleteCustomPreset={presetId => commit(previous => ({
+            ...previous,
+            dashboard: {
+              preset: previous.dashboard?.preset === presetId ? 'overview' : (previous.dashboard?.preset || 'overview'),
+              widgets: previous.dashboard?.widgets || [],
+              gridVersion: 2,
+              customPresets: (previous.dashboard?.customPresets || []).filter(p => p.id !== presetId)
+            }
+          }))}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal === 'focus' && <FocusPanel state={state} now={time} initialTaskId={focusTaskId} onClose={() => setModal(null)} onDay={() => { setModal(null); returnHome() }} onCapture={openCapture} onComplete={async task => {
         const saved = await commit(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === task.id ? { ...item, done: true } : item) }))
         if (saved) setUndoAction({ label: 'Дело завершено', restore: () => commit(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === task.id ? { ...item, done: task.done } : item) })) })
@@ -1523,7 +2139,7 @@ function App() {
           onChangeProfile={updates => commit(previous => updateUserProfile(previous, updates))}
           onOpenSettings={section => openSettings(section as any)}
           onOpenImport={() => { setProfileOpen(false); setModal('import') }}
-          onOpenWallpaper={() => { setProfileOpen(false); setModal('dashboard') }}
+          onOpenWallpaper={() => { setProfileOpen(false); openDashboardSettings('wallpaper') }}
           onClose={() => setProfileOpen(false)}
           anchorElement={profileAnchorRef.current}
         />
@@ -1537,7 +2153,7 @@ function App() {
           onClear={() => commit(prev => ({ ...prev, history: clearHistory() }))}
         />
       )}
-      {modal === 'settings' && <Settings state={state} onChange={commit} onClose={() => { setModal(null); setSettingsSection(undefined) }} onDashboard={() => setModal('dashboard')} autostart={autostart} onAutostart={changeAutostart} onBackup={async () => { try { await bridge.backup(); setToast('Резервная копия сохранена.') } catch { setToast('Не удалось создать резервную копию.') } }} calendarName={newCalendarName} calendarUrl={newCalendarUrl} onCalendarName={setNewCalendarName} onCalendarUrl={setNewCalendarUrl} onAddCalendar={addCalendar} onRemoveCalendar={removeCalendar} onCalendarRefresh={() => syncCalendars()} calendarRefreshing={isRefreshingCalendar} onNewsRefresh={news.refresh} newsRefreshing={news.refreshing} initialSection={settingsSection} onImport={() => setModal('import')} />}
+      {modal === 'settings' && <Settings state={state} onChange={commit} onClose={() => { setModal(null); setSettingsSection(undefined) }} onDashboard={() => openDashboardSettings('widgets')} autostart={autostart} onAutostart={changeAutostart} onBackup={async () => { try { await bridge.backup(); setToast('Резервная копия сохранена.') } catch { setToast('Не удалось создать резервную копию.') } }} calendarName={newCalendarName} calendarUrl={newCalendarUrl} onCalendarName={setNewCalendarName} onCalendarUrl={setNewCalendarUrl} onAddCalendar={addCalendar} onRemoveCalendar={removeCalendar} onCalendarRefresh={() => syncCalendars()} calendarRefreshing={isRefreshingCalendar} onNewsRefresh={news.refresh} newsRefreshing={news.refreshing} initialSection={settingsSection} onImport={() => setModal('import')} />}
       {modal && !['context', 'splitSpace', 'documentReference', 'deleteSpace', 'capture', 'import', 'search', 'changes', 'archive', 'dashboard', 'focus', 'settings', 'history'].includes(modal) && <Dialog className={`app-dialog ${modal === 'weather' ? 'weather-dialog' : ['newSpace', 'newStream', 'renameSpace'].includes(modal) ? 'space-create-dialog' : ''}`} title={modal === 'renameSpace' ? 'Новое название' : modal === 'newLink' ? 'Новая ссылка' : modal === 'weather' ? 'Погода' : modal === 'newStream' ? 'Новый поток' : 'Новое пространство'} onClose={() => setModal(null)}>
         {(modal === 'newSpace' || modal === 'newStream' || modal === 'renameSpace') && <>
           {modal !== 'renameSpace' && <div className={`space-create-preview tone-${newSpaceTone}`}><SpacePreview space={{ resources: [] }} /><span><strong>{newSpaceName.trim() || 'Новое пространство'}</strong></span></div>}
@@ -1583,11 +2199,17 @@ function App() {
       )}
       {toast && <div className="toast" role="status"><span>{toast}</span>{Boolean(resumeStatus?.result?.failures.length) && <button disabled={resumeStatus?.pending} onClick={() => resumeContext(resumeStatus!.spaceId, resumeStatus!.contextId, true)}>Повторить неоткрытые</button>}<button onClick={() => setToast('')} aria-label="Закрыть"><X size={15} /></button></div>}
       {undoAction && !tabsOverviewOpen && <div className="calm-undo" role="status"><span>{undoAction.label}</span>{undoAction.open && <button onClick={undoAction.open}>Открыть</button>}<button onClick={() => { undoAction.restore(); setUndoAction(null) }}>Вернуть</button><button aria-label="Закрыть" onClick={() => setUndoAction(null)}><X size={15} /></button></div>}
-    </div>
+      {windowPickerSpaceId && (
+        <OpenWindowPickerModal
+          space={state.spaces.find(s => s.id === windowPickerSpaceId)!}
+          onClose={() => setWindowPickerSpaceId(null)}
+          onSelect={handleSelectWindow}
+        />
+      )}
+      <CalmTooltip />
+      </div>
+    </I18nProvider>
   )
 }
 
 export default App
-
-
-

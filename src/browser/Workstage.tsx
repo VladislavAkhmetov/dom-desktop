@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Columns2, FolderInput, Globe2, LayoutGrid, Plus, X, Pin, Archive, BookmarkPlus, GitBranch, FileInput, Pencil, Shield } from 'lucide-react'
-import type { BrowserTab, ResearchSource, Resource, Space } from '../types'
+import type { BrowserTab, ReaderArticle, ResearchSource, Resource, Space } from '../types'
 import { NativePane } from './NativePane'
+import { ReaderView } from './ReaderView'
 import './browser.css'
 import { ActionMenu } from '../ActionMenu'
 import { contextTitle, currentContext } from '../workContexts'
@@ -42,6 +43,9 @@ export interface WorkstageProps {
   onReorderTab: (tabId: string, targetId: string, after: boolean) => void
   onMoveTab: (tabId: string, spaceId: string) => void
   onSplitTab: (tabId: string) => void
+  covers?: Record<string, string>
+  readerArticle?: ReaderArticle | null
+  onCloseReader?: () => void
 }
 
 export function Workstage({
@@ -73,7 +77,10 @@ export function Workstage({
   spaces,
   onReorderTab,
   onMoveTab,
-  onSplitTab
+  onSplitTab,
+  covers,
+  readerArticle,
+  onCloseReader
 }: WorkstageProps) {
   const strip = useRef<HTMLDivElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -312,6 +319,7 @@ export function Workstage({
         key={tab.id}
         tab={tab}
         space={space}
+        coverImage={covers?.[tab.id]}
         isSplit={secondary}
         isPaired={Boolean(splitTab)}
         onCloseSplit={onCloseSplit}
@@ -394,9 +402,10 @@ export function Workstage({
       </div>
       {addressEditor}
       <div className="browser-stage-body">
-      <div className={`workstage-canvas ${splitTab ? 'split' : ''}`}>
+      <div className={`workstage-canvas ${splitTab ? 'split' : ''}`} style={{ position: 'relative' }}>
         {pane(activeTab)}
         {splitTab && pane(splitTab, true)}
+        {readerArticle && onCloseReader && <ReaderView article={readerArticle} onClose={onCloseReader} />}
         {dragId && <div className="browser-drag-layer" data-browser-drag-layer>
           {tabs.length > 1 && <div data-tab-drop-action="split" className={`browser-drop-split ${dropAction === 'split' ? 'is-over' : ''}`} onDragOver={event => { event.preventDefault(); setDropAction('split') }} onDrop={event => { event.preventDefault(); onSplitTab(dragId); finishDrag() }}><Columns2 size={26} /><span>Рядом</span></div>}
           <div className="browser-drop-tray">{[...destinations.map(item => ({ id: item.id, name: item.kind === 'web' ? 'Браузер' : item.name })), ...(!spaces.some(item => item.kind === 'web' && !item.archivedAt) ? [{ id: '@web', name: 'Браузер' }] : [])].map(destination => <div key={destination.id} data-tab-drop-action={`space:${destination.id}`} className={`browser-drop-space ${dropAction === destination.id ? 'is-over' : ''}`} onDragOver={event => { event.preventDefault(); setDropAction(destination.id) }} onDrop={event => { event.preventDefault(); onMoveTab(dragId, destination.id); finishDrag() }}><FolderInput size={22} /><span>{destination.name}</span></div>)}<div data-tab-drop-action="save" className={`browser-drop-space ${dropAction === 'save' ? 'is-over' : ''}`} onDragOver={event => { event.preventDefault(); setDropAction('save') }} onDrop={event => { event.preventDefault(); const tab = tabs.find(item => item.id === dragId); if (tab) onSaveTab(tab); finishDrag() }}><BookmarkPlus size={22} /><span>Сохранить</span></div></div>

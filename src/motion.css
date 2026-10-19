@@ -3,7 +3,8 @@
 .fluid-selection, .fluid-hover { position: absolute; top: 0; left: 0; pointer-events: none; border-radius: var(--fluid-radius, 18px); }
 .fluid-selection { z-index: -2; background: var(--fluid-selected, rgba(255,255,255,.62)); box-shadow: var(--fluid-shadow, 0 2px 5px rgba(51,80,61,.035)); }
 .fluid-hover { z-index: -1; background: var(--fluid-preview, rgba(255,255,255,.36)); }
-.chrome-spaces.fluid-group .chrome-space.selected, .chrome-spaces.fluid-group .chrome-space:hover { background: transparent; box-shadow: none; }
+.chrome-spaces.fluid-group .chrome-space.selected, .chrome-spaces.fluid-group .chrome-space:hover,
+.chrome-spaces-track.fluid-group .chrome-space.selected, .chrome-spaces-track.fluid-group .chrome-space:hover { background: transparent; box-shadow: none; }
 .settings-nav.fluid-group { --fluid-radius: 12px; --fluid-selected: rgba(207,225,202,.65); --fluid-preview: rgba(219,233,215,.45); --fluid-shadow: none; }
 .settings-nav.fluid-group button[aria-current], .settings-nav.fluid-group button:hover { background: transparent; }
 .fluid-menu-items { --fluid-radius: 6px; --fluid-preview: #e8edde; }
@@ -16,6 +17,7 @@
 .dock-entry-popover.fluid-surface, .calm-dialog.fluid-surface { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .fluid-button { transform: none !important; }
+  .chrome-space { transition: none !important; }
 }
 @media (max-width: 640px) {
   .browser-menu.action-menu-popover .fluid-menu-items > button { min-width: 44px; min-height: 44px; }

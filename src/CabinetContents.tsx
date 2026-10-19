@@ -5,12 +5,12 @@ import { useContextMenu } from './ContextMenu'
 import { cabinetContents, readCabinetDrag, type CabinetDrag } from './cabinetInteractions'
 import { TabIcon } from './browser/TabIcon'
 import { resourceAppLabel } from './resourcePresentation'
-import type { BrowserTab, Resource, Space } from './types'
+import type { BrowserTab, RecentFile, Resource, Space } from './types'
 
 function pageDomain(url: string) { try { return new URL(url).hostname.replace(/^www\./, '') || 'Страница' } catch { return 'Страница' } }
 function documentFormat(resource: Resource) { const extension = resource.target.match(/\.([a-z0-9]+)$/i)?.[1]; return extension ? `.${extension.toLowerCase()}` : 'Файл' }
 
-export function CabinetContents({ space, destinations, covers, drag, pointerTabTarget, onPointerStart, onSelectTab, onCloseTab, onSaveTab, onMoveTab, onReorderTab, onOpen, onRemove, onCopy, onAddDocument, onAddLink, onStartDrag, onFinishDrag }: {
+export function CabinetContents({ space, destinations, covers, drag, pointerTabTarget, onPointerStart, onSelectTab, onCloseTab, onSaveTab, onMoveTab, onReorderTab, onOpen, onRemove, onCopy, onAddDocument, onAddLink, onStartDrag, onFinishDrag, suggestedRecentFile, onAddRecentFile, onDismissRecentFile }: {
   space: Space; destinations: Space[]; covers: Record<string, string>; drag: CabinetDrag | null
   onSelectTab: (id: string) => void; onCloseTab: (id: string) => void; onSaveTab: (tab: BrowserTab) => void
   onMoveTab: (id: string, spaceId: string) => void; onReorderTab: (id: string, targetId: string, after: boolean) => void
@@ -18,6 +18,9 @@ export function CabinetContents({ space, destinations, covers, drag, pointerTabT
   onAddDocument: () => void; onAddLink: () => void
   onStartDrag: (event: DragEvent<HTMLElement>, value: CabinetDrag) => void; onFinishDrag: () => void
   pointerTabTarget?: string; onPointerStart?: (event: PointerEvent<HTMLElement>, value: CabinetDrag) => void
+  suggestedRecentFile?: RecentFile | null
+  onAddRecentFile?: (file: RecentFile) => void
+  onDismissRecentFile?: (target: string) => void
 }) {
   const [query, setQuery] = useState(''), [filter, setFilter] = useState<'all' | 'file' | 'link'>('all')
   const [expanded, setExpanded] = useState(false), [previews, setPreviews] = useState(false), [dropTab, setDropTab] = useState('')
@@ -34,7 +37,7 @@ export function CabinetContents({ space, destinations, covers, drag, pointerTabT
   const shownTabs = expanded || needle ? tabs : tabs.slice(0, 6)
   const hasCovers = tabs.some(tab => /^data:image\/(png|jpeg|webp);base64,/i.test(covers[tab.id] || ''))
   const materialActions = (resource: Resource): MenuAction[] => [
-    { label: resource.kind === 'file' ? 'Открыть документ' : resource.kind === 'app' ? 'Открыть приложение' : 'Открыть сайт', icon: resource.kind === 'file' ? <FileText size={16} /> : resource.kind === 'app' ? <AppWindow size={16} /> : <Globe2 size={16} />, onSelect: () => onOpen(resource) },
+    { label: resource.kind === 'file' ? 'Открыть документ' : resource.kind === 'window' ? 'Показать окно' : resource.kind === 'app' ? 'Открыть приложение' : 'Открыть сайт', icon: resource.kind === 'file' ? <FileText size={16} /> : resource.kind === 'window' || resource.kind === 'app' ? <AppWindow size={16} /> : <Globe2 size={16} />, onSelect: () => onOpen(resource) },
     ...destinations.map(destination => ({ id: destination.id, label: `Также в «${destination.name}»`, icon: <Folder size={16} />, onSelect: () => onCopy(resource, destination.id) })),
     { label: 'Убрать из пространства', icon: <X size={16} />, onSelect: () => onRemove(resource.id) }
   ]
@@ -49,6 +52,14 @@ export function CabinetContents({ space, destinations, covers, drag, pointerTabT
       <label className="cabinet-content-search"><Search size={17} /><input aria-label="Найти в пространстве" placeholder="Найти в пространстве" value={query} onChange={event => setQuery(event.target.value)} />{query && <button onClick={() => setQuery('')} aria-label="Очистить поиск"><X size={15} /></button>}</label>
       <div className="cabinet-content-filters" aria-label="Тип содержимого">{([['all', 'Все'], ['file', 'Документы'], ['link', 'Сайты']] as const).map(([value, label]) => <button key={value} aria-pressed={value === filter} onClick={() => setFilter(value)}>{label}</button>)}</div>
       {hasCovers && <button className="cabinet-preview-toggle" aria-pressed={previews} onClick={() => setPreviews(value => !value)} title="Снимки ранее просмотренных страниц"><Image size={16} />Миниатюры</button>}
+      {suggestedRecentFile && <div className="cabinet-recent-chip" title={suggestedRecentFile.target}>
+        <button type="button" className="cabinet-recent-chip-btn" onClick={() => onAddRecentFile?.(suggestedRecentFile)} aria-label={`Добавить недавний файл «${suggestedRecentFile.name}»`}>
+          <FileText size={14} />
+          <span className="cabinet-recent-chip-name">{suggestedRecentFile.name}</span>
+          <span className="cabinet-recent-chip-add" title="Добавить в материалы">+</span>
+        </button>
+        {onDismissRecentFile && <button type="button" className="cabinet-recent-chip-dismiss" onClick={() => onDismissRecentFile(suggestedRecentFile.target)} aria-label="Скрыть подсказку"><X size={12} /></button>}
+      </div>}
     </div>
     <div className="cabinet-contents-scroll">
       {tabs.length > 0 && <section className="cabinet-content-section" aria-label="Вкладки пространства">
@@ -80,7 +91,7 @@ export function CabinetContents({ space, destinations, covers, drag, pointerTabT
         <div className="cabinet-material-grid">{materials.map(resource => {
           const actions = materialActions(resource), label = `Действия с материалом «${resource.name}»`
           return <div key={resource.id} data-resource-id={resource.id} data-resource-kind={resource.kind} className="cabinet-material-card card" draggable onPointerDown={event => onPointerStart?.(event, { kind: 'resource', spaceId: space.id, id: resource.id })} onDragStart={event => onStartDrag(event, { kind: 'resource', spaceId: space.id, id: resource.id })} onDragEnd={onFinishDrag} onContextMenu={event => context.open(event, label, actions)} onKeyDown={event => context.open(event, label, actions)}>
-            <button draggable className="cabinet-material-open" onClick={() => onOpen(resource)} title={resource.target}>{resource.kind === 'file' ? <FileText size={22} /> : <Globe2 size={22} />}<span><strong>{resource.name}</strong><small>{resource.kind === 'file' ? `${documentFormat(resource)} · Открыть документ` : resourceAppLabel(resource)}</small></span></button>
+            <button draggable className="cabinet-material-open" onClick={() => onOpen(resource)} title={resource.target}>{resource.kind === 'file' ? <FileText size={22} /> : resource.kind === 'window' ? <AppWindow size={22} /> : <Globe2 size={22} />}<span><strong>{resource.name}</strong><small>{resource.kind === 'file' ? `${documentFormat(resource)} · Открыть документ` : resourceAppLabel(resource)}</small></span></button>
             <ActionMenu label={label} actions={actions} />
           </div>
         })}</div>
@@ -90,7 +101,7 @@ export function CabinetContents({ space, destinations, covers, drag, pointerTabT
         const actions = materialActions(resource), label = `Действия с материалом «${resource.name}»`
         return <div key={resource.id} data-resource-id={resource.id} className="cabinet-tool" draggable onPointerDown={event => onPointerStart?.(event, { kind: 'resource', spaceId: space.id, id: resource.id })} onDragStart={event => onStartDrag(event, { kind: 'resource', spaceId: space.id, id: resource.id })} onDragEnd={onFinishDrag} onContextMenu={event => context.open(event, label, actions)} onKeyDown={event => context.open(event, label, actions)}><button draggable onClick={() => onOpen(resource)}><AppWindow size={18} /><span>{resource.name}</span></button><ActionMenu label={label} actions={actions} /></div>
       })}</div></section>}
-      {!tabs.length && !materials.length && !tools.length && <div className="cabinet-content-empty card"><Folder size={28} /><h2>{needle || filter !== 'all' ? 'Ничего не найдено' : 'Начните с нужного материала'}</h2>{!needle && filter === 'all' && <div><button onClick={onAddLink}><Globe2 size={17} />Сохранить сайт</button><button onClick={onAddDocument}><FileText size={17} />Документ</button></div>}</div>}
+      {!tabs.length && !materials.length && !tools.length && <div className="cabinet-content-empty card"><Folder size={28} /><h2>{needle || filter !== 'all' ? 'Ничего не найдено' : 'Начните с нужного материала'}</h2>{!needle && filter === 'all' && <div className="cabinet-content-empty-actions"><div><button onClick={onAddLink}><Globe2 size={17} />Сохранить сайт</button><button onClick={onAddDocument}><FileText size={17} />Документ</button></div>{suggestedRecentFile && <div className="cabinet-recent-chip" title={suggestedRecentFile.target}><button type="button" className="cabinet-recent-chip-btn" onClick={() => onAddRecentFile?.(suggestedRecentFile)} aria-label={`Добавить недавний файл «${suggestedRecentFile.name}»`}><FileText size={14} /><span className="cabinet-recent-chip-name">{suggestedRecentFile.name}</span><span className="cabinet-recent-chip-add" title="Добавить в материалы">+</span></button>{onDismissRecentFile && <button type="button" className="cabinet-recent-chip-dismiss" onClick={() => onDismissRecentFile(suggestedRecentFile.target)} aria-label="Скрыть подсказку"><X size={12} /></button>}</div>}</div>}</div>}
     </div>
     {context.menu}
   </section>

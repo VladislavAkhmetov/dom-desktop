@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Check, Copy, Eye, EyeOff, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { bridge } from './bridge'
 import type { SavedCredential } from './types'
+import { useI18n } from './i18n'
 
 export function PasswordSettings() {
+  const { t } = useI18n()
   const [credentials, setCredentials] = useState<SavedCredential[]>([])
   const [loading, setLoading] = useState(true)
   const [origin, setOrigin] = useState('')
@@ -90,7 +92,7 @@ export function PasswordSettings() {
     <div className="settings-columns">
       <div className="settings-card settings-collection-card">
         <div className="settings-card-heading">
-          <h4>Сохранённые пароли</h4>
+          <h4>{t('settings.passwords.title')}</h4>
           <button
             className="soft-button"
             type="button"
@@ -98,7 +100,7 @@ export function PasswordSettings() {
             title="Импорт из Chrome/Safari/1Password"
           >
             <Upload size={14} style={{ marginRight: 5 }} />
-            Импорт CSV
+            {t('settings.passwords.import_btn')}
           </button>
         </div>
 
@@ -119,17 +121,17 @@ export function PasswordSettings() {
             />
             {importStatus && <p style={{ fontSize: 12, color: '#386348', margin: '6px 0' }}>{importStatus}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className="soft-button" type="button" onClick={() => setImportOpen(false)}>Отмена</button>
-              <button className="calm-primary" type="button" onClick={handleImport} disabled={!importCsv.trim()}>Импортировать</button>
+              <button className="soft-button" type="button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
+              <button className="calm-primary" type="button" onClick={handleImport} disabled={!importCsv.trim()}>{t('settings.passwords.import_btn')}</button>
             </div>
           </div>
         )}
 
         <div className="settings-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 380, overflowY: 'auto' }}>
           {loading ? (
-            <p className="settings-empty">Загрузка ключей…</p>
+            <p className="settings-empty">{t('common.loading')}</p>
           ) : credentials.length === 0 ? (
-            <p className="settings-empty">Пока нет сохранённых паролей.</p>
+            <p className="settings-empty">{t('settings.passwords.empty')}</p>
           ) : (
             credentials.map(item => {
               const show = Boolean(visiblePasswords[item.id])
@@ -192,19 +194,19 @@ export function PasswordSettings() {
       </div>
 
       <div className="settings-card">
-        <h4>Добавить пароль вручную</h4>
+        <h4>{t('settings.passwords.add_title')}</h4>
         <form className="form-stack" onSubmit={handleAdd}>
           <label>
-            Адрес или домен сайта
+            {t('settings.passwords.origin')}
             <input
-              placeholder="https://github.com"
+              placeholder={t('settings.passwords.origin_placeholder')}
               value={origin}
               onChange={e => setOrigin(e.target.value)}
               required
             />
           </label>
           <label>
-            Логин или эл. почта
+            {t('settings.passwords.username')}
             <input
               placeholder="name@domain.com"
               value={username}
@@ -213,7 +215,7 @@ export function PasswordSettings() {
             />
           </label>
           <label>
-            Пароль
+            {t('settings.passwords.password')}
             <input
               type="password"
               placeholder="••••••••"
@@ -223,9 +225,9 @@ export function PasswordSettings() {
             />
           </label>
           <label>
-            Название (необязательно)
+            {t('settings.passwords.note')}
             <input
-              placeholder="Например: GitHub"
+              placeholder="GitHub"
               value={title}
               onChange={e => setTitle(e.target.value)}
             />
@@ -236,7 +238,7 @@ export function PasswordSettings() {
             disabled={!origin.trim() || !username.trim() || !password.trim()}
           >
             <Plus size={15} />
-            Сохранить в хранилище
+            {t('settings.passwords.save_btn')}
           </button>
         </form>
 

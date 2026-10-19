@@ -136,8 +136,58 @@ const browserBridge: DomBridge = {
       return count
     }
   },
+  browser: {
+    async show() {},
+    async hide() {},
+    async move() {},
+    async block() {},
+    async close() { return true },
+    async park() { return { protectedCount: 0, freedMB: 0 } },
+    async action() {},
+    async text() { return { url: '', title: '', text: '' } },
+    async respondPermission() { return true },
+    onEvent() { return () => undefined },
+    async getAdblockStatus() {
+      return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
+    },
+    async toggleAdblockSite() {
+      return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
+    },
+    async toggleAdblockCookies() {
+      return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
+    },
+    async toggleAdblockGlobal() {
+      return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
+    },
+    async toggleDarkSite() {
+      return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
+    },
+    async getReaderContent() { return null },
+    async translateText(text) { return text },
+    async translateTab() { return { ok: true, count: 0 } }
+  },
+  integrations: {
+    async configureGoogle() {},
+    async googleConfigured() { return false },
+    async connectMail() {},
+    async syncMail() {},
+    async disconnectMail() {},
+    async fetchFeed() { return '' },
+    async readMaterial() { return { id: '', title: '', text: '' } },
+    async addCalendar() {},
+    async fetchCalendarSource() { return '' },
+    async removeCalendar() {},
+    async configureAI() {},
+    async runAI() {},
+    async cancelAI() {},
+    async transcribeAudio() { return { text: '' } },
+    onAI() { return () => undefined }
+  },
   async pickResource() { return null },
   async openResource(resource) {
+    if (resource.kind === 'window') {
+      return { ok: false, error: 'Управление окнами Windows доступно в настольной версии dombro.' }
+    }
     if (resource.target === 'preview:figma') {
       return openExternalPreview('https://www.figma.com/files/') ? { ok: true } : { ok: false, error: 'Браузер заблокировал новое окно.' }
     }
@@ -155,6 +205,12 @@ const browserBridge: DomBridge = {
       ? `«${resource.name}» можно запустить из настольной версии Дома.`
       : `«${resource.name}» — файл на компьютере. Его открытие доступно в настольной версии Дома.` }
   },
+  osWindows: {
+    async listOpen() { return [] },
+    async minimize() { return true },
+    async restore() { return true },
+    async focus() { return true }
+  },
   async getAutostart() { return false },
   async setAutostart() { return false },
   async fetchCalendar(url: string) {
@@ -164,7 +220,32 @@ const browserBridge: DomBridge = {
     if (!res.ok) throw new Error(`Ошибка загрузки: ${res.status}`)
     return await res.text()
   },
+  async fetchSuggestions(query: string) {
+    if (!query.trim()) return []
+    try {
+      const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query.trim())}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      return Array.isArray(data[1]) ? data[1].slice(0, 8) : []
+    } catch {
+      return []
+    }
+  },
+  async toggleFullScreen() {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => undefined)
+      return false
+    }
+    await document.documentElement.requestFullscreen().catch(() => undefined)
+    return Boolean(document.fullscreenElement)
+  },
+  async isFullScreen() {
+    return Boolean(document.fullscreenElement)
+  },
+  async getRecentFiles() { return [] },
+  onToast() { return () => undefined },
   onFocusCapture() { return () => undefined },
+  onVoiceToggle() { return () => undefined },
   onStateChanged() { return () => undefined }
 }
 

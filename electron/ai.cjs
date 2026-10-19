@@ -95,6 +95,35 @@ class AI {
     if (!contexts.length) return
     await this.run({ id: crypto.randomUUID(), prompt: 'Сделай короткий обзор выбранных писем и новостей: только существенное, со ссылками на источники. Укажи, что письма переданы только фрагментами.', contexts, consent: true }, undefined, true)
   }
+  async transcribe(audioBuffer, mimeType = 'audio/webm') {
+    const state = await this.getState()
+    const config = state.aiConfiguration
+    if (!config?.configured) throw new Error('AI-провайдер не настроен')
+    const key = this.vault.get(`ai:${config.provider}`)
+    if (!key) throw new Error('API-ключ не найден в хранилище')
+    if (config.provider !== 'openai' && config.provider !== 'compatible') {
+      throw new Error('Голосовая расшифровка поддерживается для OpenAI и совместимых провайдеров')
+    }
+    const endpoint = config.provider === 'openai'
+      ? 'https://api.openai.com/v1/audio/transcriptions'
+      : `${config.endpoint}/audio/transcriptions`
+    const form = new FormData()
+    const blob = new Blob([audioBuffer], { type: mimeType })
+    form.append('file', blob, 'audio.webm')
+    form.append('model', 'whisper-1')
+    form.append('language', 'ru')
+    const response = await this.fetcher(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: form
+    })
+    if (!response.ok) {
+      const err = await response.text().catch(() => '')
+      throw new Error(`Ошибка Whisper API (${response.status}): ${err.slice(0, 100) || response.statusText}`)
+    }
+    const data = await response.json()
+    return { text: typeof data.text === 'string' ? data.text.trim() : '' }
+  }
   dispose() { for (const controller of this.running.values()) controller.abort() }
 }
 module.exports = { AI, consumeSSE, requestPayload, validateConfiguration, SYSTEM }

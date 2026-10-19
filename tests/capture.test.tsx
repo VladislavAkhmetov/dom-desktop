@@ -169,4 +169,28 @@ describe('прямое управление датой и напоминание
     await click(button('Сохранить'))
     expect(onSave).toHaveBeenCalledWith('Позвонить', null, '2026-09-30', 'task')
   })
+
+  it('отображает кнопку голосового ввода при поддержке микрофона', async () => {
+    const originalMediaDevices = navigator.mediaDevices
+    const originalMediaRecorder = (globalThis as any).MediaRecorder
+    try {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: { getUserMedia: vi.fn().mockResolvedValue({}) },
+        configurable: true
+      });
+      (globalThis as any).MediaRecorder = class {
+        static isTypeSupported() { return true }
+      }
+      await mount()
+      const voiceBtn = document.querySelector<HTMLButtonElement>('.capture-voice-button')
+      expect(voiceBtn).not.toBeNull()
+      expect(voiceBtn?.getAttribute('aria-label')).toBe('Начать голосовой ввод')
+    } finally {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: originalMediaDevices,
+        configurable: true
+      });
+      (globalThis as any).MediaRecorder = originalMediaRecorder
+    }
+  })
 })
