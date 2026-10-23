@@ -25,7 +25,7 @@ export const WEATHER_CITIES: WeatherCity[] = [
   { id: 'sochi', name: 'Сочи', latitude: 43.6028, longitude: 39.7342, timezone: 'Europe/Moscow' }
 ]
 
-export interface UfaWeather {
+export interface WeatherData {
   cityName?: string
   temperature: number
   code: number
@@ -37,7 +37,10 @@ export interface UfaWeather {
   forecast: WeatherDay[]
 }
 
-// Daily values and current conditions share Ufa's local time; wind is in m/s.
+/** Алиас для обратной совместимости */
+export type UfaWeather = WeatherData
+
+// Значения по умолчанию для начальной инициализации (Уфа, м/с)
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=54.7388&longitude=55.9721&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&wind_speed_unit=ms&timezone=Asia%2FYekaterinburg&forecast_days=7'
 const CACHE_KEY = 'dom-ufa-weather-v1'
 const finiteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -47,10 +50,11 @@ export function buildWeatherUrl(city: WeatherCity): string {
   return `https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&wind_speed_unit=ms&timezone=${encodeURIComponent(city.timezone)}&forecast_days=7`
 }
 
-export function cachedCityWeather(cityId: string): UfaWeather | null {
-  const key = cityId === 'ufa' ? CACHE_KEY : `dom-weather-${cityId}-v1`
+export function cachedCityWeather(cityId: string): WeatherData | null {
+  const key = `dom-weather-${cityId}-v1`
   try {
-    const saved = JSON.parse(localStorage.getItem(key) || 'null') as UfaWeather | null
+    const raw = localStorage.getItem(key) || (cityId === 'ufa' ? localStorage.getItem(CACHE_KEY) : null)
+    const saved = JSON.parse(raw || 'null') as WeatherData | null
     if (saved && finiteNumber(saved.temperature) && Number.isInteger(saved.code) && typeof saved.observedAt === 'string' && finiteNumber(saved.fetchedAt) && Date.now() - saved.fetchedAt >= 0 && Date.now() - saved.fetchedAt < 60 * 60 * 1000) {
       return { ...saved, feelsLike: optionalNumber(saved.feelsLike), humidity: optionalNumber(saved.humidity), windSpeed: optionalNumber(saved.windSpeed), forecast: Array.isArray(saved.forecast) ? saved.forecast.filter(validDay).map(day => ({ ...day, precipitationProbability: optionalNumber(day.precipitationProbability), windSpeed: optionalNumber(day.windSpeed) })) : [] }
     }

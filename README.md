@@ -199,6 +199,6 @@ npm run test:cabinet-native
 npm run build
 ```
 
-`npm test` запускает Vitest (48 файлов, 336 тестов) и проверку SQLite через Electron в режиме Node без окна. `npm run test:cabinet-native` проверяет изоляцию кабинетов, выгрузку памяти и сохранение пользовательского ввода в живом окне Electron. `npm run build` проверяет TypeScript и собирает веб-ресурсы.
+`npm test` запускает Vitest (56 файлов, 391 тест) и проверку SQLite через Electron в режиме Node без окна. `npm run test:cabinet-native` проверяет изоляцию кабинетов, выгрузку памяти и сохранение пользовательского ввода в живом окне Electron. `npm run build` проверяет TypeScript и собирает веб-ресурсы.
 
 Статус — в [плане выполнения](IMPLEMENTATION.md), продуктовые принципы — в [PRODUCT.md](PRODUCT.md). Фон и шрифты локальные; при запуске они не требуют сети.

@@ -1,8 +1,0 @@
-{
-  "manifest_version": 3,
-  "name": "Перенести вкладки в Дом",
-  "version": "1.0.0",
-  "description": "Сохраняет адреса открытых вкладок в локальный файл для импорта в Дом.",
-  "permissions": ["tabs"],
-  "action": { "default_popup": "popup.html" }
-}

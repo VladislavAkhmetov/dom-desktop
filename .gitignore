@@ -9,3 +9,5 @@ dist/
 release/
 .env
 .env.*
+qa/screenshots/
+

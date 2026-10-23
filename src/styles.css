@@ -61,7 +61,7 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   height: 100dvh;
   overflow: hidden;
   background-color: #a4b8ac;
-  background-image: var(--app-bg, url('backgrounds/abstract-hills.jpg'));
+  background-image: var(--app-bg, url('/backgrounds/abstract-hills.jpg'));
   background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;

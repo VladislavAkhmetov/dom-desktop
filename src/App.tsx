@@ -91,7 +91,6 @@ function addressToUrl(input: string): string {
 type Modal = 'capture' | 'newSpace' | 'newStream' | 'renameSpace' | 'newLink' | 'settings' | 'dashboard' | 'focus' | 'weather' | 'import' | 'search' | 'changes' | 'archive' | 'context' | 'splitSpace' | 'documentReference' | 'deleteSpace' | 'history' | null
 type AppRoute = WorkspaceRoute
 const tones: SpaceTone[] = ['sage', 'lilac', 'sand', 'blue']
-const trafficResource: Resource = { id: 'traffic-ufa', name: 'Пробки в Уфе', kind: 'link', target: 'https://yandex.ru/maps/172/ufa/?ll=55.9721%2C54.7388&z=12&l=trf%2Ctrfe', createdAt: new Date().toISOString() }
 
 function resourceIcon(kind: ResourceKind, size = 20) {
   if (kind === 'app') return <AppWindow size={size} strokeWidth={1.8} />
@@ -1006,7 +1005,10 @@ function App() {
   }
 
   async function openTraffic() {
-    const result = await bridge.openResource(trafficResource)
+    const cityName = weather?.cityName || 'Уфа'
+    const target = `https://yandex.ru/maps/?text=${encodeURIComponent(cityName + ' пробки')}&l=trf%2Ctrfe`
+    const trafficRes: Resource = { id: 'traffic-map', name: `Пробки · ${cityName}`, kind: 'link', target, createdAt: new Date().toISOString() }
+    const result = await bridge.openResource(trafficRes)
     if (!result.ok) setToast(result.error || 'Не удалось открыть карту пробок.')
   }
 

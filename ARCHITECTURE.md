@@ -21,7 +21,7 @@
 * **Сборка и бандлинг:** Vite 6, `tsc` (строгая проверка типов), `electron-builder` (NSIS и Portable сборки под Windows).
 * **Хранилище данных:** `better-sqlite3` с FTS5-полнотекстовым поиском, шифрование через `safeStorage` (Windows DPAPI / macOS Keychain).
 * **Анимации и физика:** Motion (`motion/react`) с соблюдением стандарта доступности `prefers-reduced-motion`.
-* **Тестирование:** Vitest 4, JSDOM, кастомные нативные тест-раннеры Electron (`tests/cabinet-native.cjs`, `scripts/test-storage.cjs`).
+* **Тестирование:** Vitest 4 (56 тест-файлов, 391 тест), JSDOM, кастомные нативные тест-раннеры Electron (`tests/cabinet-native.cjs`, `scripts/test-storage.cjs`).
 
 ---
 
@@ -410,6 +410,7 @@ stateDiagram-v2
 | [`docs/prod-security-guide.md`](file:///d:/dev/tools/browser/docs/prod-security-guide.md) | Руководство по безопасности, подписи Windows SmartScreen и выходу в продакшен. |
 | [`docs/resume-card-ux.md`](file:///d:/dev/tools/browser/docs/resume-card-ux.md) | Протокол возобновления работы («Продолжить»), оригами-парковка и границы вкладок. |
 | [`docs/browser-ui-spec.md`](file:///d:/dev/tools/browser/docs/browser-ui-spec.md) | Спецификация пользовательского интерфейса браузера и рабочих областей. |
+| [`docs/concept-critique.md`](file:///d:/dev/tools/browser/docs/concept-critique.md) | Анализ концепта, позиционирование и конкурентный срез (Dia, Edge Workspaces, Workona). |
 
 ---
 
@@ -437,8 +438,7 @@ npm run pack
 # Один Portable exe (release/dombro-<version>-Portable.exe, сейчас dombro-0.0.1-Portable.exe)
 npm run dist:portable
 
-# Прогон тестов упакованного бинарника
-node scripts/test-packaged.cjs release/win-unpacked/dombro.exe
+# Проверка собранного переносимого приложения
 node scripts/verify-portable-live.cjs
 ```
 

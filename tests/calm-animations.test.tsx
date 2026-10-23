@@ -10,7 +10,7 @@ import { emptyState } from '../shared/state'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
-describe('Calm Motion Wow Animations', () => {
+describe('Calm Motion transitions', () => {
   let root: Root
   let container: HTMLDivElement
 
