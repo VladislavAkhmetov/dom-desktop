@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, ipcMain, globalShortcut, Notification, Tray, Menu, nativeImage, safeStorage, session, components } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, globalShortcut, Notification, Tray, Menu, nativeImage, safeStorage, session, components, screen } = require('electron')
 
 app.commandLine.appendSwitch('enable-features', 'WinSystemLocationProvider')
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
@@ -6,12 +6,34 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { createStorage } = require('./storage.cjs')
 const { BrowserManager } = require('./browser.cjs')
+const { bitwardenExtensionStatus } = require('./bitwarden-extension.cjs')
 const { Vault } = require('./vault.cjs')
 const { Gmail } = require('./gmail.cjs')
 const { AI } = require('./ai.cjs')
 const { fetchLimited } = require('./network.cjs')
 const { pathToFileURL } = require('node:url')
 const osWindows = require('./os-windows.cjs')
+const { autoUpdater } = require('electron-updater')
+
+function initCalmAutoUpdater(mainWindow) {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true // Обновится само, когда юзер закроет dombro вечером
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:update-ready', {
+        version: info.version,
+      })
+    }
+  })
+
+  // Проверяем тихо через 10 секунд после запуска
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {
+      // Игнорируем отсутствие сети без ошибок в UI (Calm Tech)
+    })
+  }, 10000)
+}
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173'
 const isDev = process.argv.includes('--dev')
@@ -142,6 +164,26 @@ async function showCapture() {
 let splashWindow = null
 let splashStartTime = 0
 
+const SPLASH_HOLD_MS = 1000
+const MAIN_FADE_MS = 640
+
+function workAreaUnderCursor() {
+  const point = screen.getCursorScreenPoint()
+  return screen.getDisplayNearestPoint(point).workArea
+}
+
+function windowedBounds(area) {
+  const width = Math.min(1440, area.width)
+  const height = Math.min(920, area.height)
+  return {
+    x: Math.round(area.x + (area.width - width) / 2),
+    y: Math.round(area.y + (area.height - height) / 2),
+    width,
+    height,
+    opacity: 0
+  }
+}
+
 function createSplash() {
   if (isSmoke || splashWindow) return
   splashStartTime = Date.now()
@@ -151,9 +193,13 @@ function createSplash() {
     frame: false,
     transparent: true,
     resizable: false,
+    movable: false,
     center: true,
     skipTaskbar: true,
     alwaysOnTop: true,
+    hasShadow: false,
+    roundedCorners: false,
+    thickFrame: false,
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
@@ -162,69 +208,163 @@ function createSplash() {
       sandbox: true
     }
   })
-  splashWindow.loadFile(path.join(__dirname, 'splash.html')).catch(() => undefined)
+  const appVer = app.getVersion()
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'), { query: { v: appVer } }).catch(() => undefined)
   splashWindow.once('ready-to-show', () => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.setOpacity(0)
-      splashWindow.show()
-      fadeInWindow(splashWindow, 200)
-    }
+    if (!splashWindow || splashWindow.isDestroyed()) return
+    // Прозрачное окно Windows не принимает setOpacity. Карточка остаётся opacity: 0,
+    // пока окно скрыто, и проявляется только после show — иначе keyframes кончаются заранее.
+    splashWindow.showInactive()
+    setTimeout(() => {
+      if (!splashWindow || splashWindow.isDestroyed()) return
+      splashWindow.webContents
+        .executeJavaScript("document.documentElement.classList.add('is-in')")
+        .catch(() => undefined)
+    }, 32)
   })
 }
 
-function fadeInWindow(win, duration = 300) {
-  if (!win || win.isDestroyed()) return
-  win.setOpacity(0)
-  win.show()
-  win.focus()
-  const startTime = Date.now()
-  const timer = setInterval(() => {
+const windowFades = new WeakMap()
+
+function fadeInWindow(win, duration = MAIN_FADE_MS) {
+  return new Promise(resolve => {
     if (!win || win.isDestroyed()) {
-      clearInterval(timer)
+      resolve()
       return
     }
-    const elapsed = Date.now() - startTime
-    const progress = Math.min(1, elapsed / duration)
-    const eased = 1 - Math.pow(1 - progress, 3)
-    win.setOpacity(eased)
-    if (progress >= 1) {
-      clearInterval(timer)
+    const previous = windowFades.get(win)
+    if (previous) clearInterval(previous)
+    win.setOpacity(0)
+    if (!win.isVisible()) win.show()
+    win.setOpacity(0)
+    if (duration <= 0) {
+      windowFades.delete(win)
       win.setOpacity(1)
+      win.focus()
+      resolve()
+      return
     }
-  }, 16)
+    const start = Date.now()
+    const timer = setInterval(() => {
+      if (!win || win.isDestroyed()) {
+        clearInterval(timer)
+        windowFades.delete(win)
+        resolve()
+        return
+      }
+      const progress = Math.min(1, (Date.now() - start) / duration)
+      const eased = progress * progress * (3 - 2 * progress)
+      win.setOpacity(eased)
+      if (progress >= 1) {
+        clearInterval(timer)
+        windowFades.delete(win)
+        win.setOpacity(1)
+        win.focus()
+        resolve()
+      }
+    }, 16)
+    windowFades.set(win, timer)
+  })
 }
 
-function fadeOutWindow(win, duration = 200, callback) {
-  if (!win || win.isDestroyed()) {
-    if (callback) callback()
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function waitForAppShell(win, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (!win || win.isDestroyed()) return false
+    try {
+      const ready = await win.webContents.executeJavaScript('Boolean(document.querySelector(".app-shell"))')
+      if (ready) return true
+    } catch {
+      // Страница ещё переключается.
+    }
+    await delay(40)
+  }
+  return false
+}
+
+async function prefersReducedMotion(win) {
+  if (!win || win.isDestroyed()) return false
+  try {
+    return Boolean(await win.webContents.executeJavaScript("window.matchMedia('(prefers-reduced-motion: reduce)').matches"))
+  } catch {
+    return false
+  }
+}
+
+function dismissSplash() {
+  const win = splashWindow
+  if (!win || win.isDestroyed()) return Promise.resolve()
+  splashWindow = null
+  const close = () => {
+    if (!win.isDestroyed()) win.destroy()
+  }
+  const script = `new Promise(resolve => {
+    const card = document.querySelector('.splash-card')
+    if (!card) { resolve(); return }
+    let settled = false
+    const finish = () => { if (settled) return; settled = true; resolve() }
+    card.addEventListener('animationend', finish, { once: true })
+    document.documentElement.classList.remove('is-in')
+    document.documentElement.classList.add('is-out')
+    setTimeout(finish, 600)
+  })`
+  return win.webContents.executeJavaScript(script).catch(() => undefined).then(close)
+}
+
+function showMaximizedInvisible(win) {
+  win.setOpacity(0)
+  if (!win.isVisible()) win.show()
+  win.setOpacity(0)
+  if (!win.isMaximized()) win.maximize()
+  return new Promise(resolve => {
+    const started = Date.now()
+    const timer = setInterval(() => {
+      if (!win || win.isDestroyed()) {
+        clearInterval(timer)
+        resolve()
+        return
+      }
+      win.setOpacity(0)
+      if (Date.now() - started >= 240) {
+        clearInterval(timer)
+        resolve()
+      }
+    }, 16)
+  })
+}
+
+async function handoffToMain() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  await waitForAppShell(mainWindow, 1800)
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const reduced = await prefersReducedMotion(mainWindow)
+  await showMaximizedInvisible(mainWindow)
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (reduced) {
+    mainWindow.setOpacity(1)
+    mainWindow.focus()
+    const win = splashWindow
+    splashWindow = null
+    if (win && !win.isDestroyed()) win.destroy()
     return
   }
-  const startTime = Date.now()
-  const initialOpacity = win.getOpacity() || 1
-  const timer = setInterval(() => {
-    if (!win || win.isDestroyed()) {
-      clearInterval(timer)
-      if (callback) callback()
-      return
-    }
-    const elapsed = Date.now() - startTime
-    const progress = Math.min(1, elapsed / duration)
-    const opacity = initialOpacity * (1 - Math.pow(progress, 2))
-    win.setOpacity(Math.max(0, opacity))
-    if (progress >= 1) {
-      clearInterval(timer)
-      win.setOpacity(0)
-      if (callback) callback()
-    }
-  }, 16)
+  await Promise.all([
+    fadeInWindow(mainWindow, MAIN_FADE_MS),
+    dismissSplash()
+  ])
 }
 
 function showWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return
   if (mainWindow.isMinimized()) mainWindow.restore()
-  if (!mainWindow.isMaximized()) mainWindow.maximize()
   if (!mainWindow.isVisible()) {
-    fadeInWindow(mainWindow, 250)
+    showMaximizedInvisible(mainWindow)
+      .then(() => fadeInWindow(mainWindow, MAIN_FADE_MS))
+      .catch(error => console.error('Window reveal failed:', error))
   } else {
     mainWindow.focus()
   }
@@ -245,10 +385,10 @@ function getAssetPath(filename) {
 
 function createWindow() {
   const appIcon = getAssetPath('icon.ico')
+  const placed = isSmoke ? { width: 1440, height: 920 } : windowedBounds(workAreaUnderCursor())
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1440,
-    height: 920,
+    ...placed,
     minWidth: 900,
     minHeight: 650,
     title: isCabinetPilot ? 'dombro (кабинеты)' : 'dombro',
@@ -256,7 +396,7 @@ function createWindow() {
     backgroundColor: '#a4b8ac',
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'darwin' ? undefined : { color: '#eef3ec', symbolColor: '#2e453b', height: 36 },
+    titleBarOverlay: process.platform === 'darwin' ? undefined : { color: '#00000000', symbolColor: '#2e453b', height: 36 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -265,8 +405,8 @@ function createWindow() {
       additionalArguments: isCabinetPilot ? ['--cabinet-pilot'] : []
     }
   })
+  if (!isSmoke) mainWindow.setOpacity(0)
 
-  const MIN_SPLASH_DURATION = 900
   let revealed = false
   const reveal = () => {
     if (revealed || !mainWindow || mainWindow.isDestroyed()) return
@@ -274,27 +414,16 @@ function createWindow() {
 
     if (isSmoke) {
       mainWindow.maximize()
+      mainWindow.setOpacity(1)
       mainWindow.show()
       return
     }
 
     const elapsed = Date.now() - (splashStartTime || Date.now())
-    const delay = Math.max(0, MIN_SPLASH_DURATION - elapsed)
-
+    const wait = Math.max(0, SPLASH_HOLD_MS - elapsed)
     setTimeout(() => {
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        fadeOutWindow(splashWindow, 200, () => {
-          if (splashWindow && !splashWindow.isDestroyed()) {
-            splashWindow.destroy()
-            splashWindow = null
-          }
-        })
-      }
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.maximize()
-        fadeInWindow(mainWindow, 300)
-      }
-    }, delay)
+      handoffToMain().catch(error => console.error('Window reveal failed:', error))
+    }, wait)
   }
 
   mainWindow.once('ready-to-show', reveal)
@@ -491,6 +620,20 @@ trustedHandle('window:toggleFullScreen', () => {
   return next
 })
 trustedHandle('window:isFullScreen', () => Boolean(mainWindow?.isFullScreen()))
+trustedHandle('window:setTitleBarOverlay', (_event, options) => {
+  if (!mainWindow || mainWindow.isDestroyed() || process.platform === 'darwin') return false
+  try {
+    mainWindow.setTitleBarOverlay({
+      color: options?.color ?? '#00000000',
+      symbolColor: options?.symbolColor ?? '#2e453b',
+      height: options?.height ?? 36
+    })
+    return true
+  } catch (err) {
+    console.error('Failed to update titleBarOverlay:', err)
+    return false
+  }
+})
 trustedHandle('capture:close', () => captureWindow?.hide())
 trustedHandle('browser:show', (_event, value) => browser.show(value))
 trustedHandle('browser:hide', (_event, id) => browser.hide(id))
@@ -541,7 +684,9 @@ trustedHandle('browser:suggest', async (_event, query) => {
   }
 })
 ipcMain.on('page:signal', (event, value) => browser?.pageSignal(event.sender, value))
-ipcMain.on('page:password-offer', (event, value) => browser?.passwordOffer(event.sender, value))
+ipcMain.on('page:password-submit', (event, data) => browser?.pagePasswordSubmit(event.sender, data))
+trustedHandle('browser:autofill', async (_event, tabId, cred) => browser?.autofill(tabId, cred))
+trustedHandle('bitwarden:status', () => bitwardenExtensionStatus())
 
 const gotTheLock = app.requestSingleInstanceLock()
 
@@ -577,6 +722,9 @@ if (!gotTheLock) {
     await createIntegrations()
     createWindow()
     createTray()
+    if (!isSmoke) {
+      initCalmAutoUpdater(mainWindow)
+    }
     setInterval(() => gmail.sync().catch(() => undefined), 120000)
     setInterval(() => ai.background().catch(() => undefined), 60000)
     gmail.sync().catch(() => undefined)

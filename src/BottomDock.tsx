@@ -8,6 +8,7 @@ import { QuickAppsSettings } from './QuickAppsSettings'
 import { QuickEntry } from './QuickEntry'
 import { AnimatePresence } from 'motion/react'
 import { FluidButton, FluidSurface } from './FluidMotion'
+import { isAssistantEnabled } from './assistantModel'
 import './digest.css'
 
 interface Props {
@@ -126,7 +127,9 @@ export function BottomDock({ state, now, currentSpaceId, recentFiles, appIcon, o
     <div className="calm-dock-left">
       <div className="dock-entry-anchor" ref={entryAnchor}>
         <FluidButton ref={noteButton} className="calm-capture dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'note' ? null : 'note') }} title={`Записать · ${captureShortcut}`} aria-expanded={entryMode === 'note'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><PenLine size={19} /><span>Записать</span></FluidButton>
-        <FluidButton ref={aiButton} className="dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'ai' ? null : 'ai') }} aria-expanded={entryMode === 'ai'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><Sparkles size={19} /><span>Спросить ИИ</span></FluidButton>
+        {isAssistantEnabled && (
+          <FluidButton ref={aiButton} className="dock-entry-button" onClick={() => { setActiveAppId(null); setEntryMode(entryMode === 'ai' ? null : 'ai') }} aria-expanded={entryMode === 'ai'} aria-controls={entryMode ? 'dock-quick-entry' : undefined} aria-haspopup="dialog"><Sparkles size={19} /><span>Спросить ИИ</span></FluidButton>
+        )}
         <AnimatePresence>{entryMode && <FluidSurface key="quick-entry" className="dock-entry-popover" id="dock-quick-entry" role="dialog" aria-label={entryMode === 'note' ? 'Быстрая запись' : 'Вопрос ИИ'} style={{ x: '-50%', transformOrigin: 'bottom center' }}>
           <button className="dock-entry-close calm-icon" aria-label="Закрыть быстрый ввод" onClick={() => closeEntry(true)}><X size={20} /></button>
           <QuickEntry mode={entryMode} onModeChange={setEntryMode} showModes={false} autoFocus onSave={onSaveThought} onAssistant={draft => { setEntryMode(null); onAssistant(draft) }} />

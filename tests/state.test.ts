@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyChanges, diffState, emptyState, migrateState } from '../shared/state'
 import { parseCapture } from '../src/reminders'
-import { postponeReminder, remindersForDay } from '../src/dayModel'
+import { postponeReminder, remindersForDay, rescheduleTaskToToday } from '../src/dayModel'
 import { saveCheckpoint } from '../src/checkpoints'
 import type { AppState } from '../src/types'
 
@@ -49,6 +49,36 @@ describe('данные и планирование', () => {
     expect(parseCapture('через 0 минут позвонить', now).dueAt).toBeNull()
   })
   it('через час переходит через полночь', () => expect(parseCapture('через 3 часа позвонить', now).plannedDate).toBe('2026-09-28'))
+  it('разбирает предлог к и очищает оговорки напомни', () => {
+    // В 22:15 время 10:00 переносится на завтра
+    const v1 = parseCapture('к 10 в поликлинику', now)
+    expect(v1.title).toBe('в поликлинику')
+    expect(v1.plannedDate).toBe('2026-09-28')
+    expect(new Date(v1.dueAt!).getHours()).toBe(10)
+
+    const v2 = parseCapture('В напомни к 10 к врачу', now)
+    expect(v2.title).toBe('к врачу')
+    expect(v2.plannedDate).toBe('2026-09-28')
+    expect(new Date(v2.dueAt!).getHours()).toBe(10)
+
+    const v3 = parseCapture('завтра к 15 часам отчет', now)
+    expect(v3.title).toBe('отчет')
+    expect(v3.plannedDate).toBe('2026-09-28')
+    expect(new Date(v3.dueAt!).getHours()).toBe(15)
+  })
+  it('включает в план дня задачу с dueAt даже при plannedDate null', () => {
+    const todayTask = { id: 'r', title: 'Дело', createdAt: now.toISOString(), dueAt: '2026-09-27T10:00:00.000Z', plannedDate: null, done: false }
+    expect(remindersForDay({ ...emptyState(), reminders: [todayTask] }, new Date(2026, 8, 27))).toHaveLength(1)
+  })
+  it('переносит просроченное дело на сегодня, сохраняя время и сбрасывая уведомление', () => {
+    const overdueTask = { id: 'r', title: 'Врач', createdAt: new Date(2026, 8, 26, 8, 0).toISOString(), dueAt: new Date(2026, 8, 26, 10, 0).toISOString(), plannedDate: '2026-09-26', done: false, notifiedAt: '2026-09-26T10:00:00.000Z' }
+    const today = new Date(2026, 8, 27, 8, 30)
+    const rescheduled = rescheduleTaskToToday(overdueTask, today)
+    expect(rescheduled.plannedDate).toBe('2026-09-27')
+    expect(new Date(rescheduled.dueAt!).getHours()).toBe(10)
+    expect(new Date(rescheduled.dueAt!).getDate()).toBe(27)
+    expect(rescheduled.notifiedAt).toBeUndefined()
+  })
   it('переносит день, сохраняя срок и отсутствие таймера', () => {
     const task = { id: 'r', title: 'Текст', createdAt: now.toISOString(), dueAt: null, plannedDate: '2026-09-27', deadline: '2026-09-30', done: false }
     const next = postponeReminder(task, 'tomorrow', now)

@@ -26,6 +26,10 @@ const waitFor = async (test, label, timeout = 15000) => {
 }
 
 const renderer = (fn) => window.webContents.executeJavaScript(`(${fn.toString()})()`)
+const saveShot = (directory, name, image) => {
+  if (!image) return
+  try { fs.writeFileSync(path.join(directory, name), image.toPNG()) } catch { /* кадр проверки необязателен */ }
+}
 
 async function run() {
   // 1. Create a local HTTP server
@@ -161,6 +165,7 @@ async function run() {
   ipcMain.handle('browser:translate:text', async (_event, text) => text)
   ipcMain.handle('browser:translate:tab', async (_event, tabId) => manager.translateTab(tabId))
   ipcMain.handle('browser:suggest', async () => [])
+  ipcMain.handle('vault:credentials:list', async () => [])
   ipcMain.on('page:signal', (event, value) => manager.pageSignal(event.sender, value))
 
   const osWindows = require('../electron/os-windows.cjs')
@@ -196,7 +201,7 @@ async function run() {
   // Capture dashboard screenshot
   await new Promise(r => setTimeout(r, 600))
   const dashImg = await window.webContents.capturePage().catch(() => null)
-  if (dashImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-dashboard.png'), dashImg.toPNG())
+  saveShot(ssDir, 'cabinet-native-dashboard.png', dashImg)
 
   // 9. Verify clicking "+" in dashboard creates an empty cabinet inside dashboard without popup
   const plusBtnExists = await renderer(() => Boolean(document.querySelector('button[aria-label="Создать пространство"], button[aria-label="Новое пространство"], .space-add-trigger')))
@@ -245,7 +250,7 @@ async function run() {
 
   // Capture materials panel screenshot
   const matImg = await window.webContents.capturePage().catch(() => null)
-  if (matImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-materials.png'), matImg.toPNG())
+  saveShot(ssDir, 'cabinet-native-materials.png', matImg)
 
   // 12. Verify opening a document uses bridge.openResource
   openedResource = null
@@ -288,7 +293,7 @@ async function run() {
 
   // Capture browser screenshot
   const browserImg = await window.webContents.capturePage().catch(() => null)
-  if (browserImg) fs.writeFileSync(path.join(ssDir, 'cabinet-native-browser.png'), browserImg.toPNG())
+  saveShot(ssDir, 'cabinet-native-browser.png', browserImg)
 
   // The island must keep every toolbar action reachable at both densities.
   const layoutDir = path.join(testDir, 'attention-layout')

@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pencil, Plus, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pencil, Plus, PlusCircle, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
 import type { AppState, AIContext, CalendarEvent, Reminder, Resource, WidgetConfig, WidgetType } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
-import { isRealReminder, postponeReminder, realEvents, remindersForDay } from './dayModel'
+import { isRealReminder, postponeReminder, realEvents, remindersForDay, rescheduleTaskToToday } from './dayModel'
 import './home.css'
 import { Dialog } from './Dialog'
 import { QuickEntry } from './QuickEntry'
 import { ActionMenu } from './ActionMenu'
-import { latestContinuation } from './workContexts'
+import { activeOrRecentContinuation } from './workContexts'
 import { ResumeCard } from './ResumeCard'
 import type { ResumeResult } from './resumeContext'
 import { localDate } from '../shared/state'
-import { computeWidgetPositions, dashboardWidgets, widgetNames, widgetSpan } from './dashboard'
+import { availableWidgetTypes, computeWidgetPositions, dashboardWidgets, widgetNames, widgetSpan } from './dashboard'
 import { ScratchpadWidget } from './ScratchpadWidget'
 import { ReadingShelfWidget } from './ReadingShelfWidget'
 import { WeatherWidget } from './WeatherWidget'
@@ -58,12 +58,33 @@ interface Props {
   newsRefreshing?: boolean
   onCalendarRange: (date: Date) => void
   covers?: Record<string, string>
+  onNewSpace?: () => void
 }
 
-export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarRequested, onCalendarHandled, initialReminderId, onSearchHandled, state, now, onChange, onCapture, onFocus, onPlan, onCreateAt, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant, onSaveThought, onImport, onNewTab, onSettings, onDashboardSettings, onNewsRefresh, newsRefreshing, onCalendarRange, onResume, onOpenContext, onEditContext, onCompleteContext, onOpenDocument, resumeStatus, covers }: Props) {
+export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarRequested, onCalendarHandled, initialReminderId, onSearchHandled, state, now, onChange, onCapture, onFocus, onPlan, onCreateAt, onSpace, onOpen, onAddLink, onOpenWorkstage, onAssistant, onSaveThought, onImport, onNewTab, onSettings, onDashboardSettings, onNewsRefresh, newsRefreshing, onCalendarRange, onResume, onOpenContext, onEditContext, onCompleteContext, onOpenDocument, resumeStatus, covers, onNewSpace }: Props) {
   const [day, setDay] = useState(0)
   const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null)
-  useEffect(() => { if (!undo) return; const timer = window.setTimeout(() => setUndo(null), 8000); return () => window.clearTimeout(timer) }, [undo])
+  const undoTimerRef = useRef<number | undefined>(undefined)
+
+  const clearUndoTimer = useCallback(() => {
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = undefined
+    }
+  }, [])
+
+  const startUndoTimer = useCallback((delay = 6000) => {
+    clearUndoTimer()
+    undoTimerRef.current = window.setTimeout(() => {
+      setUndo(null)
+    }, delay)
+  }, [clearUndoTimer])
+
+  useEffect(() => {
+    if (undo) startUndoTimer(6000)
+    else clearUndoTimer()
+    return () => clearUndoTimer()
+  }, [undo, startUndoTimer, clearUndoTimer])
   const [dialog, setDialog] = useState<'digest' | 'reminder' | 'event' | 'today' | null>(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('day')
@@ -73,20 +94,52 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
   const [reminderDeadline, setReminderDeadline] = useState('')
   const [focus, setFocus] = useState(zenTimer.getState())
   useEffect(() => zenTimer.subscribe(setFocus), [])
-  const widgets = dashboardWidgets(state.dashboard?.widgets, state.dashboard?.gridVersion)
+  const hasSpaceTabs = state.spaces.some(space => !space.archivedAt && space.kind !== 'web')
+  const widgets = useMemo(() => {
+    let list = dashboardWidgets(state.dashboard?.widgets, state.dashboard?.gridVersion)
+    const hasResume = list.some(w => w.type === 'resume')
+    if (hasSpaceTabs && !hasResume && !state.dashboard?.resumeDismissed) {
+      const resumeWidget: WidgetConfig = {
+        id: 'resume',
+        type: 'resume',
+        size: 'M',
+        colSpan: 6,
+        rowSpan: 4
+      }
+      const newsIndex = list.findIndex(w => w.type === 'news')
+      if (newsIndex >= 0) {
+        list = [...list.slice(0, newsIndex), resumeWidget, ...list.slice(newsIndex)]
+      } else {
+        list = [resumeWidget, ...list]
+      }
+    } else if (hasResume && list.some(w => w.type === 'news')) {
+      const resumeIndex = list.findIndex(w => w.type === 'resume')
+      const newsIndex = list.findIndex(w => w.type === 'news')
+      if (newsIndex >= 0 && resumeIndex > newsIndex) {
+        const resumeWidget = list[resumeIndex]
+        const withoutResume = list.filter((_, i) => i !== resumeIndex)
+        const newNewsIndex = withoutResume.findIndex(w => w.type === 'news')
+        list = [...withoutResume.slice(0, newNewsIndex), resumeWidget, ...withoutResume.slice(newNewsIndex)]
+      }
+    }
+    return list
+  }, [state.dashboard?.widgets, state.dashboard?.gridVersion, state.dashboard?.resumeDismissed, hasSpaceTabs])
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollWrapRef = useRef<HTMLDivElement>(null)
   const [scrollEdges, setScrollEdges] = useState({ before: false, after: false })
   const [showAddPicker, setShowAddPicker] = useState(false)
 
   const setWidgets = (next: WidgetConfig[]) => {
+    const isRemovingResume = widgets.some(w => w.type === 'resume') && !next.some(w => w.type === 'resume')
+    const isAddingResume = !widgets.some(w => w.type === 'resume') && next.some(w => w.type === 'resume')
     onChange(previous => ({
       ...previous,
       dashboard: {
         preset: previous.dashboard?.preset || 'custom',
         widgets: next,
         gridVersion: 2,
-        customPresets: previous.dashboard?.customPresets
+        customPresets: previous.dashboard?.customPresets,
+        resumeDismissed: isRemovingResume ? true : isAddingResume ? false : previous.dashboard?.resumeDismissed
       }
     }))
   }
@@ -262,13 +315,17 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
   useEffect(() => { const reminder = state.reminders.find(item => item.id === initialReminderId); if (reminder) editReminder(reminder); if (initialReminderId) onSearchHandled() }, [initialReminderId])
 
   const resources = state.spaces.flatMap(space => space.resources.map(resource => ({ ...resource, spaceId: space.id })))
-  const continuation = latestContinuation(state)
+  const continuation = activeOrRecentContinuation(state)
   const hasResume = Boolean(continuation)
   const selectedDay = new Date(now)
   selectedDay.setDate(selectedDay.getDate() + day)
   const plan = remindersForDay(state, selectedDay)
   const realReminders = state.reminders.filter(item => isRealReminder(item) && !item.done)
-  const earlier = realReminders.filter(item => item.plannedDate && item.plannedDate < localDate(now)!)
+  const earlier = realReminders.filter(item => {
+    if (item.plannedDate) return item.plannedDate < localDate(now)!
+    if (item.dueAt) return localDate(new Date(item.dueAt))! < localDate(now)!
+    return false
+  })
   const links = resources.filter(resource => resource.kind === 'link' && !resource.completedAt && !/figma\.com\/(design|file)/i.test(resource.target))
   const events = realEvents(state).filter(event => Date.parse(event.endAt) >= now.getTime()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
   const dayEvents = realEvents(state).filter(event => eventInDay(event, selectedDay))
@@ -326,7 +383,6 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
         {widgets.map(widget => {
           switch (widget.type) {
             case 'resume':
-              if (!continuation) return null
               return (
                 <ResumeCard
                   key={widget.id}
@@ -341,14 +397,15 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                   size={widget.size}
                   covers={covers}
                   onPointerDown={e => onCardPointerDown(e, widget.id)}
-                  pending={resumeStatus?.contextId === continuation.context.id && resumeStatus.pending}
-                  result={resumeStatus?.contextId === continuation.context.id ? resumeStatus.result : undefined}
-                  onResume={retry => onResume(continuation.space.id, continuation.context.id, retry)}
-                  onSpace={() => onSpace(continuation.space.id)}
-                  onEdit={() => onEditContext(continuation.space.id, continuation.context.id)}
-                  onComplete={() => onCompleteContext(continuation.space.id, continuation.context.id)}
-                  onDocument={document => onOpenDocument(document, continuation.context.id)}
-                  onTabs={() => onOpenContext(continuation.space.id, continuation.context.id)}
+                  pending={Boolean(continuation && resumeStatus && resumeStatus.contextId === continuation.context.id && resumeStatus.pending)}
+                  result={continuation && resumeStatus && resumeStatus.contextId === continuation.context.id ? resumeStatus.result : undefined}
+                  onResume={retry => continuation && onResume(continuation.space.id, continuation.context.id, retry)}
+                  onSpace={() => continuation ? onSpace(continuation.space.id) : onNewSpace ? onNewSpace() : onSpace('')}
+                  onEdit={() => continuation && onEditContext(continuation.space.id, continuation.context.id)}
+                  onComplete={() => continuation && onCompleteContext(continuation.space.id, continuation.context.id)}
+                  onDocument={document => continuation && onOpenDocument(document, continuation.context.id)}
+                  onTabs={() => continuation && onOpenContext(continuation.space.id, continuation.context.id)}
+                  onNewSpace={onNewSpace}
                 >
                   {renderCardControls(widget)}
                 </ResumeCard>
@@ -378,7 +435,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                   </div>
                   <div className="calm-plan-list">
                     {schedule.slice(0, 3).map(item => (
-                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 5 * 60000 ? 'live-hint' : ''}`}>
+                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 15 * 60000 ? 'live-hint' : ''}`}>
                         {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
                         <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
                         {item.event?.meetingUrl ? (
@@ -399,7 +456,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                           { label: 'Завтра', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
                           { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
                           { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
-                          , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null }, 'Убрано из сегодняшнего') }
+                          , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null, dueAt: null, notifiedAt: undefined }, 'Убрано из сегодняшнего') }
                         ]} /> : null}
                       </div>
                     ))}
@@ -407,42 +464,63 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                       <div className="calm-plan-empty-wrap">
                         {day === 0 && earlier.length > 0 ? (
                           <div className="plan-earlier-section">
+                            <div className="plan-section-label">С прошлых дней</div>
                             <div className="plan-earlier-list">
                               {earlier.slice(0, 2).map(task => (
                                 <div key={task.id} className="calm-plan-item task-row is-overdue-row">
                                   <button className="task-check" aria-label={`Завершить: ${task.title}`} title="Отметить сделанным" onClick={() => changeTask(task, { done: true }, 'Дело завершено')}><Check size={14} /></button>
                                   <button className="plan-item-title" onClick={() => editReminder(task)}>
                                     <span>{task.title}</span>
-                                    <time className="calm-time">С прошлых дней</time>
                                   </button>
                                   <button
                                     type="button"
                                     className="plan-move-today-btn"
-                                    onClick={() => changeTask(task, { plannedDate: localDate(new Date()) }, 'Перенесено на сегодня')}
+                                    onClick={() => changeTask(task, rescheduleTaskToToday(task, now), 'Перенесено на сегодня')}
                                     title="Перенести дело на сегодня"
                                   >
-                                    <span>→ На сегодня</span>
+                                    <span>На сегодня →</span>
                                   </button>
                                 </div>
                               ))}
                             </div>
-                            <button type="button" className="calm-plan-empty-placeholder" onClick={() => onPlan(day)}>
-                              На этот день нет дел — нажмите, чтобы записать…
+                            {earlier.length > 2 && (
+                              <button type="button" className="calm-text-button plan-earlier-more" onClick={() => showDigest()}>
+                                Все дела с прошлых дней · {earlier.length}
+                              </button>
+                            )}
+                            <button type="button" className="plan-add-task-row" onClick={() => onPlan(day)}>
+                              <PlusCircle size={20} />
+                              <span>{day === 0 ? 'Добавить дело на сегодня' : day === 1 ? 'Добавить дело на завтра' : 'Добавить дело на этот день'}</span>
                             </button>
                           </div>
                         ) : (
-                          <button type="button" className="calm-plan-empty-placeholder" onClick={() => onPlan(day)}>
-                            На этот день нет дел — нажмите, чтобы записать…
-                          </button>
+                          <>
+                            <div className="plan-empty-label">{day === 0 ? 'На сегодня дел нет' : day === 1 ? 'На завтра пока нет дел' : 'На этот день дел нет'}</div>
+                            <button type="button" className="plan-add-task-row" onClick={() => onPlan(day)}>
+                              <PlusCircle size={20} />
+                              <span>{day === 0 ? 'Добавить дело на сегодня' : day === 1 ? 'Добавить дело на завтра' : 'Добавить дело на этот день'}</span>
+                            </button>
+                          </>
                         )}
                       </div>
+                    )}
+                    {schedule.length > 0 && (
+                      <button type="button" className="plan-add-task-row" onClick={() => onPlan(day)}>
+                        <PlusCircle size={20} />
+                        <span>{day === 0 ? 'Добавить дело на сегодня' : day === 1 ? 'Добавить дело на завтра' : 'Добавить дело на этот день'}</span>
+                      </button>
                     )}
                   </div>
                   <div className="plan-bottom">
                     {schedule.length > 3 && <button className="calm-text-button" onClick={() => setDialog('today')}>Все дела на этот день · {schedule.length}<ArrowRight size={16} /></button>}
-                    {schedule.length > 0 && earlier.length > 0 && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}
+                    {earlier.length > 0 && (schedule.length > 0 || earlier.length > 2) && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}
                     <button className="plan-undated-pill" onClick={() => showDigest('notes')} title="Открыть мысли и дела без даты">
-                      <span>💭 Мысли без даты · {state.reminders.filter(item => !item.done && !item.plannedDate && !item.dueAt).length}</span>
+                      <span className="plan-undated-left">
+                        <span className="plan-undated-icon">💭</span>
+                        <span>Мысли без даты</span>
+                        <span className="plan-undated-count">{state.reminders.filter(item => !item.done && !item.plannedDate && !item.dueAt).length}</span>
+                      </span>
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                   {renderCardControls(widget)}
@@ -551,6 +629,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                     onOpen={onOpen}
                     onAddLink={onAddLink}
                     colSpan={liveSpans[widget.id]?.colSpan ?? widgetSpan(widget).colSpan}
+                    covers={covers}
                   />
                   {renderCardControls(widget)}
                 </section>
@@ -693,7 +772,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                 {showAddPicker && (
                   <div className="dashboard-add-floating-picker" role="menu">
                     <div className="picker-header">Добавить виджет</div>
-                    {(Object.keys(widgetNames) as WidgetType[])
+                    {availableWidgetTypes
                       .filter(type => !widgets.some(w => w.type === type))
                       .map(type => (
                         <button
@@ -708,7 +787,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                           <Plus size={15} /> <span>{widgetNames[type]}</span>
                         </button>
                       ))}
-                    {(Object.keys(widgetNames) as WidgetType[]).every(type => widgets.some(w => w.type === type)) && (
+                    {availableWidgetTypes.every(type => widgets.some(w => w.type === type)) && (
                       <span className="picker-empty">Все виджеты уже добавлены</span>
                     )}
                   </div>
@@ -772,7 +851,18 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
       {digestTab === 'events' && events.slice(visiblePage * 4, visiblePage * 4 + 4).map(event => <div className="calm-event-row" key={event.id}><strong>{event.title}</strong><small>{formatDue(event.startAt)}</small></div>)}
       {(digestTab === 'notes' ? realReminders.length : digestItems.length) === 0 && <p className="calm-digest-empty">{digestTab === 'notes' ? 'Нет записей' : digestTab === 'reading' ? 'Нет сохранённых ссылок' : 'Нет событий'}</p>}
     </div><div className="calm-dialog-actions"><div className="calm-pagination">{totalPages > 1 && <><button className="calm-icon" disabled={!visiblePage} onClick={() => setPage(visiblePage - 1)} aria-label="Назад"><ChevronLeft size={18} /></button><span>{visiblePage + 1} / {totalPages}</span><button className="calm-icon" disabled={visiblePage + 1 === totalPages} onClick={() => setPage(visiblePage + 1)} aria-label="Далее"><ChevronRight size={18} /></button></>}</div>{digestTab !== 'events' && <button className="calm-primary" onClick={() => { setDialog(null); digestTab === 'reading' ? onAddLink() : onCapture() }}><Plus size={18} />{digestTab === 'reading' ? 'Сохранить ссылку' : 'Записать'}</button>}</div></Dialog>}
-    {undo && <div className="calm-undo" role="status"><span>{undo.label}</span><button onClick={() => { undo.restore(); setUndo(null) }}>Вернуть</button></div>}
+    {undo && (
+      <div
+        className="calm-undo"
+        role="status"
+        onMouseEnter={clearUndoTimer}
+        onMouseLeave={() => startUndoTimer(3000)}
+      >
+        <span>{undo.label}</span>
+        <button onClick={() => { undo.restore(); setUndo(null) }}>Вернуть</button>
+        <button aria-label="Закрыть" onClick={() => setUndo(null)}><X size={15} /></button>
+      </div>
+    )}
   </>
 }
 

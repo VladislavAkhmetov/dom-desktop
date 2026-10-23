@@ -29,9 +29,9 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); vi.useRealTimers(); vi.unstubAllGlobals() })
 
-function Surface({ browser = false, layoutLocked = false }: { browser?: boolean; layoutLocked?: boolean }) {
+function Surface({ browser = false, layoutLocked = false, update }: { browser?: boolean; layoutLocked?: boolean; update?: { version: string } | null }) {
   const [state, setState] = useState(stored)
-  return <AttentionIsland browser={browser} layoutLocked={layoutLocked} onDay={onDay} state={state} now={now} onOpen={onOpen} onSpace={onSpace} onFocus={onFocus} onChange={async update => {
+  return <AttentionIsland browser={browser} layoutLocked={layoutLocked} onDay={onDay} state={state} now={now} onOpen={onOpen} onSpace={onSpace} onFocus={onFocus} update={update} onChange={async update => {
     if (!saveSucceeds) return false
     stored = update(stored); setState(stored); return true
   }} />
@@ -143,5 +143,20 @@ describe('динамический остров браузинга', () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ target: 'https://meet.google.com/abc-defg-hij' }))
     expect(stored.reminders[0].done).toBe(false)
     expect(document.querySelector('.browser-day-pulse')?.textContent).toBe('Сейчас · Забрать заказ')
+  })
+  it('отображает спокойный сигнал готовности обновления и скрывает по кнопке Понятно', async () => {
+    await act(async () => root.render(<Surface update={{ version: '0.0.2' }} />))
+    expect(document.querySelector('.island-summary strong')?.textContent).toBe('Доступно обновление dombro')
+    expect(document.querySelector('.island-summary small')?.textContent).toBe('Перезапустить при выходе')
+    await click(document.querySelector<HTMLButtonElement>('.island-trigger')!)
+    expect(document.querySelector('.island-details h2')?.textContent).toBe('Доступно обновление dombro')
+    expect(document.querySelector('.island-details p')?.textContent).toContain('0.0.2')
+    await click(button('Понятно'))
+    expect(stored.dismissedNotices).toContain('update:0.0.2')
+    expect(document.querySelector('.island-details')).toBeNull()
+  })
+  it('в браузере отображает спокойную строку обновления', async () => {
+    await act(async () => root.render(<Surface browser update={{ version: '0.0.2' }} />))
+    expect(document.querySelector('.browser-island-line')?.textContent).toBe('Доступно обновление dombro · Перезапустить при выходе')
   })
 })

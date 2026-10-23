@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useSpring, useTransform, useReducedMotion } from 'motion/react'
 import { ArrowRight, Bell, CalendarDays, Check, ChevronDown, Clock3, Mail, Music2, Pause, Sparkles, Timer, Video, X } from 'lucide-react'
@@ -9,7 +9,28 @@ import { selectGreeting } from './greetingModel'
 import { zenTimer } from './focus/zenTimer'
 import { audioManager } from './player/audioStream'
 import { sound } from './sound'
+import { bridge } from './bridge'
 import './attention.css'
+
+let currentUpdateReady: { version: string } | null = null
+const updateListeners = new Set<(update: { version: string } | null) => void>()
+
+if (typeof window !== 'undefined') {
+  bridge.onUpdateReady?.((data) => {
+    currentUpdateReady = data
+    updateListeners.forEach(fn => fn(data))
+  })
+}
+
+export function useUpdateReady() {
+  const [update, setUpdate] = useState<{ version: string } | null>(currentUpdateReady)
+  useEffect(() => {
+    const listener = (data: { version: string } | null) => setUpdate(data)
+    updateListeners.add(listener)
+    return () => { updateListeners.delete(listener) }
+  }, [])
+  return update
+}
 
 export function MemoryReliefSignal({ freedMB }: { freedMB: number }) {
   const reduced = useReducedMotion()
@@ -48,9 +69,11 @@ export function MemoryReliefSignal({ freedMB }: { freedMB: number }) {
 }
 
 type Signal = AttentionSignal
-const categories: Record<Signal['type'], string> = { task: 'Напоминание', mail: 'Письмо', event: 'Встреча', focus: 'Фокус', music: 'Музыка', activity: 'Помощник' }
+const categories: Record<Signal['type'], string> = { task: 'Напоминание', mail: 'Письмо', event: 'Встреча', focus: 'Фокус', music: 'Музыка', activity: 'Помощник', update: 'Обновление' }
 
-export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus, compact = false, browser = false, layoutLocked = false, onDay, onAssistant, onUndo, memoryRelief }: { state: AppState; now: Date; onChange: (update: (state: AppState) => AppState) => unknown; onOpen: (resource: Resource) => void; onSpace: (id: string) => void; onFocus: () => void; compact?: boolean; browser?: boolean; layoutLocked?: boolean; onDay?: () => void; onAssistant?: () => void; onUndo?: (taskId: string, noticeId: string) => void; memoryRelief?: { freedMB: number; id: string } | null }) {
+export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus, compact = false, browser = false, layoutLocked = false, onDay, onAssistant, onUndo, memoryRelief, update: propUpdate }: { state: AppState; now: Date; onChange: (update: (state: AppState) => AppState) => unknown; onOpen: (resource: Resource) => void; onSpace: (id: string) => void; onFocus: () => void; compact?: boolean; browser?: boolean; layoutLocked?: boolean; onDay?: () => void; onAssistant?: () => void; onUndo?: (taskId: string, noticeId: string) => void; memoryRelief?: { freedMB: number; id: string } | null; update?: { version: string } | null }) {
+  const globalUpdate = useUpdateReady()
+  const activeUpdate = propUpdate !== undefined ? propUpdate : globalUpdate
   const [focus, setFocus] = useState(zenTimer.getState())
   const [playing, setPlaying] = useState(audioManager.getIsPlaying())
   const [expanded, setExpanded] = useState(false)
@@ -74,7 +97,23 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
   const [position, setPosition] = useState({ top: 0, left: 0 })
   useEffect(() => zenTimer.subscribe(setFocus), [])
   useEffect(() => audioManager.subscribe(() => setPlaying(audioManager.getIsPlaying())), [])
-  useEffect(() => { if (!undo) return; const timer = window.setTimeout(() => setUndo(null), 8000); return () => window.clearTimeout(timer) }, [undo])
+  const islandUndoTimerRef = useRef<number | undefined>(undefined)
+  const clearIslandUndoTimer = useCallback(() => {
+    if (islandUndoTimerRef.current) {
+      window.clearTimeout(islandUndoTimerRef.current)
+      islandUndoTimerRef.current = undefined
+    }
+  }, [])
+  const startIslandUndoTimer = useCallback((delay = 6000) => {
+    clearIslandUndoTimer()
+    islandUndoTimerRef.current = window.setTimeout(() => setUndo(null), delay)
+  }, [clearIslandUndoTimer])
+
+  useEffect(() => {
+    if (undo) startIslandUndoTimer(6000)
+    else clearIslandUndoTimer()
+    return () => clearIslandUndoTimer()
+  }, [undo, startIslandUndoTimer, clearIslandUndoTimer])
   useEffect(() => {
     if (greetingPhase === 'settled') return
     if (isHovered) return
@@ -132,7 +171,7 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
     return () => document.removeEventListener('pointerdown', outside)
   }, [expanded])
   const attentionState = browser ? { ...state, reminders: state.reminders.filter(isRealReminder), events: realEvents(state) } : state
-  const liveSignal = selectAttentionSignal(attentionState, now, focus, { ambient: !browser, music: playing ? audioManager.getStation().name : undefined })
+  const liveSignal = selectAttentionSignal(attentionState, now, focus, { ambient: !browser, music: playing ? audioManager.getStation().name : undefined, update: activeUpdate })
   const hasSignal = Boolean(liveSignal)
   useLayoutEffect(() => { if (!layoutLocked && !expanded) setWide(hasSignal) }, [hasSignal, layoutLocked, expanded])
   useLayoutEffect(() => {
@@ -204,7 +243,7 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
             <>
               <button className="island-primary" disabled={saving} onClick={completeTask}><Check size={16} />Сделано</button>
               <button disabled={saving} onClick={snooze}><Clock3 size={15} />Напомнить через 15 мин</button>
-              {browser && <button disabled={saving} onClick={dismiss}>Скрыть</button>}
+              {(browser || signal.id.endsWith(':soon')) && <button disabled={saving} onClick={dismiss}>Скрыть</button>}
             </>
           ) : signal.type === 'focus' ? (
             focus.status === 'running' ? (
@@ -217,6 +256,8 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
             )
           ) : signal.type === 'music' ? (
             <button onClick={() => { audioManager.pause(); close() }}><Pause size={16} />Пауза</button>
+          ) : signal.type === 'update' ? (
+            <button disabled={saving} onClick={dismiss}>Понятно</button>
           ) : (
             <>
               {signal.url && (
@@ -237,7 +278,35 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
         {error && <p className="island-error" role="alert">{error}</p>}
         {browser && onDay && <button className="browser-island-day" onClick={() => { close(); onDay() }}>План дня<ArrowRight size={15} /></button>}
       </section>
-  const undoNotice = undo && <div className={'calm-undo' + (browser ? ' browser-island-undo' : '')} role="status"><span>Дело завершено</span><button disabled={saving} onClick={() => { const current = undo; void change(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === current.taskId ? { ...item, done: false } : item), dismissedNotices: previous.dismissedNotices?.filter(item => item !== current.noticeId) }), () => setUndo(null)) }}>Вернуть</button><button aria-label="Закрыть" onClick={() => setUndo(null)}><X size={15} /></button></div>
+  const undoNotice = undo && (
+    <div
+      className={'calm-undo' + (browser ? ' browser-island-undo' : '')}
+      role="status"
+      onMouseEnter={clearIslandUndoTimer}
+      onMouseLeave={() => startIslandUndoTimer(3000)}
+    >
+      <span>Дело завершено</span>
+      <button
+        disabled={saving}
+        onClick={() => {
+          const current = undo
+          void change(
+            previous => ({
+              ...previous,
+              reminders: previous.reminders.map(item => item.id === current.taskId ? { ...item, done: false } : item),
+              dismissedNotices: previous.dismissedNotices?.filter(item => item !== current.noticeId)
+            }),
+            () => setUndo(null)
+          )
+        }}
+      >
+        Вернуть
+      </button>
+      <button aria-label="Закрыть" onClick={() => setUndo(null)}>
+        <X size={15} />
+      </button>
+    </div>
+  )
   const showGreeting = (greetingPhase === 'active' || greetingPhase === 'dissolving') && !browser && !compact && !memoryRelief
   const isManifesting = greetingPhase === 'manifesting' && !browser && !compact && !memoryRelief
   return <>

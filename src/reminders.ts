@@ -3,7 +3,9 @@ import { localDate } from '../shared/state'
 export interface ParsedCapture { title: string; dueAt: string | null; plannedDate: string | null; kind: 'note' | 'task' }
 
 export function parseCapture(raw: string, now = new Date()): ParsedCapture {
-  let text = raw.trim().replace(/^напомни(?:\s+мне)?\s+/i, '')
+  let text = raw.trim()
+    .replace(/^(?:(?:ну|пожалуйста|в)\s+)?(?:напомни(?:\s+мне)?|напомнить)\s+/iu, '')
+    .replace(/^напомни(?:\s+мне)?\s+/iu, '')
   let dueAt: Date | null = null
   let plannedDate: string | null = null
 
@@ -18,7 +20,7 @@ export function parseCapture(raw: string, now = new Date()): ParsedCapture {
   } else {
     const dayWord = text.match(/(?<![\p{L}\p{N}])(сегодня|завтра|послезавтра)(?![\p{L}\p{N}])/iu)
     const dateMatch = text.match(/\b(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?\b/)
-    const timeMatch = text.match(/(?<![\p{L}\p{N}])в\s+([01]?\d|2[0-3])(?::([0-5]\d))?(?![\p{L}\p{N}])/iu)
+    const timeMatch = text.match(/(?<![\p{L}\p{N}])(?:в|к)\s+([01]?\d|2[0-3])(?::([0-5]\d))?(?:\s*(?:часов|часам|часа|час|ч))?(?![\p{L}\p{N}])/iu)
     if (dayWord || dateMatch || timeMatch) {
       const date = new Date(now)
       date.setSeconds(0, 0)

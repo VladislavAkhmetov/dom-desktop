@@ -3,7 +3,7 @@ import { Check, Loader2, RefreshCw, Search } from 'lucide-react'
 import { Dialog } from '../Dialog'
 import { bridge } from '../bridge'
 import type { OpenWindowItem, Space } from '../types'
-import { productIcon } from '../App'
+import { productIcon } from '../productIcon'
 
 interface Props {
   space: Space

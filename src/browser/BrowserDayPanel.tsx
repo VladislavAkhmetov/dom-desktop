@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, Clock3, Mail, Pin, Plus, Sparkles, Timer, X } from 'lucide-react'
 import type { AppState, Resource } from '../types'
 import type { ZenTimerState } from '../focus/zenTimer'
+import { isAssistantEnabled } from '../assistantModel'
 import { eventTime, type BrowserDayModel } from './browserDayModel'
 
 export interface BrowserDayPanelProps {
@@ -58,7 +59,7 @@ export function BrowserDayPanel({ state, model, now, focus, pinned, onPin, onClo
       <button className={`browser-day-focus ${focus.status === 'running' ? 'is-active' : ''}`} onClick={onFocus}><Timer size={20} /><span><strong>{focus.status === 'running' ? `Фокус · ${Math.ceil(focus.remainingSeconds / 60)} мин` : focus.status === 'completed' ? 'Фокус завершён' : 'Сосредоточиться'}</strong><small>{focus.task?.title || (focus.status === 'completed' ? 'Можно сделать перерыв' : 'Выберите одно дело')}</small></span><ArrowRight size={16} /></button>
       <form className="browser-day-capture" onSubmit={event => { event.preventDefault(); const title = draft.trim(); if (title) void save('capture', () => onAddTask(title), () => setDraft('')) }}><label htmlFor="browser-day-task">Добавить дело на сегодня</label><div><input id="browser-day-task" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Что нужно сделать?" maxLength={500} disabled={pending === 'capture'} onKeyDown={event => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault() }} /><button type="submit" disabled={!draft.trim() || Boolean(pending)} aria-label="Добавить дело на сегодня"><Plus size={18} /></button></div></form>
       {error && <p className="browser-day-warning" role="alert">{error}</p>}
-      <div className="browser-day-quick"><button onClick={onCapture}>Записать мысль</button><button onClick={onAssistant}><Sparkles size={15} />Спросить ИИ</button></div>
+      <div className="browser-day-quick"><button onClick={onCapture}>Записать мысль</button>{isAssistantEnabled && <button onClick={onAssistant}><Sparkles size={15} />Спросить ИИ</button>}</div>
     </div>
     <button className="browser-day-dashboard" onClick={onHome}>Открыть дашборд <ArrowUpRight size={17} /></button>
   </aside>

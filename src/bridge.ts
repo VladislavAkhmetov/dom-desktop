@@ -164,7 +164,11 @@ const browserBridge: DomBridge = {
     },
     async getReaderContent() { return null },
     async translateText(text) { return text },
-    async translateTab() { return { ok: true, count: 0 } }
+    async translateTab() { return { ok: true, count: 0 } },
+    async autofill() { return true }
+  },
+  async bitwardenStatus() {
+    return { loaded: false, version: '2026.10.0', worker: false, error: 'Расширение Bitwarden во вкладки не загружается. Строки «Сохранить пароль?» не будет.' }
   },
   integrations: {
     async configureGoogle() {},
@@ -242,8 +246,10 @@ const browserBridge: DomBridge = {
   async isFullScreen() {
     return Boolean(document.fullscreenElement)
   },
+  async setTitleBarOverlay() { return true },
   async getRecentFiles() { return [] },
   onToast() { return () => undefined },
+  onUpdateReady() { return () => undefined },
   onFocusCapture() { return () => undefined },
   onVoiceToggle() { return () => undefined },
   onStateChanged() { return () => undefined }

@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, Eye, EyeOff, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
+import { Check, Copy, Download, ExternalLink, Eye, EyeOff, KeyRound, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { bridge } from './bridge'
-import type { SavedCredential } from './types'
+import type { BitwardenExtensionStatus, SavedCredential } from './types'
 import { useI18n } from './i18n'
+
+function bitwardenLine(status: BitwardenExtensionStatus | null) {
+  if (!status) return 'Проверяю расширение Bitwarden…'
+  if (status.loaded && status.worker) return `Расширение Bitwarden ${status.version} загружено во вкладки, его процесс запущен. Подсказку на странице рисует оно. Своего запроса «Сохранить пароль?» у dombro нет.`
+  if (status.loaded) return `Файлы Bitwarden ${status.version} прочитаны, но его процесс не запустился. Строки «Сохранить пароль?» не будет.`
+  return status.error || 'Расширение Bitwarden не загрузилось. Строки «Сохранить пароль?» не будет.'
+}
 
 export function PasswordSettings() {
   const { t } = useI18n()
@@ -17,6 +24,7 @@ export function PasswordSettings() {
   const [importOpen, setImportOpen] = useState(false)
   const [importCsv, setImportCsv] = useState('')
   const [importStatus, setImportStatus] = useState<string | null>(null)
+  const [bitwarden, setBitwarden] = useState<BitwardenExtensionStatus | null>(null)
 
   async function load() {
     setLoading(true)
@@ -34,6 +42,11 @@ export function PasswordSettings() {
 
   useEffect(() => {
     load()
+    let alive = true
+    bridge.bitwardenStatus?.().then(value => { if (alive) setBitwarden(value) }).catch(() => {
+      if (alive) setBitwarden({ loaded: false, version: '', worker: false, error: 'статус недоступен' })
+    })
+    return () => { alive = false }
   }, [])
 
   async function handleAdd(event: React.FormEvent) {
@@ -88,11 +101,64 @@ export function PasswordSettings() {
     }
   }
 
+  function handleExportCsv() {
+    if (!credentials.length) return
+    const header = 'name,url,username,password\n'
+    const rows = credentials.map(c => {
+      const escape = (s: string) => `"${(s || '').replace(/"/g, '""')}"`
+      return `${escape(c.title || c.origin)},${escape(c.origin)},${escape(c.username)},${escape(c.password)}`
+    }).join('\n')
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dombro-passwords-bitwarden-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function openBitwarden() {
+    try {
+      window.open('bitwarden://', '_blank')
+    } catch {
+      window.open('https://bitwarden.com/download/', '_blank')
+    }
+  }
+
   return (
     <div className="settings-columns">
+      {/* Рекомендуемый безопасный менеджер: Bitwarden в 1-2 касания */}
+      <div className="settings-card" style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, rgba(23,93,220,0.06), rgba(40,167,69,0.04))', border: '1px solid rgba(23,93,220,0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#175ddc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <KeyRound size={20} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: 16 }}>Менеджер паролей: Bitwarden</h4>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+                Пароль остаётся в Bitwarden. dombro поле пароля не читает и не сохраняет.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="soft-button" type="button" onClick={handleExportCsv} disabled={!credentials.length} title="Экспорт существующих паролей в Bitwarden CSV">
+              <Download size={14} style={{ marginRight: 5 }} />
+              Экспорт в Bitwarden CSV
+            </button>
+            <button className="calm-primary" type="button" onClick={openBitwarden}>
+              <ExternalLink size={14} style={{ marginRight: 5 }} />
+              Открыть Bitwarden
+            </button>
+          </div>
+        </div>
+
+        <p style={{ margin: '14px 0 0', fontSize: 13, lineHeight: 1.45 }}>{bitwardenLine(bitwarden)}</p>
+      </div>
+
       <div className="settings-card settings-collection-card">
         <div className="settings-card-heading">
-          <h4>{t('settings.passwords.title')}</h4>
+          <h4>{t('settings.passwords.title')} (Резерв)</h4>
           <button
             className="soft-button"
             type="button"
@@ -245,7 +311,7 @@ export function PasswordSettings() {
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(100,143,125,0.15)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <ShieldCheck size={20} color="#486955" style={{ flex: 'none', marginTop: 2 }} />
           <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 }}>
-            Пароли шифруются криптографией вашей операционной системы (DPAPI на Windows, Apple Keychain на Mac). Они никогда не отправляются на удалённые серверы.
+            Пароли в этом списке шифруются средствами ОС. Со страницы они сюда не попадают. Автозаполнение с сайта в этой сборке не работает.
           </p>
         </div>
       </div>

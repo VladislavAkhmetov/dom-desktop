@@ -1,0 +1,422 @@
+[
+  {
+    "name": "четверг, 22 октября. Показать календарь месяца",
+    "className": "hub-date",
+    "disabled": false,
+    "w": 162,
+    "h": 64
+  },
+  {
+    "name": "План дня",
+    "className": "ambient-greeting-action",
+    "disabled": false,
+    "w": 34,
+    "h": 34
+  },
+  {
+    "name": "Погода в Уфе: 9°, Ясно. Показать прогноз на три дня",
+    "className": "hub-weather",
+    "disabled": false,
+    "w": 82,
+    "h": 28
+  },
+  {
+    "name": "На главную dombro",
+    "className": "brand",
+    "disabled": false,
+    "w": 143,
+    "h": 36
+  },
+  {
+    "name": "Браузер",
+    "className": "chrome-button chrome-browser ",
+    "disabled": false,
+    "w": 107,
+    "h": 38
+  },
+  {
+    "name": "Обзор и поиск вкладок",
+    "className": "chrome-button chrome-tab-desk",
+    "disabled": false,
+    "w": 38,
+    "h": 38
+  },
+  {
+    "name": "ИИ в Доме",
+    "className": "chrome-button chrome-assistant ",
+    "disabled": false,
+    "w": 39,
+    "h": 38
+  },
+  {
+    "name": "Поиск в Доме",
+    "className": "chrome-button",
+    "disabled": false,
+    "w": 39,
+    "h": 38
+  },
+  {
+    "name": "Настройки",
+    "className": "chrome-button",
+    "disabled": false,
+    "w": 39,
+    "h": 38
+  },
+  {
+    "name": "Профиль: Александр",
+    "className": "chrome-button chrome-profile ",
+    "disabled": false,
+    "w": 36,
+    "h": 38
+  },
+  {
+    "name": "Мой день",
+    "className": "chrome-space selected",
+    "disabled": false,
+    "w": 88,
+    "h": 32
+  },
+  {
+    "name": "Обновить логотип",
+    "className": "chrome-space  is-pinned",
+    "disabled": false,
+    "w": 141,
+    "h": 32
+  },
+  {
+    "name": "Поездка на выходные",
+    "className": "chrome-space  is-pinned",
+    "disabled": false,
+    "w": 166,
+    "h": 32
+  },
+  {
+    "name": "Учёба",
+    "className": "chrome-space  is-pinned",
+    "disabled": false,
+    "w": 64,
+    "h": 32
+  },
+  {
+    "name": "Дом",
+    "className": "chrome-space  is-pinned",
+    "disabled": false,
+    "w": 54,
+    "h": 32
+  },
+  {
+    "name": "Все пространства",
+    "className": "chrome-space ",
+    "disabled": false,
+    "w": 142,
+    "h": 32
+  },
+  {
+    "name": "Создать пространство",
+    "className": "chrome-new-space",
+    "disabled": false,
+    "w": 32,
+    "h": 32
+  },
+  {
+    "name": "Поиск по пространствам",
+    "className": "chrome-space-search",
+    "disabled": false,
+    "w": 32,
+    "h": 32
+  },
+  {
+    "name": "Обновить логотип",
+    "className": "resume-space-link",
+    "disabled": false,
+    "w": 271,
+    "h": 30
+  },
+  {
+    "name": "Действия с продолжением",
+    "className": "task-more",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Логотип_Мастер_2026.ai",
+    "className": "resume-material",
+    "disabled": false,
+    "w": 167,
+    "h": 26
+  },
+  {
+    "name": "Векторные_паттерны_v3.ai",
+    "className": "resume-material",
+    "disabled": false,
+    "w": 178,
+    "h": 26
+  },
+  {
+    "name": "2 вкладки",
+    "className": "resume-tabs-pill resume-material resume-tab-group",
+    "disabled": false,
+    "w": 80,
+    "h": 26
+  },
+  {
+    "name": "Продолжить",
+    "className": "fluid-button resume-primary",
+    "disabled": false,
+    "w": 138,
+    "h": 36
+  },
+  {
+    "name": "Сегодня",
+    "className": "selected",
+    "disabled": false,
+    "w": 99,
+    "h": 30
+  },
+  {
+    "name": "Завтра",
+    "className": "",
+    "disabled": false,
+    "w": 51,
+    "h": 30
+  },
+  {
+    "name": "Открыть календарь",
+    "className": "calm-icon",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Добавить дело",
+    "className": "calm-icon",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Завершить: Отправить итоги встречи",
+    "className": "task-check",
+    "disabled": false,
+    "w": 20,
+    "h": 20
+  },
+  {
+    "name": "Отправить итоги встречи 18:30",
+    "className": "plan-item-title",
+    "disabled": false,
+    "w": 439,
+    "h": 45
+  },
+  {
+    "name": "Действия: Отправить итоги встречи",
+    "className": "task-more",
+    "disabled": false,
+    "w": 30,
+    "h": 32
+  },
+  {
+    "name": "Разговор с командой 19:00 · Событие",
+    "className": "plan-item-title",
+    "disabled": false,
+    "w": 480,
+    "h": 45
+  },
+  {
+    "name": "Завершить: Забрать заказ по дороге домой",
+    "className": "task-check",
+    "disabled": false,
+    "w": 20,
+    "h": 20
+  },
+  {
+    "name": "Забрать заказ по дороге домой 20:00",
+    "className": "plan-item-title",
+    "disabled": false,
+    "w": 439,
+    "h": 45
+  },
+  {
+    "name": "Действия: Забрать заказ по дороге домой",
+    "className": "task-more",
+    "disabled": false,
+    "w": 30,
+    "h": 32
+  },
+  {
+    "name": "Добавить дело на сегодня",
+    "className": "plan-add-task-row",
+    "disabled": false,
+    "w": 513,
+    "h": 48
+  },
+  {
+    "name": "💭 Мысли без даты 1",
+    "className": "plan-undated-pill",
+    "disabled": false,
+    "w": 523,
+    "h": 39
+  },
+  {
+    "name": "Отображение списком",
+    "className": "reading-mode-btn is-active",
+    "disabled": false,
+    "w": 26,
+    "h": 26
+  },
+  {
+    "name": "Отображение плитками",
+    "className": "reading-mode-btn ",
+    "disabled": false,
+    "w": 26,
+    "h": 26
+  },
+  {
+    "name": "Добавить ссылку",
+    "className": "calm-icon",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Мудборд: воздух, стекло, спокойствие 6 мин · Обновить логотип",
+    "className": "reading-shelf-open",
+    "disabled": false,
+    "w": 462,
+    "h": 46
+  },
+  {
+    "name": "Отметить прочитанным: Мудборд: воздух, стекло, спокойствие",
+    "className": "reading-shelf-check",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "FTS5 полнотекстовый поиск и транзакционная безопасность github.com · 8 мин · Учёба",
+    "className": "reading-shelf-open",
+    "disabled": false,
+    "w": 462,
+    "h": 46
+  },
+  {
+    "name": "Отметить прочитанным: FTS5 полнотекстовый поиск и транзакционная безопасность",
+    "className": "reading-shelf-check",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Архитектура локальных приложений на Electron и SQLite habr.com · 9 мин · Учёба",
+    "className": "reading-shelf-open",
+    "disabled": false,
+    "w": 462,
+    "h": 46
+  },
+  {
+    "name": "Отметить прочитанным: Архитектура локальных приложений на Electron и SQLite",
+    "className": "reading-shelf-check",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Типографика для людей: как засечки создают ясность medium.com · 9 мин · Учёба",
+    "className": "reading-shelf-open",
+    "disabled": false,
+    "w": 462,
+    "h": 46
+  },
+  {
+    "name": "Отметить прочитанным: Типографика для людей: как засечки создают ясность",
+    "className": "reading-shelf-check",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Принципы спокойного дизайна и снижение когнитивной нагрузки calmtech.institute · 9 мин · Учёба",
+    "className": "reading-shelf-open",
+    "disabled": false,
+    "w": 462,
+    "h": 46
+  },
+  {
+    "name": "Отметить прочитанным: Принципы спокойного дизайна и снижение когнитивной нагрузки",
+    "className": "reading-shelf-check",
+    "disabled": false,
+    "w": 28,
+    "h": 28
+  },
+  {
+    "name": "Настроить виджеты",
+    "className": "edit-fab edit-fab-toggle dashboard-edit-toggle",
+    "disabled": false,
+    "w": 38,
+    "h": 38
+  },
+  {
+    "name": "Записать",
+    "className": "fluid-button calm-capture dock-entry-button",
+    "disabled": false,
+    "w": 123,
+    "h": 42
+  },
+  {
+    "name": "Спросить ИИ",
+    "className": "fluid-button dock-entry-button",
+    "disabled": false,
+    "w": 151,
+    "h": 42
+  },
+  {
+    "name": "Фокус",
+    "className": "fluid-button calm-dock-timer ",
+    "disabled": false,
+    "w": 104,
+    "h": 42
+  },
+  {
+    "name": "Слушать",
+    "className": "player-control-btn play-btn",
+    "disabled": false,
+    "w": 26,
+    "h": 26
+  },
+  {
+    "name": "Следующая станция",
+    "className": "player-control-btn next-btn",
+    "disabled": false,
+    "w": 26,
+    "h": 26
+  },
+  {
+    "name": "Меню плеера",
+    "className": "player-control-btn chevron-btn ",
+    "disabled": false,
+    "w": 20,
+    "h": 20
+  },
+  {
+    "name": "Figma",
+    "className": "calm-app-btn ",
+    "disabled": false,
+    "w": 44,
+    "h": 44
+  },
+  {
+    "name": "Illustrator 2025",
+    "className": "calm-app-btn ",
+    "disabled": false,
+    "w": 44,
+    "h": 44
+  },
+  {
+    "name": "Настроить быстрые приложения",
+    "className": "quick-app-add",
+    "disabled": false,
+    "w": 44,
+    "h": 44
+  }
+]

@@ -17,8 +17,12 @@ export function planTime(dayOffset: number, now = new Date()) {
 }
 
 export function remindersForDay(state: AppState, date: Date) {
-  return state.reminders.filter(item => isRealReminder(item) && !item.done && (item.plannedDate !== undefined ? item.plannedDate === localDate(date) : item.dueAt && sameDay(item.dueAt, date)))
-    .sort((a, b) => (a.dueAt ? Date.parse(a.dueAt) : Infinity) - (b.dueAt ? Date.parse(b.dueAt) : Infinity))
+  const targetKey = localDate(date)
+  return state.reminders.filter(item =>
+    isRealReminder(item) &&
+    !item.done &&
+    (item.plannedDate ? item.plannedDate === targetKey : Boolean(item.dueAt && sameDay(item.dueAt, date)))
+  ).sort((a, b) => (a.dueAt ? Date.parse(a.dueAt) : Infinity) - (b.dueAt ? Date.parse(b.dueAt) : Infinity))
 }
 
 export function postponeReminder(item: Reminder, choice: 'hour' | 'tomorrow', now = new Date()): Reminder {
@@ -29,4 +33,22 @@ export function postponeReminder(item: Reminder, choice: 'hour' | 'tomorrow', no
     if (item.dueAt) { const previous = new Date(item.dueAt); due.setHours(previous.getHours(), previous.getMinutes(), 0, 0) }
   }
   return { ...item, kind: 'task', plannedDate: localDate(due), dueAt: choice === 'hour' || item.dueAt ? due.toISOString() : null, notifiedAt: undefined, done: false }
+}
+
+export function rescheduleTaskToToday(item: Reminder, now = new Date()): Reminder {
+  let dueAt: string | null = null
+  if (item.dueAt) {
+    const previous = new Date(item.dueAt)
+    const next = new Date(now)
+    next.setHours(previous.getHours(), previous.getMinutes(), 0, 0)
+    dueAt = next.toISOString()
+  }
+  return {
+    ...item,
+    kind: 'task',
+    plannedDate: localDate(now),
+    dueAt,
+    notifiedAt: undefined,
+    done: false
+  }
 }

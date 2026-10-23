@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type HTMLAttributes } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, History, Pencil,
@@ -11,12 +12,11 @@ import { Capture } from './Capture'
 import { planTime } from './dayModel'
 import { isDemo } from './demo'
 import { formatDue, toLocalInput } from './reminders'
-import type { AppState, BrowserSession, BrowserTab, CalendarEvent, CalendarSubscription, OpenResult, OpenWindowItem, ReaderArticle, RecentFile, Reminder, ResearchSource, Resource, ResourceKind, Space, SpaceTone } from './types'
+import type { BrowserSession, BrowserTab, OpenResult, OpenWindowItem, PasswordSavePromptInfo, ReaderArticle, RecentFile, Reminder, ResearchSource, Resource, ResourceKind, Space, SpaceTone } from './types'
 import { localDate, normalizeSpace } from '../shared/state'
 import { activateContext, contextDocuments, contextSession, contextTitle, createContext, currentContext, documentPathKey, recordDocumentOpen, updateContextSession } from './workContexts'
 import { resumeDocuments, type ResumeResult } from './resumeContext'
-import { normalizeCalendarUrl } from './calendar/ical'
-import { calendarRange, parseCalendar } from './calendar/parse'
+import { useCalendarSync } from './useCalendarSync'
 import { cachedUfaWeather, fetchUfaWeather, type UfaWeather } from './weather'
 import { AmbientDate, AmbientWeather, WeatherDetails } from './AmbientPreviews'
 import { Workstage } from './browser/Workstage'
@@ -24,7 +24,8 @@ import { BottomDock } from './BottomDock'
 import { FluidGroup } from './FluidMotion'
 import { useWorkspaceTransition, type WorkspaceRoute } from './workspaceTransition'
 import { AssistantPanel } from './CloudAssistant'
-import { assistantRoles, defaultAssistantPreferences } from './assistantModel'
+import { assistantRoles, isAssistantEnabled } from './assistantModel'
+import { useAssistantSession } from './useAssistantSession'
 import { recentMaterials, resourceAppLabel } from './resourcePresentation'
 import { zenTimer } from './focus/zenTimer'
 import { FocusPanel } from './focus/FocusPanel'
@@ -67,11 +68,15 @@ import { cabinetFromTabs, copyMaterial, formatSpaceDisplayName, hasCabinetWork, 
 import { SpacePanel } from './browser/SpacePanel'
 import { CabinetContents } from './CabinetContents'
 import { useContextMenu } from './ContextMenu'
-import { readCabinetDrag, reorderCabinets, writeCabinetDrag, type CabinetDrag } from './cabinetInteractions'
-import { useCabinetPointerDrag } from './useCabinetPointerDrag'
+import { readCabinetDrag, reorderCabinets } from './cabinetInteractions'
+import { useCabinetDrag, type CabinetDragActions } from './useCabinetDrag'
 import { OpenWindowPickerModal } from './browser/OpenWindowPickerModal'
+import { useSpacesTabDrag } from './useSpacesTabDrag'
 import './cabinet.css'
-import type { AIContext } from './types'
+import { CalmWindSvgFilter } from './CalmWindSvgFilter'
+import { productIcon } from './productIcon'
+
+export { CalmWindSvgFilter, productIcon }
 
 const emptySession = (): BrowserSession => ({ tabs: [], activeTabId: '', splitTabId: null })
 
@@ -99,46 +104,6 @@ function shortName(target: string, kind: ResourceKind) {
     try { return new URL(target).hostname.replace(/^www\./, '') } catch { return target }
   }
   return target.split(/[\\/]/).pop()?.replace(/\.(exe|lnk)$/i, '') || 'Ресурс'
-}
-
-export function productIcon(name: string) {
-  if (/figma/i.test(name)) return <span className="figma-mark" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-  if (/illustrator/i.test(name)) return <span className="illustrator-mark" aria-hidden="true">Ai</span>
-  if (/photoshop/i.test(name)) return <span className="photoshop-mark" aria-hidden="true">Ps</span>
-  if (/indesign/i.test(name)) return <span className="indesign-mark" aria-hidden="true">Id</span>
-  if (/word/i.test(name)) return <span className="word-mark" aria-hidden="true">W</span>
-  if (/code|vs\s*code|visual studio/i.test(name)) return <span className="vscode-mark" aria-hidden="true">VS</span>
-  if (/telegram/i.test(name)) return <span className="telegram-mark" aria-hidden="true">TG</span>
-  if (/notion/i.test(name)) return <span className="notion-mark" aria-hidden="true">N</span>
-  if (/spotify/i.test(name)) return <span className="spotify-mark" aria-hidden="true">♫</span>
-  if (/obsidian/i.test(name)) return <span className="obsidian-mark" aria-hidden="true">✦</span>
-  if (/slack/i.test(name)) return <span className="slack-mark" aria-hidden="true">#</span>
-  if (/docs|документ/i.test(name)) return <span className="docs-mark" aria-hidden="true">D</span>
-  return <AppWindow size={22} strokeWidth={1.5} />
-}
-
-export function CalmWindSvgFilter() {
-  return (
-    <svg
-      width="0"
-      height="0"
-      style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none', opacity: 0 }}
-      aria-hidden="true"
-    >
-      <defs>
-        <filter id="calm-wind-dissolve" x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.04 0.08" numOctaves="2" result="noise" />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale="38"
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
-        </filter>
-      </defs>
-    </svg>
-  )
 }
 
 function App() {
@@ -183,38 +148,9 @@ function App() {
   useEffect(() => { if (route.type !== 'browse' && !browserDayPinned) setBrowserDayOpen(false) }, [route.type, browserDayPinned])
   const [tabCovers, setTabCovers] = useState<Record<string, string>>({})
   const setRoute = useWorkspaceTransition(shellRef, route, setRouteState, tabCovers)
-  const [cabinetDrag, setCabinetDrag] = useState<CabinetDrag | null>(null)
-  const cabinetDragRef = useRef<CabinetDrag | null>(null)
-  const [cabinetDrop, setCabinetDrop] = useState<{ id: string; after: boolean; pin: boolean } | null>(null)
-  const [cabinetTabDrop, setCabinetTabDrop] = useState('')
+  const cabinetActions = useRef<CabinetDragActions | null>(null)
+  const { cabinetDrag, cabinetDragRef, cabinetDrop, setCabinetDrop, cabinetTabDrop, pointerCabinet, startCabinetDrag, finishCabinetDrag } = useCabinetDrag(cabinetActions)
   const spaceContext = useContextMenu()
-  const pointerCabinet = useCabinetPointerDrag({
-    onStart: value => { cabinetDragRef.current = value; setCabinetDrag(value) },
-    onOver: (value, x, y) => {
-      const target = document.elementFromPoint(x, y)
-      const tab = target?.closest<HTMLElement>('.cabinet-tab-card')
-      setCabinetTabDrop(value.kind === 'tab' && tab?.dataset.cabinetOwner === value.spaceId && tab.dataset.tabId !== value.id ? tab.dataset.tabId || '' : '')
-      const item = target?.closest<HTMLElement>('[data-cabinet-space-target]'), id = item?.dataset.spaceId
-      if (!item || !id || id === value.spaceId) { setCabinetDrop(null); return }
-      const bounds = item.getBoundingClientRect(), after = x > bounds.left + bounds.width / 2, pin = item.classList.contains('chrome-space')
-      setCabinetDrop(previous => previous?.id === id && previous.after === after && previous.pin === pin ? previous : { id, after, pin })
-    },
-    onDrop: (value, x, y) => {
-      const target = document.elementFromPoint(x, y), tab = target?.closest<HTMLElement>('.cabinet-tab-card')
-      if (value.kind === 'tab' && tab?.dataset.cabinetOwner === value.spaceId && tab.dataset.tabId && tab.dataset.tabId !== value.id) {
-        const source = state?.spaces.find(space => space.id === value.spaceId), bounds = tab.getBoundingClientRect()
-        if (source) reorderTab(source.id, currentContext(source).id, value.id, tab.dataset.tabId, x > bounds.left + bounds.width / 2)
-        return
-      }
-      const item = target?.closest<HTMLElement>('[data-cabinet-space-target]'), destination = item?.dataset.spaceId
-      const source = state?.spaces.find(space => space.id === value.spaceId && !space.archivedAt)
-      if (!source || !item || !destination || source.id === destination) return
-      if (value.kind === 'space') { const bounds = item.getBoundingClientRect(); reorderSpace(source.id, destination, x > bounds.left + bounds.width / 2, item.classList.contains('chrome-space')) }
-      else if (value.kind === 'tab') moveTab(source.id, value.id, destination)
-      else { const resource = source.resources.find(resource => resource.id === value.id); if (resource) void copyToCabinet(resource, destination) }
-    },
-    onFinish: finishCabinetDrag
-  })
   const [toast, setToast] = useState('')
   const [contextEditor, setContextEditor] = useState<{ spaceId: string; contextId: string; isNew: boolean } | null>(null)
   const [contextName, setContextName] = useState('')
@@ -236,9 +172,7 @@ function App() {
   const [captureTimed, setCaptureTimed] = useState(false)
   const [autostart, setAutostart] = useState(false)
   const [weather, setWeather] = useState<UfaWeather | null>(cachedUfaWeather)
-  const [newCalendarName, setNewCalendarName] = useState('')
-  const [newCalendarUrl, setNewCalendarUrl] = useState('')
-  const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false)
+  const { newCalendarName, setNewCalendarName, newCalendarUrl, setNewCalendarUrl, isRefreshingCalendar, syncCalendars, addCalendar, removeCalendar } = useCalendarSync(state, commit, setToast)
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [dismissedRecentTargets, setDismissedRecentTargets] = useState<Set<string>>(new Set())
 
@@ -274,11 +208,7 @@ function App() {
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [Boolean(state), isWorkstageOpen])
-  const [assistantOpen, setAssistantOpen] = useState(false)
-  const [assistantDraft, setAssistantDraft] = useState('')
-  const [assistantContexts, setAssistantContexts] = useState<AIContext[]>([])
-  const [assistantPreferences, setAssistantPreferences] = useState(defaultAssistantPreferences)
-  useEffect(() => { const role = state?.aiConfiguration?.role; if (role) setAssistantPreferences(previous => previous.role === role ? previous : { ...previous, role }) }, [state?.aiConfiguration?.role])
+  const { assistantOpen, setAssistantOpen, assistantDraft, setAssistantDraft, assistantContexts, setAssistantContexts, assistantPreferences, setAssistantPreferences } = useAssistantSession(state?.aiConfiguration?.role)
   const [omniboxUrl, setOmniboxUrl] = useState('')
   const [homeSuggestions, setHomeSuggestions] = useState<string[]>([])
   const [showHomeSuggestions, setShowHomeSuggestions] = useState(false)
@@ -314,8 +244,8 @@ function App() {
     window.addEventListener('pointerdown', handleOutside)
     return () => window.removeEventListener('pointerdown', handleOutside)
   }, [])
-  const [passwordOffer, setPasswordOffer] = useState<{ origin: string; username: string; password: string; title?: string } | null>(null)
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestInfo | null>(null)
+  const [passwordPrompt, setPasswordPrompt] = useState<PasswordSavePromptInfo | null>(null)
   const [readerArticle, setReaderArticle] = useState<ReaderArticle | null>(null)
   const targetWorkstageSpace = state?.spaces.find(space => space.id === (workstageSpaceId || state.activeSpaceId)) || state?.spaces[0]
   const session = targetWorkstageSpace ? contextSession(targetWorkstageSpace) : emptySession()
@@ -323,81 +253,6 @@ function App() {
   const activeTabId = tabs.some(tab => tab.id === session.activeTabId) ? session.activeTabId : tabs[0]?.id || ''
   const splitTabId = tabs.some(tab => tab.id === session.splitTabId) ? session.splitTabId || null : null
   const activeTab = tabs.find(tab => tab.id === activeTabId)
-
-  async function syncCalendars(targetState?: AppState, reference = new Date(), silent = false) {
-    const s = targetState || state
-    if (!s) return
-    const subs = s.calendarSubscriptions || []
-    if (!subs.length) return
-    setIsRefreshingCalendar(true)
-    try {
-      const allEvents: CalendarEvent[] = []
-      const results = new Map<string, { error?: string; lastFetchedAt?: string }>()
-      for (const sub of subs) {
-        try {
-          const raw = bridge.integrations && sub.secretId ? await bridge.integrations.fetchCalendarSource(sub.id) : bridge.fetchCalendar
-            ? await bridge.fetchCalendar(sub.url)
-            : await fetch(normalizeCalendarUrl(sub.url)).then(r => r.text())
-          const parsed = parseCalendar(raw, reference, sub.id)
-          allEvents.push(...parsed)
-          results.set(sub.id, { lastFetchedAt: new Date().toISOString() })
-        } catch (e) {
-          results.set(sub.id, { error: e instanceof Error ? e.message : 'Не удалось обновить календарь' })
-        }
-      }
-      const range = calendarRange(reference)
-      commit(prev => {
-        const enabled = new Set(prev.calendarSubscriptions?.map(item => item.id))
-        const retained = (prev.events || []).filter(event => !event.sourceId || enabled.has(event.sourceId) && (results.get(event.sourceId)?.error || Date.parse(event.endAt) < range.start.getTime() || Date.parse(event.startAt) > range.end.getTime()))
-        const unique = new Map([...retained, ...allEvents.filter(event => enabled.has(event.sourceId!)).map(event => { const old = prev.events?.find(item => item.id === event.id); return { ...event, spaceId: old?.spaceId, noticeMinutes: old?.noticeMinutes } })].map(event => [event.id, event]))
-        return { ...prev, events: [...unique.values()], reminders: prev.reminders.map(item => {
-          if (item.trigger?.kind !== 'event') return item
-          const event = unique.get(item.trigger.eventId)
-          const dueAt = event ? new Date(Date.parse(event.endAt) + item.trigger.offsetMinutes * 60000).toISOString() : null
-          return item.dueAt === dueAt ? item : { ...item, dueAt, notifiedAt: undefined }
-        }), calendarSubscriptions: prev.calendarSubscriptions?.map(sub => results.has(sub.id) ? { ...sub, ...results.get(sub.id), error: results.get(sub.id)?.error } : sub) }
-      })
-      if (!silent) setToast(`Календарь обновлён: событий ${allEvents.length}. Ошибок: ${[...results.values()].filter(item => item.error).length}.`)
-    } catch {
-      setToast('Не удалось обновить календарь.')
-    } finally {
-      setIsRefreshingCalendar(false)
-    }
-  }
-
-  async function addCalendar() {
-    const url = newCalendarUrl.trim()
-    const name = newCalendarName.trim() || 'Мой календарь'
-    if (!url) { setToast('Укажите ссылку на календарь.'); return }
-    if (bridge.integrations) {
-      try { await bridge.integrations.addCalendar(name, url); setNewCalendarName(''); setNewCalendarUrl(''); setToast('Календарь подключён. Адрес сохранён в защищённом хранилище.') }
-      catch (error) { setToast(error instanceof Error ? error.message : 'Не удалось подключить календарь') }
-      return
-    }
-    const sub: CalendarSubscription = {
-      id: crypto.randomUUID(),
-      name,
-      url: normalizeCalendarUrl(url),
-      lastFetchedAt: new Date().toISOString()
-    }
-    const nextSubs = [...(state?.calendarSubscriptions || []), sub]
-    commit(prev => ({ ...prev, calendarSubscriptions: nextSubs }))
-    setNewCalendarName('')
-    setNewCalendarUrl('')
-    setToast(`Календарь «${name}» добавлен.`)
-    if (state) syncCalendars({ ...state, calendarSubscriptions: nextSubs })
-  }
-
-  function removeCalendar(id: string) {
-    if (bridge.integrations) { bridge.integrations.removeCalendar(id).then(() => setToast('Календарь отключён.')).catch(error => setToast(error.message)); return }
-    commit(prev => ({
-      ...prev,
-      calendarSubscriptions: (prev.calendarSubscriptions || []).filter(s => s.id !== id)
-      , events: (prev.events || []).filter(event => event.sourceId !== id)
-    }))
-    setToast('Календарь отключён.')
-  }
-
 
   useEffect(() => {
     bridge.getAutostart().then(setAutostart).catch(() => undefined)
@@ -448,14 +303,6 @@ function App() {
         return updateContextSession(value, session => ({ ...session, tabs: [...session.tabs, tab], activeTabId: event.background ? session.activeTabId : tab.id }), new Date().toISOString(), parent.contextId, !event.background)
       }) }))
       else if (event.type === 'shortcut') handleShortcut(event.key, event.shift, event.alt)
-      else if (event.type === 'password-offer') {
-        setPasswordOffer({
-          origin: event.origin,
-          username: event.username,
-          password: event.password,
-          title: event.title
-        })
-      }
       else if (event.type === 'permission-request') {
         setPermissionRequest({
           id: event.id,
@@ -464,6 +311,16 @@ function App() {
           origin: event.origin,
           permission: event.permission,
           details: event.details
+        })
+      }
+      else if (event.type === 'password-save-offer') {
+        setPasswordPrompt({
+          id: crypto.randomUUID(),
+          tabId: event.tabId,
+          origin: event.origin,
+          hostname: event.hostname,
+          username: event.username,
+          password: event.password
         })
       }
       else if (event.type === 'adblock-stats') {
@@ -490,7 +347,29 @@ function App() {
 
   useEffect(() => {
     setReaderArticle(null)
+    setPasswordPrompt(null)
   }, [activeTabId])
+
+  const handlePasswordPromptSave = async (username: string, password: string) => {
+    if (!passwordPrompt || !bridge.vault?.saveCredential) return
+    try {
+      await bridge.vault.saveCredential({
+        origin: passwordPrompt.origin,
+        username,
+        password,
+        title: passwordPrompt.hostname
+      })
+      setToast(`Пароль для ${passwordPrompt.hostname} сохранён`)
+    } catch {
+      setToast('Не удалось сохранить пароль')
+    } finally {
+      setPasswordPrompt(null)
+    }
+  }
+
+  const handlePasswordPromptDismiss = () => {
+    setPasswordPrompt(null)
+  }
 
   const handleToggleReader = async () => {
     if (readerArticle) {
@@ -524,6 +403,31 @@ function App() {
     const timer = window.setTimeout(() => setToast(''), 4200)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  const undoTimerRef = useRef<number | undefined>(undefined)
+
+  const clearUndoTimer = useCallback(() => {
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = undefined
+    }
+  }, [])
+
+  const startUndoTimer = useCallback((delay = 6000) => {
+    clearUndoTimer()
+    undoTimerRef.current = window.setTimeout(() => {
+      setUndoAction(null)
+    }, delay)
+  }, [clearUndoTimer])
+
+  useEffect(() => {
+    if (undoAction) {
+      startUndoTimer(6000)
+    } else {
+      clearUndoTimer()
+    }
+    return () => clearUndoTimer()
+  }, [undoAction, startUndoTimer, clearUndoTimer])
 
   useEffect(() => {
     let active = true
@@ -559,7 +463,7 @@ function App() {
         event.preventDefault()
         focusAddress()
       }
-      if ((event.ctrlKey || event.metaKey) && ['d', 't', 'w', 'tab', 'h'].includes(event.key.toLowerCase())) { event.preventDefault(); handleShortcut(event.key.toLowerCase(), event.shiftKey, event.altKey) }
+      if ((event.ctrlKey || event.metaKey) && ['d', 't', 'w', 'tab'].includes(event.key.toLowerCase())) { event.preventDefault(); handleShortcut(event.key.toLowerCase(), event.shiftKey, event.altKey) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -594,14 +498,6 @@ function App() {
     setTabsOverviewScope(scope)
     setTabsOverviewOpen(true)
   }
-
-  const calendarSources = state?.calendarSubscriptions?.map(item => `${item.id}:${item.secretId || item.url}`).join('|') || ''
-  useEffect(() => {
-    if (!state || !calendarSources) return
-    syncCalendars(state, new Date(), true)
-    const timer = window.setInterval(() => syncCalendars(undefined, new Date(), true), 15 * 60 * 1000)
-    return () => window.clearInterval(timer)
-  }, [state === null, calendarSources])
 
   function updateSession(updater: (previous: BrowserSession) => BrowserSession) {
     const spaceId = targetWorkstageSpace?.id
@@ -649,7 +545,11 @@ function App() {
     const saved = await commit(previous => {
       const previousSpace = previous.spaces.find(space => space.id === previousId)
       const saved = previousSpace && hasCabinetWork(previousSpace) ? saveCheckpoint(previous, previousSpace.id) : previous
-      return newCabinet(saved, id, tabId, tones[previous.spaces.filter(space => space.kind !== 'web').length % tones.length])
+      const withCabinet = newCabinet(saved, id, tabId, tones[previous.spaces.filter(space => space.kind !== 'web').length % tones.length])
+      return {
+        ...withCabinet,
+        dashboard: withCabinet.dashboard ? { ...withCabinet.dashboard, resumeDismissed: false } : withCabinet.dashboard
+      }
     })
     if (!saved) return
     setSpacePanelOpen(false); setBrowserDayOpen(false); setModal(null)
@@ -810,20 +710,17 @@ function App() {
     ]
   }
 
-  function startCabinetDrag(event: DragEvent<HTMLElement>, value: CabinetDrag) {
-    if (pointerCabinet.isPending()) { event.preventDefault(); return }
-    event.stopPropagation(); writeCabinetDrag(event, value); cabinetDragRef.current = value; setCabinetDrag(value)
-  }
-  function finishCabinetDrag() { cabinetDragRef.current = null; setCabinetDrag(null); setCabinetDrop(null); setCabinetTabDrop('') }
-
   function spaceInteractions(space: Space, pin = false): HTMLAttributes<HTMLElement> {
-    if (!isCabinetPreview) return {}
     return {
       draggable: true,
-      onPointerDown: event => pointerCabinet.start(event, { kind: 'space', spaceId: space.id, id: space.id }),
+      onPointerDown: event => {
+        if (isCabinetPreview && !pin) pointerCabinet.start(event, { kind: 'space', spaceId: space.id, id: space.id })
+      },
       onContextMenu: event => spaceContext.open(event, `Действия с пространством «${space.name}»`, spaceActions(space)),
       onKeyDown: event => spaceContext.open(event, `Действия с пространством «${space.name}»`, spaceActions(space)),
-      onDragStart: event => startCabinetDrag(event, { kind: 'space', spaceId: space.id, id: space.id }),
+      onDragStart: event => {
+        if (isCabinetPreview && !pin) startCabinetDrag(event, { kind: 'space', spaceId: space.id, id: space.id })
+      },
       onDragEnd: finishCabinetDrag,
       onDragOver: event => {
         const dragging = cabinetDragRef.current
@@ -921,7 +818,12 @@ function App() {
     }
     const isStream = modal === 'newStream'
     const space: Space = { id: crypto.randomUUID(), name, tone: newSpaceTone, kind: isStream ? 'stream' : 'base', resources: [], ...(isStream ? { activeSession: emptySession() } : {}) }
-    commit(previous => ({ ...previous, activeSpaceId: space.id, spaces: [...previous.spaces, space] }))
+    commit(previous => ({
+      ...previous,
+      activeSpaceId: space.id,
+      spaces: [...previous.spaces, space],
+      dashboard: previous.dashboard ? { ...previous.dashboard, resumeDismissed: false } : previous.dashboard
+    }))
     setNewSpaceName('')
     setModal(null)
     if (isStream) {
@@ -1589,20 +1491,7 @@ function App() {
 
   const activeTopSpaceId = currentSpace?.id || targetWorkstageSpace?.id
   const availableTopSpaces = state ? state.spaces.filter(space => !space.archivedAt && space.kind !== 'web') : []
-  const visibleTopSpaces = useMemo(() => {
-    if (availableTopSpaces.length <= 4) return availableTopSpaces
-    const sorted = [...availableTopSpaces].sort((a, b) => {
-      const timeA = Date.parse(a.lastActiveAt || a.checkpoint?.savedAt || '') || 0
-      const timeB = Date.parse(b.lastActiveAt || b.checkpoint?.savedAt || '') || 0
-      return timeB - timeA
-    })
-    const top4 = sorted.slice(0, 4)
-    if (activeTopSpaceId && !top4.some(s => s.id === activeTopSpaceId)) {
-      const activeSpace = availableTopSpaces.find(s => s.id === activeTopSpaceId)
-      if (activeSpace) top4[3] = activeSpace
-    }
-    return availableTopSpaces.filter(space => top4.some(s => s.id === space.id))
-  }, [availableTopSpaces, activeTopSpaceId])
+  const visibleTopSpaces = availableTopSpaces
 
   useLayoutEffect(() => {
     const el = spacesViewportRef.current
@@ -1611,9 +1500,9 @@ function App() {
     const measure = () => {
       const max = Math.max(0, el.scrollWidth - el.clientWidth)
       const offset = Math.max(0, Math.min(max, el.scrollLeft))
-      const before = offset > 2
-      const after = offset < max - 2
       const hasOverflow = max > 2
+      const before = hasOverflow && offset > 2
+      const after = hasOverflow && offset < max - 2
       setSpacesEdges(prev => prev.before === before && prev.after === after && prev.hasOverflow === hasOverflow ? prev : { before, after, hasOverflow })
     }
 
@@ -1621,8 +1510,12 @@ function App() {
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
     observer?.observe(el)
     if (el.firstElementChild) observer?.observe(el.firstElementChild)
+    if (el.parentElement) observer?.observe(el.parentElement)
     el.addEventListener('scroll', measure, { passive: true })
     window.addEventListener('resize', measure)
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(measure).catch(() => {})
+    }
 
     const wheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaY) < Math.abs(event.deltaX) || event.ctrlKey) return
@@ -1641,7 +1534,7 @@ function App() {
       el.removeEventListener('wheel', wheel)
       window.removeEventListener('resize', measure)
     }
-  }, [visibleTopSpaces.length])
+  }, [visibleTopSpaces.length, state?.spaces])
 
   useLayoutEffect(() => {
     const el = spacesViewportRef.current
@@ -1663,6 +1556,14 @@ function App() {
       })
     }
   }, [activeTopSpaceId, currentSpace?.id, visibleTopSpaces.length, isWorkstageOpen, showSpaces])
+
+  cabinetActions.current = { spaces: () => state?.spaces, reorderTab, reorderSpace, moveTab, copyToCabinet }
+
+  const spacesTabDrag = useSpacesTabDrag({
+    viewportRef: spacesViewportRef,
+    spaces: visibleTopSpaces,
+    onReorderSpace: (id, targetId, after) => reorderSpace(id, targetId, after)
+  })
 
   if (!state) return <div className="loading-screen"><span className="brand-mark">✳</span><span>{toast || 'Загрузка…'}</span></div>
 
@@ -1724,6 +1625,9 @@ function App() {
           onSearch={() => setModal('search')} onHistory={() => setModal('history')} onSettings={() => openSettings()} onPark={parkSpace}
           permissionRequest={permissionRequest && (!permissionRequest.tabId || permissionRequest.tabId === activeTabId) ? permissionRequest : null}
           onPermissionResponse={handlePermissionResponse}
+          passwordPrompt={passwordPrompt && (!passwordPrompt.tabId || passwordPrompt.tabId === activeTabId) ? passwordPrompt : null}
+          onPasswordPromptSave={handlePasswordPromptSave}
+          onPasswordPromptDismiss={handlePasswordPromptDismiss}
           onReaderMode={handleToggleReader}
           isReaderActive={Boolean(readerArticle)}
         /> : <header className="browser-chrome">
@@ -1791,7 +1695,9 @@ function App() {
             <div className="chrome-actions">
               <button className={`chrome-button chrome-browser ${isWorkstageOpen && targetWorkstageSpace?.kind === 'web' ? 'selected' : ''}`} onClick={openWeb} aria-label={t('nav.browser')} aria-pressed={isWorkstageOpen && targetWorkstageSpace?.kind === 'web'} title={t('nav.browser')}><Globe2 size={18} /><span>{t('nav.browser')}</span></button>
               <button className="chrome-button chrome-tab-desk" onClick={() => openTabsOverview()} title="Стол · Ctrl Shift A" aria-label="Обзор и поиск вкладок"><LayoutGrid size={18} /></button>
-              <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => { setAssistantContexts([]); setAssistantOpen(true) }} aria-label={t('nav.assistant')} title={`ИИ · ${assistantRoles[assistantPreferences.role].label}`}><Sparkles size={19} strokeWidth={1.7} /></button>
+              {isAssistantEnabled && (
+                <button className={`chrome-button chrome-assistant ${assistantOpen ? 'selected' : ''}`} onClick={() => { setAssistantContexts([]); setAssistantOpen(true) }} aria-label={t('nav.assistant')} title={`ИИ · ${assistantRoles[assistantPreferences.role].label}`}><Sparkles size={19} strokeWidth={1.7} /></button>
+              )}
               <button className="chrome-button" onClick={() => setModal('search')} title={`${t('nav.search_dom')} · Ctrl K`} aria-label={t('nav.search_dom')}><Search size={19} /></button>
               <button className="chrome-button" onClick={() => openSettings()} aria-label={t('nav.settings')}><Settings2 size={19} /></button>
               {(() => {
@@ -1814,50 +1720,120 @@ function App() {
           </div>
           {!isWorkstageOpen && <div className="chrome-secondary">
             <nav className="chrome-spaces" aria-label="Пространства">
-              <div
-                className={`chrome-spaces-viewport ${spacesEdges.before ? 'has-before' : ''} ${spacesEdges.after ? 'has-after' : ''}`}
-                ref={spacesViewportRef}
-              >
-                <FluidGroup as="div" className="chrome-spaces-track" itemSelector=":scope > .chrome-space">
-                  <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
-                  {visibleTopSpaces.map(space => {
-                    const displayName = formatSpaceDisplayName(space)
-                    return <button {...spaceInteractions(space, true)} key={space.id} data-space-id={space.id} data-cabinet-space-target={isCabinetPreview || undefined}
-                      className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}${cabinetDrop?.id === space.id ? ' is-drop-target' : ''}${space.pinned ? ' is-pinned' : ''}`}
-                      onClick={() => openSpace(space.id)} title={`Продолжить: ${displayName}`}>{displayName}</button>
-                  })}
-                </FluidGroup>
+              <div className="chrome-spaces-home">
+                <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
               </div>
-              {(spacesEdges.hasOverflow || spacesEdges.before || spacesEdges.after) && (
-                <div className="chrome-spaces-scroll-arrows" aria-label="Прокрутка вкладок">
+              <div className="chrome-spaces-scroll-container">
+                <div
+                  className={`chrome-spaces-fade chrome-spaces-fade-left ${spacesEdges.hasOverflow && spacesEdges.before ? 'is-visible' : ''}`}
+                  aria-hidden={!spacesEdges.hasOverflow || !spacesEdges.before}
+                >
                   <button
                     type="button"
                     className="chrome-spaces-scroll-btn chrome-scroll-left"
-                    disabled={!spacesEdges.before}
+                    disabled={!spacesEdges.hasOverflow || !spacesEdges.before}
                     onPointerDown={() => startSpacesHoldScroll(-1)}
                     onPointerUp={stopSpacesHoldScroll}
                     onPointerLeave={stopSpacesHoldScroll}
                     onPointerCancel={stopSpacesHoldScroll}
                     aria-label="Прокрутить вкладки влево"
                     title="Влево"
+                    tabIndex={spacesEdges.hasOverflow && spacesEdges.before ? 0 : -1}
                   >
                     <ChevronLeft size={16} />
                   </button>
+                </div>
+                <div
+                  className={`chrome-spaces-viewport ${spacesEdges.hasOverflow && spacesEdges.before ? 'has-before' : ''} ${spacesEdges.hasOverflow && spacesEdges.after ? 'has-after' : ''}`}
+                  ref={spacesViewportRef}
+                  onDragOver={spacesTabDrag.dragId ? spacesTabDrag.previewDrag : undefined}
+                  onDrop={spacesTabDrag.dragId ? spacesTabDrag.dropTab : undefined}
+                >
+                  <FluidGroup as="div" className={`chrome-spaces-track ${spacesTabDrag.dragId ? 'is-reordering' : ''}`} itemSelector=":scope > .chrome-space">
+                    {visibleTopSpaces.map(space => {
+                      const displayName = formatSpaceDisplayName(space)
+                      const isDragging = spacesTabDrag.dragId === space.id
+                      const interactions = spaceInteractions(space, true)
+                      return (
+                        <button
+                          {...interactions}
+                          key={space.id}
+                          data-space-id={space.id}
+                          data-cabinet-space-target={isCabinetPreview || undefined}
+                          style={spacesTabDrag.previewStyle(space.id)}
+                          className={`chrome-space ${(isWorkstageOpen && space.id === targetWorkstageSpace?.id) || currentSpace?.id === space.id ? 'selected' : ''}${cabinetDrop?.id === space.id ? ' is-drop-target' : ''}${space.pinned ? ' is-pinned' : ''}${isDragging ? ' is-dragging' : ''}`}
+                          onPointerDown={event => {
+                            spacesTabDrag.onPointerDown(event, space)
+                            interactions.onPointerDown?.(event)
+                          }}
+                          onDragStart={event => {
+                            spacesTabDrag.startDrag(event, space)
+                            interactions.onDragStart?.(event)
+                          }}
+                          onDragOver={event => {
+                            if (spacesTabDrag.dragId) {
+                              spacesTabDrag.previewDrag(event)
+                            } else {
+                              interactions.onDragOver?.(event)
+                            }
+                          }}
+                          onDrop={event => {
+                            if (spacesTabDrag.dragId) {
+                              spacesTabDrag.dropTab(event)
+                            } else {
+                              interactions.onDrop?.(event)
+                            }
+                          }}
+                          onDragEnd={event => {
+                            spacesTabDrag.finishDrag()
+                            interactions.onDragEnd?.(event)
+                          }}
+                          onClick={() => {
+                            if (spacesTabDrag.suppressClick.current) return
+                            openSpace(space.id)
+                          }}
+                          title={`Продолжить: ${displayName}`}
+                        >
+                          {displayName}
+                        </button>
+                      )
+                    })}
+                  </FluidGroup>
+                </div>
+                {spacesTabDrag.dragPointer && spacesTabDrag.dragLayout.current && spacesTabDrag.draggedSpace && typeof document !== 'undefined' && document.body && createPortal(
+                  <div
+                    className="chrome-space-drag-preview"
+                    aria-hidden="true"
+                    style={{
+                      left: spacesTabDrag.dragPointer.x - spacesTabDrag.dragLayout.current.grabOffset,
+                      top: spacesTabDrag.dragPointer.y - 16,
+                      width: spacesTabDrag.dragLayout.current.width
+                    }}
+                  >
+                    <span>{formatSpaceDisplayName(spacesTabDrag.draggedSpace)}</span>
+                  </div>,
+                  document.body
+                )}
+                <div
+                  className={`chrome-spaces-fade chrome-spaces-fade-right ${spacesEdges.hasOverflow && spacesEdges.after ? 'is-visible' : ''}`}
+                  aria-hidden={!spacesEdges.hasOverflow || !spacesEdges.after}
+                >
                   <button
                     type="button"
                     className="chrome-spaces-scroll-btn chrome-scroll-right"
-                    disabled={!spacesEdges.after}
+                    disabled={!spacesEdges.hasOverflow || !spacesEdges.after}
                     onPointerDown={() => startSpacesHoldScroll(1)}
                     onPointerUp={stopSpacesHoldScroll}
                     onPointerLeave={stopSpacesHoldScroll}
                     onPointerCancel={stopSpacesHoldScroll}
                     aria-label="Прокрутить вкладки вправо"
                     title="Вправо"
+                    tabIndex={spacesEdges.hasOverflow && spacesEdges.after ? 0 : -1}
                   >
                     <ChevronRight size={16} />
                   </button>
                 </div>
-              )}
+              </div>
               <div className="chrome-spaces-actions">
                 <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => setRoute({ type: 'spaces' })}>Все пространства</button>
                 <button className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Создать пространство"><Plus size={17} /></button>
@@ -1904,6 +1880,7 @@ function App() {
               newsRefreshing={news.refreshing}
               onCalendarRange={date => syncCalendars(undefined, date, true)}
               covers={tabCovers}
+              onNewSpace={createStream}
             />
           ) : (
             <Workstage
@@ -1959,7 +1936,7 @@ function App() {
           )
         ) : showSpaces && !currentSpace ? (
           <SpacesOverview spaces={availableTopSpaces} hasArchive={state.spaces.some(space => space.archivedAt)} onOpen={openSpace} onCreate={createStream} onArchive={() => setModal('archive')}
-            onPin={toggleSpacePin} onRename={renameCabinet} onArchiveSpace={archiveSpace} onDelete={space => { setSpaceActionId(space.id); setModal('deleteSpace') }} interactions={spaceInteractions} actionsForSpace={isCabinetPreview ? spaceActions : undefined} dropSpaceId={cabinetDrop?.id} />
+            onPin={toggleSpacePin} onRename={renameCabinet} onArchiveSpace={archiveSpace} onDelete={space => { setSpaceActionId(space.id); setModal('deleteSpace') }} interactions={spaceInteractions} actionsForSpace={spaceActions} dropSpaceId={cabinetDrop?.id} />
         ) : currentSpace && (
           <main className={`collection-stage space-detail tone-context-${currentSpace.tone}${isCabinetPreview ? ' cabinet-detail' : ''}`} aria-label={currentSpace.name}>
             <div className="collection-header">
@@ -2165,40 +2142,26 @@ function App() {
         {modal === 'newLink' && <><span className="modal-kicker"><Globe2 size={16} /> СОХРАНИТЬ САЙТ</span><div className="form-stack"><label>Название<input value={linkName} onChange={event => setLinkName(event.target.value)} /></label><label>Адрес<input value={linkUrl} onChange={event => setLinkUrl(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addLink() }} /></label></div><div className="modal-bottom end"><button className="primary-button" onClick={addLink}>Добавить <ArrowRight size={17} /></button></div></>}
         {modal === 'weather' && <WeatherDetails weather={weather} now={time} onOpenTraffic={openTraffic} />}
       </Dialog>}
-      {passwordOffer && (
-        <div className="calm-password-prompt" role="alert">
-          <div className="calm-password-prompt-info">
-            <span className="calm-password-prompt-title">Сохранить пароль?</span>
-            <span className="calm-password-prompt-sub">
-              {passwordOffer.username ? `${passwordOffer.username} · ` : ''}{(() => {
-                try { return new URL(passwordOffer.origin).hostname } catch { return passwordOffer.origin }
-              })()}
-            </span>
-          </div>
-          <div className="calm-password-prompt-actions">
-            <button className="soft-button" onClick={() => setPasswordOffer(null)}>Не сейчас</button>
-            <button className="calm-primary" onClick={async () => {
-              try {
-                if (bridge.vault) {
-                  await bridge.vault.saveCredential({
-                    origin: passwordOffer.origin,
-                    username: passwordOffer.username,
-                    password: passwordOffer.password,
-                    title: passwordOffer.title || new URL(passwordOffer.origin).hostname
-                  })
-                  setToast('Пароль сохранён в локальный менеджер')
-                }
-              } catch {
-                setToast('Не удалось сохранить пароль')
-              } finally {
-                setPasswordOffer(null)
-              }
-            }}>Сохранить</button>
-          </div>
+      {toast && <div className="toast" role="status"><span>{toast}</span>{Boolean(resumeStatus?.result?.failures.length) && <button disabled={resumeStatus?.pending} onClick={() => resumeContext(resumeStatus!.spaceId, resumeStatus!.contextId, true)}>Повторить неоткрытые</button>}<button onClick={() => setToast('')} aria-label="Закрыть"><X size={15} /></button></div>}
+      {undoAction && !tabsOverviewOpen && (
+        <div
+          className="calm-undo"
+          role="status"
+          onMouseEnter={clearUndoTimer}
+          onMouseLeave={() => startUndoTimer(3000)}
+          onMouseOver={clearUndoTimer}
+          onMouseOut={() => startUndoTimer(3000)}
+          onPointerEnter={clearUndoTimer}
+          onPointerLeave={() => startUndoTimer(3000)}
+          onPointerOver={clearUndoTimer}
+          onPointerOut={() => startUndoTimer(3000)}
+        >
+          <span>{undoAction.label}</span>
+          {undoAction.open && <button onClick={undoAction.open}>Открыть</button>}
+          <button onClick={() => { undoAction.restore(); setUndoAction(null) }}>Вернуть</button>
+          <button aria-label="Закрыть" onClick={() => setUndoAction(null)}><X size={15} /></button>
         </div>
       )}
-      {toast && <div className="toast" role="status"><span>{toast}</span>{Boolean(resumeStatus?.result?.failures.length) && <button disabled={resumeStatus?.pending} onClick={() => resumeContext(resumeStatus!.spaceId, resumeStatus!.contextId, true)}>Повторить неоткрытые</button>}<button onClick={() => setToast('')} aria-label="Закрыть"><X size={15} /></button></div>}
-      {undoAction && !tabsOverviewOpen && <div className="calm-undo" role="status"><span>{undoAction.label}</span>{undoAction.open && <button onClick={undoAction.open}>Открыть</button>}<button onClick={() => { undoAction.restore(); setUndoAction(null) }}>Вернуть</button><button aria-label="Закрыть" onClick={() => setUndoAction(null)}><X size={15} /></button></div>}
       {windowPickerSpaceId && (
         <OpenWindowPickerModal
           space={state.spaces.find(s => s.id === windowPickerSpaceId)!}

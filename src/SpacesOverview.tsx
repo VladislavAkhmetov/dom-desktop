@@ -4,7 +4,6 @@ import type { Space } from './types'
 import { SpacePreview, spaceContents } from './SpacePreview'
 import './spaces.css'
 import { ActionMenu, type MenuAction } from './ActionMenu'
-import { isCabinetPreview } from './cabinetMode'
 
 export function SpacesOverview({ spaces, hasArchive, onOpen, onCreate, onArchive, onPin, onRename, onArchiveSpace, onDelete, interactions, actionsForSpace, dropSpaceId }: { spaces: Space[]; hasArchive: boolean; onOpen: (id: string) => void; onCreate: () => void; onArchive: () => void; onPin?: (space: Space) => void; onRename?: (space: Space) => void; onArchiveSpace?: (space: Space) => void; onDelete?: (space: Space) => void; interactions?: (space: Space) => HTMLAttributes<HTMLElement>; actionsForSpace?: (space: Space) => MenuAction[]; dropSpaceId?: string }) {
   const scroller = useRef<HTMLDivElement>(null)
@@ -55,23 +54,42 @@ export function SpacesOverview({ spaces, hasArchive, onOpen, onCreate, onArchive
     </div></div>
     <div className={`spaces-rail${edges.before ? ' has-before' : ''}${edges.after ? ' has-after' : ''}`}>
       <div className="spaces-scroller" ref={scroller} id={scrollbarId} aria-label="Список пространств" tabIndex={0} onKeyDown={event => { if (event.target !== event.currentTarget) return; if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); move(event.key === 'ArrowRight' ? 1 : -1) } }}>
-        {spaces.map(space => isCabinetPreview ? <div {...interactions?.(space)} data-cabinet-space-target className={`overview-space cabinet-card card tone-${space.tone}${edges.peekingId === space.id ? ' is-peeking' : ''}${dropSpaceId === space.id ? ' is-drop-target' : ''}`} key={space.id} data-space-id={space.id}>
-          <button draggable={Boolean(interactions)} className="overview-space-open" title={space.name} onClick={() => onOpen(space.id)}>
-            <SpacePreview space={space} />
-            <span className="space-card-copy"><strong>{space.name}</strong><small>{space.checkpoint?.nextStep || spaceContents(space) || 'Пустое пространство'}</small></span>
-            <span className="overview-arrow"><ArrowUpRight size={19} /></span>
-          </button>
-          <ActionMenu className="overview-space-menu" label={`Действия с пространством «${space.name}»`} actions={actionsForSpace?.(space) || [
-            { label: space.pinned ? 'Открепить из меню' : 'Закрепить в меню', icon: <Pin size={16} />, onSelect: () => onPin?.(space) },
-            { label: 'Переименовать', icon: <Pencil size={16} />, onSelect: () => onRename?.(space) },
-            { label: 'В архив', icon: <Archive size={16} />, onSelect: () => onArchiveSpace?.(space) },
-            { label: 'Удалить пространство', icon: <Trash2 size={16} />, onSelect: () => onDelete?.(space) }
-          ]} />
-        </div> : <button className={`overview-space card tone-${space.tone}${edges.peekingId === space.id ? ' is-peeking' : ''}`} key={space.id} data-space-id={space.id} title={space.name} onClick={() => onOpen(space.id)}>
-          <SpacePreview space={space} />
-          <span className="space-card-copy"><strong>{space.name}</strong>{(space.checkpoint?.nextStep || spaceContents(space)) && <small>{space.checkpoint?.nextStep || spaceContents(space)}</small>}</span>
-          <span className="overview-arrow"><ArrowUpRight size={19} /></span>
-        </button>)}
+        {spaces.map(space => {
+          const subtitle = space.checkpoint?.nextStep || spaceContents(space)
+          return (
+            <div
+              {...interactions?.(space)}
+              data-cabinet-space-target
+              className={`overview-space cabinet-card card tone-${space.tone}${edges.peekingId === space.id ? ' is-peeking' : ''}${dropSpaceId === space.id ? ' is-drop-target' : ''}`}
+              key={space.id}
+              data-space-id={space.id}
+            >
+              <button
+                draggable={Boolean(interactions && interactions(space)?.draggable)}
+                className="overview-space-open"
+                title={space.name}
+                onClick={() => onOpen(space.id)}
+              >
+                <SpacePreview space={space} />
+                <span className="space-card-copy">
+                  <strong>{space.name}</strong>
+                  {subtitle && <small>{subtitle}</small>}
+                </span>
+                <span className="overview-arrow"><ArrowUpRight size={19} /></span>
+              </button>
+              <ActionMenu
+                className="overview-space-menu"
+                label={`Действия с пространством «${space.name}»`}
+                actions={actionsForSpace?.(space) || [
+                  { label: space.pinned ? 'Открепить из меню' : 'Закрепить в меню', icon: <Pin size={16} />, onSelect: () => onPin?.(space) },
+                  { label: 'Переименовать', icon: <Pencil size={16} />, onSelect: () => onRename?.(space) },
+                  { label: 'В архив', icon: <Archive size={16} />, onSelect: () => onArchiveSpace?.(space) },
+                  { label: 'Удалить пространство', icon: <Trash2 size={16} />, onSelect: () => onDelete?.(space) }
+                ]}
+              />
+            </div>
+          )
+        })}
       </div>
     </div>
     {edges.max > 2 && <div className={`spaces-scrollbar${dragging ? ' is-dragging' : ''}`} role="scrollbar" aria-label="Прокрутка пространств" aria-orientation="horizontal" aria-controls={scrollbarId} aria-valuemin={0} aria-valuemax={Math.round(edges.max)} aria-valuenow={Math.round(edges.offset)} tabIndex={0} onPointerDown={event => {

@@ -1,4 +1,4 @@
-.ambient-preview { position: relative; width: fit-content; color: var(--ink, #28473e); -webkit-app-region: no-drag; }
+.ambient-preview { position: relative; width: fit-content; color: inherit; -webkit-app-region: no-drag; }
 .ambient-preview:has(.ambient-card) { z-index: 70; }
 .ambient-preview > button { position: relative; isolation: isolate; }
 .ambient-preview > button::before { content: ''; position: absolute; inset: -5px -9px; z-index: -1; border: 1px solid transparent; border-radius: 19px; background: rgba(255,255,255,0); transition: background .18s, border-color .18s, box-shadow .18s; }
@@ -6,7 +6,7 @@
 .ambient-weather > button::before { inset: -4px -8px; border-radius: 13px; }
 .ambient-card-anchor { position: absolute; top: 100%; left: -9px; width: min(296px, calc(100vw - 24px)); padding-top: 14px; }
 .ambient-weather .ambient-card-anchor { left: auto; right: -8px; }
-.ambient-card { max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 18px 17px 10px; border: 1px solid rgba(255,255,255,.8); border-radius: 24px; background: linear-gradient(145deg,rgba(255,255,255,.94),rgba(241,247,243,.91)); backdrop-filter: blur(28px) saturate(1.35); -webkit-backdrop-filter: blur(28px) saturate(1.35); box-shadow: 0 18px 48px -15px rgba(30,58,48,.27), 0 3px 10px rgba(30,58,48,.06), inset 0 1px 0 #fff; animation: ambient-card-in .18s cubic-bezier(.2,.8,.2,1); transform-origin: top left; }
+.ambient-card { max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 18px 17px 10px; border: 1px solid rgba(255,255,255,.8); border-radius: 24px; background: linear-gradient(145deg,rgba(255,255,255,.94),rgba(241,247,243,.91)); backdrop-filter: blur(28px) saturate(1.35); -webkit-backdrop-filter: blur(28px) saturate(1.35); box-shadow: 0 18px 48px -15px rgba(30,58,48,.27), 0 3px 10px rgba(30,58,48,.06), inset 0 1px 0 #fff; animation: ambient-card-in .18s cubic-bezier(.2,.8,.2,1); transform-origin: top left; color: var(--ink, #1c2621); }
 .ambient-weather .ambient-card { transform-origin: top right; }
 .ambient-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
 .ambient-card-heading h2 { font-size: 15px; font-weight: 700; letter-spacing: -.025em; line-height: 1.4; }

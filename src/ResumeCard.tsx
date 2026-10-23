@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { AppWindow, ArrowRight, ArrowUpRight, Check, FileText, Folder, Globe2, Pencil } from 'lucide-react'
+import { AppWindow, ArrowRight, ArrowUpRight, Check, FileText, Folder, Layers, Pencil, Plus } from 'lucide-react'
 import { ActionMenu } from './ActionMenu'
 import { FluidButton } from './FluidMotion'
 import type { Resource } from './types'
@@ -20,13 +20,19 @@ function tabSubtitle(tabs: BrowserTab[], documents: Resource[], contextTitle: st
   if (active?.url) {
     try {
       const u = new URL(active.url)
-      const domain = u.hostname.replace(/^www\./, '')
+      const rawDomain = u.hostname.replace(/^www\./, '')
+      const domain = rawDomain === 'localhost' || rawDomain === '127.0.0.1' ? '' : rawDomain
       const extra = tabs.length - 1
-      if (extra > 0) {
-        const word = extra === 1 ? 'вкладка' : (extra >= 2 && extra <= 4) ? 'вкладки' : 'вкладок'
-        parts.push(`${domain} · ещё ${extra} ${word}`)
-      } else {
-        parts.push(domain)
+      if (domain) {
+        if (extra > 0) {
+          const word = extra === 1 ? 'вкладка' : (extra >= 2 && extra <= 4) ? 'вкладки' : 'вкладок'
+          parts.push(`${domain} · ещё ${extra} ${word}`)
+        } else {
+          parts.push(domain)
+        }
+      } else if (extra > 0) {
+        const totalWord = tabs.length === 1 ? 'вкладка' : (tabs.length >= 2 && tabs.length <= 4) ? 'вкладки' : 'вкладок'
+        parts.push(`${tabs.length} ${totalWord}`)
       }
     } catch {
       if (tabs.length > 0) parts.push(`${tabs.length} вкл.`)
@@ -38,7 +44,7 @@ function tabSubtitle(tabs: BrowserTab[], documents: Resource[], contextTitle: st
   if (documents.length > 0) {
     parts.push(`${documents.length} док.`)
   }
-  return parts.join(' · ') || 'Готово к продолжению'
+  return parts.filter(Boolean).join(' · ') || 'Готово к продолжению'
 }
 
 export function ParkedCoversStack({ spaceId, covers }: { spaceId: string; covers: { id: string; dataUrl: string }[] }) {
@@ -77,7 +83,7 @@ export function ParkedCoversStack({ spaceId, covers }: { spaceId: string; covers
 
 type Continuation = NonNullable<ReturnType<typeof latestContinuation>>
 interface Props {
-  continuation: Continuation
+  continuation?: Continuation | null
   now: Date
   hidden: boolean
   style: CSSProperties
@@ -97,6 +103,7 @@ interface Props {
   rowSpan?: number
   colSpan?: number
   size?: import('./types').WidgetSize
+  onNewSpace?: () => void
 }
 
 function activityLabel(at: string | undefined, now: Date) {
@@ -108,12 +115,90 @@ function activityLabel(at: string | undefined, now: Date) {
   return `${day}, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function ResumeCard({ continuation: { space, context, documents, tabs, at, title }, now, hidden, style, pending, result, onResume, onSpace, onEdit, onComplete, onDocument, onTabs, covers, children, onPointerDown, dataWidgetId, className, rowSpan, colSpan, size }: Props) {
+export function ResumeCard({ continuation, now, hidden, style, pending, result, onResume, onSpace, onEdit, onComplete, onDocument, onTabs, covers, children, onPointerDown, dataWidgetId, className, rowSpan, colSpan, size, onNewSpace }: Props) {
   const reduced = useReducedMotion()
-  const checkpoint = context.checkpoint
-  const failures = result?.failures.filter(failure => documents.some(document => document.id === failure.id)) || []
   const isCompactRow = rowSpan !== undefined && rowSpan <= 2
   const isSmall = (rowSpan !== undefined && rowSpan <= 4) || (colSpan !== undefined && colSpan <= 5) || size === 'S'
+
+  if (!continuation) {
+    const handleCreate = () => {
+      if (onNewSpace) onNewSpace()
+      else onSpace()
+    }
+
+    return (
+      <motion.section
+        layout="position"
+        initial={reduced ? undefined : { y: 2 }}
+        animate={reduced ? undefined : { y: 0 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
+        className={`calm-card resume-card context-resume resume-card-empty ${isCompactRow ? 'is-compact-row' : ''} ${isSmall ? 'is-small-card' : ''} ${className || ''}`}
+        data-widget="resume"
+        data-widget-id={dataWidgetId}
+        data-row-span={rowSpan}
+        data-col-span={colSpan}
+        data-widget-size={size}
+        onPointerDown={onPointerDown}
+        hidden={hidden}
+        style={style}
+        aria-label="Продолжить"
+      >
+        {isCompactRow ? (
+          <div className="resume-compact-wrap">
+            <div className="resume-compact-main">
+              <div className="resume-compact-meta">
+                <span className="resume-space-link" style={{ cursor: 'default' }}>
+                  <Folder size={14} aria-hidden="true" />
+                  <span>Пространства</span>
+                </span>
+              </div>
+              <h2 className="resume-compact-title">Нет открытых пространств</h2>
+              <p className="resume-compact-sub">Создайте пространство для продолжения работы</p>
+            </div>
+            <div className="resume-compact-actions">
+              <FluidButton className="resume-primary resume-compact-btn" onClick={handleCreate}>
+                Создать
+                <Plus size={16} />
+              </FluidButton>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="resume-card-heading">
+              <div className="resume-heading-context">
+                <div className="resume-space-link" style={{ cursor: 'default' }}>
+                  <Folder size={18} aria-hidden="true" />
+                  <h2 className="resume-space-title">Продолжить работу</h2>
+                </div>
+              </div>
+            </div>
+            <div className="resume-body-content">
+              <div className="resume-main">
+                <div className="resume-subtitle-row">
+                  <span className="resume-subtitle">Нет открытых пространств</span>
+                </div>
+                <p className="resume-next-step">Создайте пространство для организации вкладок, документов и контекста</p>
+                <div className="resume-footer-row">
+                  <div />
+                  <div className="resume-actions">
+                    <FluidButton className="resume-primary" onClick={handleCreate}>
+                      Создать пространство
+                      <Plus size={18} />
+                    </FluidButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        {children}
+      </motion.section>
+    )
+  }
+
+  const { space, context, documents, tabs, at, title } = continuation
+  const checkpoint = context.checkpoint
+  const failures = result?.failures.filter(failure => documents.some(document => document.id === failure.id)) || []
   const spaceDisplayName = formatSpaceDisplayName(space)
   const subtitle = tabSubtitle(tabs, documents, context.title, spaceDisplayName)
   const visibleCovers = tabs
@@ -179,7 +264,11 @@ export function ResumeCard({ continuation: { space, context, documents, tabs, at
           <div className="resume-main">
             <div className="resume-subtitle-row">
               <span className="resume-subtitle">{subtitle}</span>
-              {activityLabel(at, now) && <time className="resume-time" dateTime={at}>{activityLabel(at, now)}</time>}
+              {activityLabel(at, now) && (
+                <time className="resume-time" dateTime={at}>
+                  Последнее открытие · {activityLabel(at, now)}
+                </time>
+              )}
             </div>
             {checkpoint?.nextStep && (isCabinetPreview || checkpoint.nextStep !== spaceDisplayName) && (
               <p className="resume-next-step">{checkpoint.nextStep}</p>
@@ -188,7 +277,7 @@ export function ResumeCard({ continuation: { space, context, documents, tabs, at
             {!checkpoint?.nextStep && !checkpoint?.note && documents.length === 0 && tabs.length === 0 && (
               <p className="resume-next-step">Пространство готово к работе</p>
             )}
-            {(documents.length > 0 || tabs.length > 0) && (
+            {documents.length > 0 && (
               <div className="resume-contents" aria-label="Состав продолжения">
                 {documents.slice(0, 2).map(document => (
                   <button className="resume-material" key={document.id} disabled={pending} onClick={() => onDocument(document)} title={`${document.name} · ${document.kind === 'window' ? 'окно программы' : 'программа по умолчанию'}`}>
@@ -207,20 +296,27 @@ export function ResumeCard({ continuation: { space, context, documents, tabs, at
                     ))}
                   </details>
                 )}
-                {tabs.length > 0 && (
-                  <button className="resume-material resume-tab-group" disabled={pending} onClick={onTabs} title={tabs.map(tab => tab.title || tab.url).join('\n')}>
-                    <Globe2 size={16} aria-hidden="true" />
-                    <span>{isCabinetPreview ? 'Вкладки пространства' : 'Вкладки дела'}</span>
-                    <small>{tabs.length}</small>
-                  </button>
-                )}
               </div>
             )}
-            <div className="resume-actions">
-              <FluidButton className="resume-primary" disabled={pending} onClick={() => onResume()}>
-                {pending ? 'Открываем…' : 'Продолжить'}
-                <ArrowRight size={18} />
-              </FluidButton>
+            <div className="resume-footer-row">
+              {tabs.length > 0 ? (
+                <button
+                  type="button"
+                  className="resume-tabs-pill resume-material resume-tab-group"
+                  disabled={pending}
+                  onClick={onTabs}
+                  title={tabs.map(tab => tab.title || tab.url).join('\n')}
+                >
+                  <Layers size={16} aria-hidden="true" />
+                  <span>{tabs.length} {tabs.length === 1 ? 'вкладка' : (tabs.length >= 2 && tabs.length <= 4) ? 'вкладки' : 'вкладок'}</span>
+                </button>
+              ) : <div />}
+              <div className="resume-actions">
+                <FluidButton className="resume-primary" disabled={pending} onClick={() => onResume()}>
+                  {pending ? 'Открываем…' : 'Продолжить'}
+                  <ArrowRight size={18} />
+                </FluidButton>
+              </div>
             </div>
             {failures.length > 0 && (
               <div className="resume-errors" role="status">

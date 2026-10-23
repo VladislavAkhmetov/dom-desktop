@@ -98,12 +98,17 @@ export function activeOrRecentContinuation(state: AppState) {
     candidateSpaces.push(anySpaces[0])
   }
 
-  const activeCandidate = candidateSpaces.find(space => space.id === state.activeSpaceId)
-  const chosenSpace = activeCandidate || [...candidateSpaces].sort((a, b) => (Date.parse(b.lastActiveAt || '') || 0) - (Date.parse(a.lastActiveAt || '') || 0))[0]
+  const uncompletedSpaces = candidateSpaces.filter(s => {
+    const norm = normalizeSpace(s)
+    return norm.workContexts?.some(c => !c.completedAt)
+  })
+  const pool = uncompletedSpaces.length ? uncompletedSpaces : candidateSpaces
+  const activeCandidate = pool.find(space => space.id === state.activeSpaceId)
+  const chosenSpace = activeCandidate || [...pool].sort((a, b) => (Date.parse(b.lastActiveAt || '') || 0) - (Date.parse(a.lastActiveAt || '') || 0))[0]
   if (!chosenSpace) return undefined
 
   const space = normalizeSpace(chosenSpace)
-  const context = currentContext(space)
+  const context = space.workContexts?.find(c => !c.completedAt) || currentContext(space)
   const documents = contextDocuments(space, context)
   const tabs = contextSession(space, context.id).tabs.filter(tab => tab.url)
   const at = context.lastActiveAt || space.lastActiveAt || undefined

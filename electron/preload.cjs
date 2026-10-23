@@ -54,8 +54,10 @@ contextBridge.exposeInMainWorld('dom', {
     toggleDarkSite: (tabId, hostname, enabled) => ipcRenderer.invoke('browser:dark:toggle', tabId, hostname, enabled),
     getReaderContent: tabId => ipcRenderer.invoke('browser:reader:content', tabId),
     translateText: (text, targetLang) => ipcRenderer.invoke('browser:translate:text', text, targetLang),
-    translateTab: tabId => ipcRenderer.invoke('browser:translate:tab', tabId)
+    translateTab: tabId => ipcRenderer.invoke('browser:translate:tab', tabId),
+    autofill: (tabId, cred) => ipcRenderer.invoke('browser:autofill', tabId, cred)
   },
+  bitwardenStatus: () => ipcRenderer.invoke('bitwarden:status'),
   pickResource: kind => ipcRenderer.invoke('resource:pick', kind),
   openResource: resource => ipcRenderer.invoke('resource:open', resource),
   osWindows: {
@@ -70,6 +72,7 @@ contextBridge.exposeInMainWorld('dom', {
   fetchSuggestions: query => ipcRenderer.invoke('browser:suggest', query),
   toggleFullScreen: () => ipcRenderer.invoke('window:toggleFullScreen'),
   isFullScreen: () => ipcRenderer.invoke('window:isFullScreen'),
+  setTitleBarOverlay: options => ipcRenderer.invoke('window:setTitleBarOverlay', options),
   onFocusCapture: callback => {
     const listener = () => callback()
     ipcRenderer.on('focus:capture', listener)
@@ -85,6 +88,11 @@ contextBridge.exposeInMainWorld('dom', {
     const listener = (_event, message) => callback(message)
     ipcRenderer.on('toast:show', listener)
     return () => ipcRenderer.removeListener('toast:show', listener)
+  },
+  onUpdateReady: callback => {
+    const listener = (_event, data) => callback(data)
+    ipcRenderer.on('app:update-ready', listener)
+    return () => ipcRenderer.removeListener('app:update-ready', listener)
   },
   onStateChanged: callback => {
     const listener = (_event, state) => callback(state)

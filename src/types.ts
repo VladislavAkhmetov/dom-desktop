@@ -246,6 +246,7 @@ export interface AppState {
     widgets: WidgetConfig[]
     gridVersion?: number
     customPresets?: DashboardCustomPreset[]
+    resumeDismissed?: boolean
   }
   liveHints?: boolean
   dismissedNotices?: string[]
@@ -343,7 +344,9 @@ export interface DomBridge {
     getReaderContent?(tabId: string): Promise<ReaderArticle | null>
     translateText?(text: string, targetLang?: string): Promise<string>
     translateTab?(tabId: string): Promise<{ ok: boolean; count?: number; error?: string }>
+    autofill?(tabId: string, cred: { username?: string; password?: string; origin?: string }): Promise<boolean>
   }
+  bitwardenStatus?(): Promise<BitwardenExtensionStatus>
   pickResource(kind: 'app' | 'file'): Promise<string | null>
   openResource(resource: Resource): Promise<OpenResult>
   osWindows?: {
@@ -358,8 +361,10 @@ export interface DomBridge {
   fetchSuggestions?(query: string): Promise<string[]>
   toggleFullScreen?(): Promise<boolean>
   isFullScreen?(): Promise<boolean>
+  setTitleBarOverlay?(options?: { color?: string; symbolColor?: string; height?: number }): Promise<boolean>
   getRecentFiles?(): Promise<RecentFile[]>
   onToast?(callback: (message: string) => void): () => void
+  onUpdateReady?(callback: (update: { version: string }) => void): () => void
   onFocusCapture(callback: () => void): () => void
   onVoiceToggle?(callback: () => void): () => void
   onStateChanged(callback: (state: AppState) => void): () => void
@@ -415,12 +420,29 @@ export interface HabitsState {
   items: HabitItem[]
 }
 
+export interface BitwardenExtensionStatus {
+  loaded: boolean
+  version: string
+  id?: string
+  worker?: boolean
+  error?: string
+}
+
+export interface PasswordSavePromptInfo {
+  id: string
+  tabId: string
+  origin: string
+  hostname: string
+  username: string
+  password: string
+}
+
 export type NativeBrowserEvent =
   | { type: 'update'; tabId: string; spaceId: string; updates: Partial<BrowserTab> }
   | { type: 'new-tab'; spaceId: string; parentTabId: string; url: string; background: boolean }
   | { type: 'shortcut'; key: string; shift: boolean; alt: boolean }
   | { type: 'cover'; tabId: string; image: string }
-  | { type: 'password-offer'; origin: string; username: string; password: string; title?: string }
   | { type: 'permission-request'; id: string; tabId?: string; hostname: string; origin: string; permission: string; details?: string }
   | { type: 'adblock-stats'; tabId: string; count: number }
+  | { type: 'password-save-offer'; tabId: string; origin: string; hostname: string; username: string; password: string }
 

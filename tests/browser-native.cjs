@@ -120,6 +120,8 @@ async function run() {
   assert.equal(await first.view.webContents.executeJavaScript('document.querySelector("#draft").value'), 'Сохранённый при переключении текст', 'Новая вкладка не теряет заполненную форму')
   const fullWidth = first.bounds.width
   await renderer(() => document.querySelector('.browser-day-pulse').click())
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.browser-island-day'))), 'Остров внимания открывает план дня')
+  await renderer(() => document.querySelector('.browser-island-day').click())
   await waitFor(() => renderer(() => document.querySelector('.browser-day-panel')?.getBoundingClientRect()?.left).then(left => left && first.bounds.x + first.bounds.width <= left + 1 && first.bounds.width < fullWidth), 'Страница освобождает место панели дня')
   assert.equal(manager.blocked, false, 'Панель дня не блокирует нативную страницу')
   assert.equal(first.view.getVisible(), true, 'Сайт виден рядом с панелью дня')

@@ -47,7 +47,7 @@ export function ActionMenu({ label, actions, triggerContent, className = '' }: {
       items[next]?.focus()
     }
   }}>
-    <button ref={trigger} className={triggerContent ? 'menu-trigger' : 'task-more'} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}>{triggerContent || <MoreHorizontal size={18} />}</button>
+    <button type="button" ref={trigger} className={triggerContent ? 'menu-trigger' : 'task-more'} aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpen(value => !value) }}>{triggerContent || <MoreHorizontal size={18} />}</button>
     {createPortal(<AnimatePresence>{open && <FluidSurface key={id} className={`action-menu-popover ${className}`} ref={menu} style={{ position: 'fixed', ...position, right: 'auto', zIndex: 120, maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto', transformOrigin: 'top right' }} id={id} role="menu" aria-label={label}><FluidGroup className="fluid-menu-items" axis="y">{actions.map(action => <button role="menuitem" key={action.id || action.label} onClick={() => { setOpen(false); trigger.current?.focus(); action.onSelect() }}>{action.icon}<span>{action.label}</span></button>)}</FluidGroup></FluidSurface>}</AnimatePresence>, document.body)}
   </div>
 }

@@ -48,3 +48,66 @@ it('сигнал ИИ появляется по завершении, учиты
   state.dismissedNotices = []
   expect(selectAttentionSignal(state, new Date(now.getTime() + 6 * 60000), idle)).toBeNull()
 })
+it('сигнал обновления появляется с самым низким приоритетом после напоминаний, встреч и фокуса', () => {
+  const state = emptyState()
+  const idle = { status: 'idle', remainingSeconds: 0 }
+  const update = { version: '0.0.2' }
+
+  // Сигнал обновления виден, когда нет других сигналов
+  const signal = selectAttentionSignal(state, now, idle, { update })
+  expect(signal?.type).toBe('update')
+  expect(signal?.title).toBe('Доступно обновление dombro')
+  expect(signal?.label).toBe('Перезапустить при выходе')
+  expect(attentionLine(signal)).toBe('Доступно обновление dombro · Перезапустить при выходе')
+
+  // Напоминание вытесняет сигнал обновления
+  state.reminders = [{ id: 'r', title: 'Заказ', createdAt: now.toISOString(), dueAt: now.toISOString(), done: false }]
+  expect(selectAttentionSignal(state, now, idle, { update })?.type).toBe('task')
+
+  // Фокус вытесняет сигнал обновления
+  state.reminders = []
+  expect(selectAttentionSignal(state, now, { status: 'running', remainingSeconds: 500 }, { ambient: true, update })?.type).toBe('focus')
+
+  // Скрытие пользователем предотвращает показ сигнала
+  state.dismissedNotices = ['update:0.0.2']
+  expect(selectAttentionSignal(state, now, idle, { update })).toBeNull()
+})
+
+it('динамический остров выдает мягкое предупреждение за 15 минут до срока задачи', () => {
+  const state = emptyState()
+  const idle = { status: 'idle', remainingSeconds: 0 }
+  const in10min = new Date(now.getTime() + 10 * 60_000).toISOString()
+  state.reminders = [{ id: 'task-pill', title: 'Принять витамины', createdAt: now.toISOString(), dueAt: in10min, done: false }]
+
+  const signal = selectAttention(state, now, idle)
+  expect(signal?.type).toBe('task')
+  expect(signal?.title).toBe('Принять витамины')
+  expect(signal?.label).toBe('Через 10 мин')
+  expect(signal?.id).toBe(`task:task-pill:${in10min}:soon`)
+  expect(attentionLine(signal)).toBe('Через 10 мин · Принять витамины')
+
+  // Скрытие мягкого предупреждения скрывает его сейчас, но не блокирует наступление точного срока
+  state.dismissedNotices = [`task:task-pill:${in10min}:soon`]
+  expect(selectAttention(state, now, idle)).toBeNull()
+
+  // При наступлении точного срока срабатывает основное напоминание "Сейчас"
+  const exactTime = new Date(now.getTime() + 10 * 60_000)
+  const exactSignal = selectAttention(state, exactTime, idle)
+  expect(exactSignal?.type).toBe('task')
+  expect(exactSignal?.label).toBe('Сейчас')
+  expect(exactSignal?.id).toBe(`task:task-pill:${in10min}`)
+  expect(attentionLine(exactSignal)).toBe('Сейчас · Принять витамины')
+})
+
+it('напоминание Сейчас имеет приоритет над приближающейся задачей Через 10 мин', () => {
+  const state = emptyState()
+  const idle = { status: 'idle', remainingSeconds: 0 }
+  const in10min = new Date(now.getTime() + 10 * 60_000).toISOString()
+  state.reminders = [
+    { id: 't-future', title: 'Встреча курьера', createdAt: now.toISOString(), dueAt: in10min, done: false },
+    { id: 't-now', title: 'Выключить духовку', createdAt: now.toISOString(), dueAt: now.toISOString(), done: false }
+  ]
+  const signal = selectAttention(state, now, idle)
+  expect(signal?.targetId).toBe('t-now')
+  expect(signal?.label).toBe('Сейчас')
+})

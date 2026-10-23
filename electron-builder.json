@@ -33,7 +33,8 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "dombro",
-    "artifactName": "${productName}-Setup-${version}.${ext}"
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "differentialPackage": true
   },
   "portable": {
     "artifactName": "${productName}-${version}-Portable.exe"
@@ -42,5 +43,11 @@
     "target": ["dmg", "zip"],
     "category": "public.app-category.productivity"
   },
-  "publish": null
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "owner",
+      "repo": "dombro-releases"
+    }
+  ]
 }

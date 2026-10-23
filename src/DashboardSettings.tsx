@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, BookmarkPlus, Check, Plus, Trash2, X } from 'lucide-react'
-import type { DashboardCustomPreset, WidgetConfig, WidgetType } from './types'
+import type { DashboardCustomPreset, WidgetConfig } from './types'
 import { Dialog } from './Dialog'
-import { builtinDashboardPresets, defaultWidgets, widgetDefaultSpan, widgetNames } from './dashboard'
+import { availableWidgetTypes, builtinDashboardPresets, defaultWidgets, widgetDefaultSpan, widgetNames } from './dashboard'
 import { WallpaperPicker } from './WallpaperPicker'
 
 const PRESET_ICONS: Record<string, string> = {
+  overview: '☕',
   calm: '🧘',
   work: '⚡',
-  overview: '☕',
   city: '🌤️',
   balance: '🌱'
 }
@@ -165,7 +165,7 @@ export function DashboardSettings({
           </div>
 
           <div className="widget-add-list">
-            {(Object.keys(widgetNames) as WidgetType[])
+            {availableWidgetTypes
               .filter(type => !widgets.some(item => item.type === type))
               .map(type => (
                 <button

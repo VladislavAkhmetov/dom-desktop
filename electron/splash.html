@@ -34,16 +34,35 @@
       justify-content: space-between;
       padding: 24px 22px 18px;
       color: #24382e;
-      animation: splash-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+      opacity: 0;
     }
-    @keyframes splash-appear {
-      from {
-        opacity: 0;
-        transform: scale(0.97);
-      }
-      to {
+    html.is-in .splash-card {
+      animation: splash-in 0.6s cubic-bezier(0.45, 0, 0.55, 1) both;
+    }
+    html.is-out .splash-card {
+      animation: splash-out 0.52s cubic-bezier(0.45, 0, 0.9, 1) forwards;
+    }
+    @keyframes splash-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes splash-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-card,
+      html.is-in .splash-card {
+        animation: none;
         opacity: 1;
-        transform: scale(1);
+      }
+      html.is-out .splash-card {
+        animation: none;
+        opacity: 0;
+      }
+      .brand-mark,
+      .progress-bar {
+        animation: none;
       }
     }
     .brand-section {
@@ -164,8 +183,18 @@
     </div>
     <div class="footer-section">
       <span class="badge">кабинеты</span>
-      <span>v0.1.0</span>
+      <span id="splash-version">v0.0.1</span>
     </div>
   </div>
+  <script>
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ver = params.get('v');
+      if (ver) {
+        const el = document.getElementById('splash-version');
+        if (el) el.textContent = 'v' + ver;
+      }
+    } catch {}
+  </script>
 </body>
 </html>

@@ -2,7 +2,8 @@ const { spawn } = require('node:child_process')
 const path = require('node:path')
 const fs = require('node:fs')
 
-const exePath = path.resolve(__dirname, '../release/dombro-0.1.0-Portable.exe')
+const pkg = require('../package.json')
+const exePath = path.resolve(__dirname, `../release/dombro-${pkg.version}-Portable.exe`)
 console.log('Testing portable executable:', exePath)
 if (!fs.existsSync(exePath)) {
   console.error('Portable binary not found:', exePath)
@@ -47,7 +48,7 @@ async function check() {
     process.exit(1)
   }
 
-  console.log('✓ Success: dombro-0.1.0-Portable.exe runs cleanly and boots properly!')
+  console.log(`✓ Success: dombro-${pkg.version}-Portable.exe runs cleanly and boots properly!`)
   process.exit(0)
 }
 

@@ -102,10 +102,12 @@ describe('полоса вкладок рабочих пространств (Chr
   it('отображает все открытые пространства в строке без исчезновения прежних', async () => {
     await mount()
 
+    const homeBtn = document.querySelector('.chrome-spaces-home .chrome-space')
+    expect(homeBtn?.textContent?.trim()).toBe('Мой день')
+
     const spaceButtons = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space'))
     const names = spaceButtons.map(b => b.textContent?.trim())
 
-    expect(names).toContain('Мой день')
     expect(names).toContain('Первое пространство')
     expect(names).toContain('Второе пространство')
   })
@@ -193,5 +195,64 @@ describe('полоса вкладок рабочих пространств (Chr
       rightArrow?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
     })
     expect(scrollBySpy).toHaveBeenCalledWith(expect.objectContaining({ left: 200 }))
+  })
+
+  it('не ограничивает количество вкладок до 4 и сохраняет все пространства при большом их числе (например 6+ пространств)', async () => {
+    await mount()
+    const plusButton = labelled('Создать пространство')
+    expect(plusButton).not.toBeNull()
+    for (let i = 0; i < 4; i++) {
+      await click(plusButton)
+    }
+    const homeBtn = document.querySelector('.chrome-spaces-home .chrome-space')
+    expect(homeBtn?.textContent?.trim()).toBe('Мой день')
+
+    const spaceButtons = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space'))
+    const names = spaceButtons.map(b => b.textContent?.trim())
+    expect(names).toContain('Первое пространство')
+    expect(names).toContain('Второе пространство')
+    // 2 initial spaces + 4 newly created = 6 spaces in track (plus 'Мой день' pinned on left)
+    expect(spaceButtons.length).toBe(6)
+  })
+
+  it('содержит градиентные полупрозрачные зоны по краям скролла и защищенный блок действий', async () => {
+    await mount()
+    const container = document.querySelector('.chrome-spaces-scroll-container')
+    expect(container).not.toBeNull()
+    const leftFade = container?.querySelector('.chrome-spaces-fade-left')
+    const rightFade = container?.querySelector('.chrome-spaces-fade-right')
+    expect(leftFade).not.toBeNull()
+    expect(rightFade).not.toBeNull()
+    expect(leftFade?.querySelector('.chrome-scroll-left')).not.toBeNull()
+    expect(rightFade?.querySelector('.chrome-scroll-right')).not.toBeNull()
+    const actions = document.querySelector('.chrome-spaces-actions')
+    expect(actions).not.toBeNull()
+    expect(container?.contains(actions!)).toBe(false)
+  })
+
+  it('когда вкладки помещаются без скролла (hasOverflow: false), стрелки скрыты и не имеют класса is-visible, маски не применяются', async () => {
+    await mount()
+    const viewport = document.querySelector<HTMLDivElement>('.chrome-spaces-viewport')!
+    Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: 300 })
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 800 })
+    Object.defineProperty(viewport, 'scrollLeft', { configurable: true, writable: true, value: 0 })
+
+    await act(async () => {
+      viewport.dispatchEvent(new Event('scroll'))
+      window.dispatchEvent(new Event('resize'))
+    })
+
+    const leftFade = document.querySelector('.chrome-spaces-fade-left')
+    const rightFade = document.querySelector('.chrome-spaces-fade-right')
+
+    expect(leftFade?.classList.contains('is-visible')).toBe(false)
+    expect(rightFade?.classList.contains('is-visible')).toBe(false)
+    expect(viewport.classList.contains('has-before')).toBe(false)
+    expect(viewport.classList.contains('has-after')).toBe(false)
+
+    const leftBtn = leftFade?.querySelector<HTMLButtonElement>('.chrome-scroll-left')
+    const rightBtn = rightFade?.querySelector<HTMLButtonElement>('.chrome-scroll-right')
+    expect(leftBtn?.disabled).toBe(true)
+    expect(rightBtn?.disabled).toBe(true)
   })
 })

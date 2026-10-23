@@ -34,11 +34,12 @@ async function click(label: string) { await act(async () => labelled(label).clic
 function notify() { state = { ...state, reminders: [{ id: 'task', title: 'Отправить макет', createdAt: now.toISOString(), dueAt: now.toISOString(), done: false }] } }
 function wide() { return document.querySelector('.browser-attention-island')?.getAttribute('data-wide') }
 
-it('сохраняет прямой вход в создание, материалы, запись и ИИ', async () => {
+it('сохраняет прямой вход в создание, материалы и запись (кнопка ИИ скрыта пока функционал не готов)', async () => {
   await render()
-  for (const [label, handler] of [['Новое пространство', create], ['Материалы пространства', materials], ['Записать', capture], ['Спросить ИИ', assistant]] as const) {
+  for (const [label, handler] of [['Новое пространство', create], ['Материалы пространства', materials], ['Записать', capture]] as const) {
     await click(label); expect(handler).toHaveBeenCalledOnce()
   }
+  expect(document.querySelector('button[aria-label="Спросить ИИ"]')).toBeNull()
   expect(labelled('Новое пространство').textContent).toBe('')
   expect(labelled('Выбрать пространство').querySelector('svg.lucide-folder')).toBeNull()
   expect(labelled('Материалы пространства').querySelector('svg.lucide-panel-right')).not.toBeNull()

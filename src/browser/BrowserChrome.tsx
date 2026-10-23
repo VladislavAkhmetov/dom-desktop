@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, Globe2, History, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer } from 'lucide-react'
-import type { BrowserTab, HistoryItem, Space, UserProfile } from '../types'
+import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, Globe2, History, KeyRound, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer, X } from 'lucide-react'
+import type { BrowserTab, HistoryItem, PasswordSavePromptInfo, SavedCredential, Space, UserProfile } from '../types'
 import { audioManager } from '../player/audioStream'
 import { getUserProfile } from '../userProfile'
 import { ActionMenu } from '../ActionMenu'
 import { isCabinetPreview } from '../cabinetMode'
+import { isAssistantEnabled } from '../assistantModel'
 import { buildOmniboxSuggestions, type OmniboxSuggestionItem } from './omniboxSuggestions'
 import { bridge } from '../bridge'
 import { PermissionPrompt, type PermissionRequestInfo } from './PermissionPrompt'
+import { PasswordSavePrompt } from './PasswordSavePrompt'
 import { AdblockShield } from './AdblockShield'
 import { TranslateButton } from './TranslateButton'
 import '../cabinet.css'
@@ -46,15 +48,20 @@ export interface BrowserChromeProps {
   materialsOpen?: boolean
   permissionRequest?: PermissionRequestInfo | null
   onPermissionResponse?: (id: string, allowed: boolean | null) => void
+  passwordPrompt?: PasswordSavePromptInfo | null
+  onPasswordPromptSave?: (username: string, password: string) => void
+  onPasswordPromptDismiss?: () => void
   onReaderMode?: () => void
   isReaderActive?: boolean
 }
 
-export function BrowserChrome({ space, spaces, tab, history = [], attentionIsland, nativeNavigation, onHome, onSpace, onSpaceDashboard, onWeb, onAllSpaces, onNavigate, onNavigation, onSave, pageActions, onDay, onCapture, onAssistant, onFocus, onHistory, onSearch, onSettings, onPark, profile, onProfile, onNewSpace, onPinSpace, onRenameSpace, onArchiveSpace, materialsOpen, permissionRequest, onPermissionResponse, onReaderMode, isReaderActive }: BrowserChromeProps) {
+export function BrowserChrome({ space, spaces, tab, history = [], attentionIsland, nativeNavigation, onHome, onSpace, onSpaceDashboard, onWeb, onAllSpaces, onNavigate, onNavigation, onSave, pageActions, onDay, onCapture, onAssistant, onFocus, onHistory, onSearch, onSettings, onPark, profile, onProfile, onNewSpace, onPinSpace, onRenameSpace, onArchiveSpace, materialsOpen, permissionRequest, onPermissionResponse, passwordPrompt, onPasswordPromptSave, onPasswordPromptDismiss, onReaderMode, isReaderActive }: BrowserChromeProps) {
   const [address, setAddress] = useState(tab?.url || '')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [googleSuggestions, setGoogleSuggestions] = useState<string[]>([])
+  const [matchingCredentials, setMatchingCredentials] = useState<SavedCredential[]>([])
+  const [showAutofillPopover, setShowAutofillPopover] = useState(false)
   const [hoveredControl, setHoveredControl] = useState(false)
   const [focusedControl, setFocusedControl] = useState(false)
   const [playing, setPlaying] = useState(audioManager.getIsPlaying())
@@ -64,6 +71,29 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
   const editing = useRef(false)
   const keyboard = useRef(false)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!tab?.url || !bridge.vault?.listCredentials) {
+      setMatchingCredentials([])
+      setShowAutofillPopover(false)
+      return
+    }
+    let origin = ''
+    let hostname = ''
+    try {
+      const u = new URL(tab.url)
+      origin = u.origin
+      hostname = u.hostname
+    } catch {}
+    if (!origin) {
+      setMatchingCredentials([])
+      setShowAutofillPopover(false)
+      return
+    }
+    bridge.vault.listCredentials(hostname || origin)
+      .then(list => setMatchingCredentials(list || []))
+      .catch(() => setMatchingCredentials([]))
+  }, [tab?.url, passwordPrompt])
 
   useEffect(() => {
     editing.current = false
@@ -240,12 +270,73 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
         )}
         <TranslateButton tabId={tab?.id} lang={tab?.lang} onAiSummary={onAssistant} />
         <AdblockShield tabId={tab?.id} url={tab?.url} blockedCount={tab?.blockedCount} onReload={() => onNavigation('reload')} />
+        {matchingCredentials.length > 0 && (
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <button
+              type="button"
+              className={`browser-key-toggle ${showAutofillPopover ? 'is-active' : ''}`}
+              onClick={() => setShowAutofillPopover(prev => !prev)}
+              title="Сохранённые пароли для этого сайта"
+              aria-label="Сохранённые пароли для этого сайта"
+            >
+              <KeyRound size={16} />
+            </button>
+            {showAutofillPopover && (
+              <div className="chrome-autofill-popover" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span className="autofill-popover-title">Автозаполнение</span>
+                  <button
+                    type="button"
+                    className="password-close-btn"
+                    onClick={() => setShowAutofillPopover(false)}
+                    aria-label="Закрыть"
+                    title="Закрыть"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {matchingCredentials.map(cred => (
+                  <div
+                    key={cred.id}
+                    className="autofill-item"
+                    onClick={async () => {
+                      if (tab?.id && bridge.browser?.autofill) {
+                        await bridge.browser.autofill(tab.id, {
+                          username: cred.username,
+                          password: cred.password,
+                          origin: cred.origin
+                        })
+                      }
+                      setShowAutofillPopover(false)
+                    }}
+                  >
+                    <div className="autofill-item-info">
+                      <span className="autofill-item-user">{cred.username}</span>
+                      <span className="autofill-item-dots">••••••••</span>
+                    </div>
+                    <button type="button" className="password-btn password-btn-save" style={{ minWidth: 60, height: 26, fontSize: 12 }}>
+                      Вставить
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {pageActions || <button className={`browser-save-page ${saved ? 'is-saved' : ''}`} type="button" onClick={onSave} disabled={!tab?.url} aria-label={saved ? 'Страница сохранена — выбрать место' : 'Сохранить страницу'} title={tab?.url ? 'Сохранить страницу · Ctrl D' : 'Сначала откройте страницу'}>{saved ? <Check size={17} /> : <Bookmark size={17} />}</button>}
 
         {permissionRequest && onPermissionResponse && (
           <PermissionPrompt
             request={permissionRequest}
             onRespond={allowed => onPermissionResponse(permissionRequest.id, allowed)}
+          />
+        )}
+
+        {passwordPrompt && onPasswordPromptSave && onPasswordPromptDismiss && (
+          <PasswordSavePrompt
+            prompt={passwordPrompt}
+            onSave={onPasswordPromptSave}
+            onDismiss={onPasswordPromptDismiss}
           />
         )}
 
@@ -293,7 +384,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
       {attentionIsland(hoveredControl || focusedControl)}
       <div className="browser-quick-actions" aria-label="Быстрые действия">
         <button onClick={onCapture} aria-label="Записать" title="Записать мысль или дело"><PencilLine size={18} /></button>
-        <button onClick={onAssistant} aria-label="Спросить ИИ" title="Спросить ИИ"><Sparkles size={18} /></button>
+        {isAssistantEnabled && <button onClick={onAssistant} aria-label="Спросить ИИ" title="Спросить ИИ"><Sparkles size={18} /></button>}
       </div>
       {onProfile && (() => {
         const userProfile = getUserProfile(profile ? { userProfile: profile } as any : undefined)

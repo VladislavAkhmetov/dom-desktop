@@ -21,13 +21,15 @@
 .hub-content > main { height: 100%; min-height: 0; }
 .app-shell:not(.browsing) .hub-bottom { grid-row: 4; height: 52px; margin: 0; }
 .browser-content { display: flex; flex: 1; min-height: 0; }
-.hub-ambient { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 20px; min-height: 72px; margin-bottom: 4px; position: relative; z-index: 60; flex: none; color: #294d43; }
-.hub-date { display: flex; align-items: center; gap: 12px; text-align: left; width: fit-content; min-height: 64px; border-radius: 18px; color: inherit; }
-.hub-date > strong { font-size: 56px; font-weight: 500; line-height: 1; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
-.hub-date .hub-date-copy { display: grid; gap: 5px; font-size: 20px; font-weight: 500; line-height: 1.15; letter-spacing: -.02em; }
-.hub-date small { display: block; font-size: 14px; font-weight: 500; line-height: 1.25; letter-spacing: 0; color: #395d51; }
+.hub-ambient { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: start; gap: 20px; min-height: 72px; margin-bottom: 4px; position: relative; z-index: 60; flex: none; color: #294d43; }
+.hub-ambient > .universal-island { align-self: center; }
+.hub-date { display: flex; align-items: center; gap: 12px; text-align: left; width: fit-content; min-height: 0; border-radius: 18px; color: #294d43; }
+.hub-date > strong { font-family: var(--font-display); font-size: 58px; font-weight: 600; line-height: 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.hub-date .hub-date-copy { display: grid; gap: 4px; font-size: 21px; font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
+.hub-date .hub-date-copy > span { font-family: var(--font-display); }
+.hub-date small { display: block; font-family: var(--font-ui); font-size: 13.5px; font-weight: 500; line-height: 1.25; letter-spacing: 0; color: #34574b; }
 .hub-status { justify-self: end; text-align: right; display: grid; justify-items: end; gap: 3px; color: inherit; }
-.hub-status time { font-size: 44px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.045em; }
+.hub-status time { font-family: var(--font-display); font-size: 44px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
 .hub-status .hub-weather { display: inline-flex; align-items: center; gap: 8px; min-height: 28px; border-radius: 12px; color: #34574b; font-size: 14px; line-height: 1.25; }
 .hub-weather svg { width: 22px; height: 22px; }
 .hub-weather strong { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }

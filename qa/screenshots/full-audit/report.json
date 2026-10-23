@@ -1,0 +1,202 @@
+{
+  "controlsOnHome": 60,
+  "controlsAfter": 60,
+  "steps": 67,
+  "findings": [
+    {
+      "name": "24-presets",
+      "action": {
+        "ok": false,
+        "reason": "нет «Настроить виджеты»"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "25-preset-calm",
+      "action": {
+        "ok": false,
+        "reason": "нет «Спокойный» в [role=\"radio\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "26-preset-work",
+      "action": {
+        "ok": false,
+        "reason": "нет «Рабочий» в [role=\"radio\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "27-preset-city",
+      "action": {
+        "ok": false,
+        "reason": "нет «Город» в [role=\"radio\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "28-preset-balance",
+      "action": {
+        "ok": false,
+        "reason": "нет «Баланс» в [role=\"radio\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "29-preset-overview",
+      "action": {
+        "ok": false,
+        "reason": "нет «Обзор» в [role=\"radio\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "30-wallpaper-tab",
+      "action": {
+        "ok": false,
+        "reason": "нет «Фон и оформление»"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "31-widgets-tab",
+      "action": {
+        "ok": false,
+        "reason": "нет «Виджеты» в [role=\"dialog\"] button, [role=\"tab\"]"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "39-settings-english",
+      "action": {
+        "ok": false,
+        "reason": "нет English"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [
+        {
+          "size": 11,
+          "sample": "Приложение",
+          "className": "settings-nav-label"
+        },
+        {
+          "size": 11,
+          "sample": "Подключения",
+          "className": "settings-nav-label"
+        },
+        {
+          "size": 11,
+          "sample": "Безопасность",
+          "className": "settings-nav-label"
+        }
+      ],
+      "dialogs": [
+        "Настройки Приложение Профиль Общие Подключения Календари Почта Gmail Дайджест Бе"
+      ]
+    },
+    {
+      "name": "60-new-space-tone",
+      "action": {
+        "ok": false,
+        "reason": "нет Сирень / Лаванда / Шалфей"
+      },
+      "errors": [],
+      "issues": [
+        {
+          "kind": "слишком мелкая цель",
+          "name": "Сохранить сайт",
+          "w": 125,
+          "h": 20
+        },
+        {
+          "kind": "слишком мелкая цель",
+          "name": "Документ",
+          "w": 88,
+          "h": 20
+        },
+        {
+          "kind": "слишком мелкая цель",
+          "name": "Громкость",
+          "w": 15,
+          "h": 15
+        }
+      ],
+      "tiny": [],
+      "dialogs": [
+        "Музыкальный центр"
+      ]
+    },
+    {
+      "name": "62-browser-island",
+      "action": {
+        "ok": false,
+        "reason": "нет Уведомления / Сейчас / Нет срочного / Центр внимания"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "63-browser-day",
+      "action": {
+        "ok": false,
+        "reason": "нет План дня / Открыть план"
+      },
+      "errors": [],
+      "issues": [],
+      "tiny": [],
+      "dialogs": []
+    },
+    {
+      "name": "66-undated",
+      "action": {
+        "ok": false,
+        "reason": "нет «Мысли без даты»"
+      },
+      "errors": [],
+      "issues": [
+        {
+          "kind": "слишком мелкая цель",
+          "name": "Сохранить сайт",
+          "w": 125,
+          "h": 20
+        },
+        {
+          "kind": "слишком мелкая цель",
+          "name": "Документ",
+          "w": 88,
+          "h": 20
+        }
+      ],
+      "tiny": [],
+      "dialogs": []
+    }
+  ]
+}

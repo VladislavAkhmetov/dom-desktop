@@ -45,7 +45,14 @@ export function exampleDay(): AppState {
     { id: 'ai-poster', name: 'Постер_А2_Печать.ai', kind: 'file' as const, target: 'D:\\Design\\Prints\\Постер_А2_Печать.ai', createdAt: yAt(9, 30), lastOpenedAt: yAt(12, 30) }
   ]
 
-  return {
+    const readingArticles = [
+      { id: 'read-calm-tech', name: 'Принципы спокойного дизайна и снижение когнитивной нагрузки', kind: 'link' as const, target: 'https://calmtech.institute/principles', createdAt: yAt(11, 0), lastOpenedAt: yAt(15, 30) },
+      { id: 'read-typography', name: 'Типографика для людей: как засечки создают ясность', kind: 'link' as const, target: 'https://medium.com/design/typography-comfort', createdAt: yAt(14, 0), lastOpenedAt: yAt(17, 20) },
+      { id: 'read-architecture', name: 'Архитектура локальных приложений на Electron и SQLite', kind: 'link' as const, target: 'https://habr.com/ru/articles/842100/', createdAt: yAt(16, 0), lastOpenedAt: yAt(18, 0) },
+      { id: 'read-sqlite-fts', name: 'FTS5 полнотекстовый поиск и транзакционная безопасность', kind: 'link' as const, target: 'https://github.com/sqlite/sqlite-fts5-guide', createdAt: yAt(17, 30), lastOpenedAt: yAt(18, 50) }
+    ]
+
+    return {
     version: 1, dismissedUntil: null, starterAppsAdded: true,
     userProfile: { name: 'Александр', avatarTone: 'sage', status: 'В потоке' },
     spaces: [{ id: 'example-studio', name: 'Работа', tone: 'sage', resources: [
@@ -57,7 +64,7 @@ export function exampleDay(): AppState {
     ], activeContextId: 'example-brand', workContexts: [{ id: 'example-brand', title: 'Обновить логотип', documentIds: ['ai-logo', 'ai-patterns'], activeTabId: 'example-reference', lastActiveAt: yAt(19, 10) }], activeSession: { tabs: [
       { id: 'example-reference', contextId: 'example-brand', title: 'Мудборд: воздух, стекло, спокойствие', url: new URL('/assets/moodboard/index.html', window.location.origin).href },
       { id: 'example-checkout', contextId: 'example-brand', title: 'Редизайн чекаута и оплаты v2', url: figmaRecentDocs[0].target }
-    ], activeTabId: 'example-reference', savedAt: yAt(19, 10) } }, { id: 'example-personal-space', name: 'Поездка на выходные', tone: 'sand', resources: [], lastActiveAt: yAt(17), activeSession: { tabs: [{ id: 'example-weekend', title: 'План поездки', url: new URL('/prototype/weekend.html', window.location.origin).href }], activeTabId: 'example-weekend' } }, { id: 'example-learning', name: 'Учёба', tone: 'blue', resources: [] }, ...additionalSpaces],
+    ], activeTabId: 'example-reference', savedAt: yAt(19, 10) } }, { id: 'example-personal-space', name: 'Поездка на выходные', tone: 'sand', resources: [], lastActiveAt: yAt(17), activeSession: { tabs: [{ id: 'example-weekend', title: 'План поездки', url: new URL('/prototype/weekend.html', window.location.origin).href }], activeTabId: 'example-weekend' } }, { id: 'example-learning', name: 'Учёба', tone: 'blue', resources: readingArticles }, ...additionalSpaces],
     checkpoint: { spaceId: 'example-personal-space', note: 'Даты выбраны. Осталось сравнить варианты и обсудить с близкими.', nextStep: 'Выбрать, где остановиться', savedAt: yAt(17) },
     reminders: [
       { id: 'example-review', title: 'Отправить итоги встречи', createdAt, dueAt: at(18, 30), done: false },

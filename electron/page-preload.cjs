@@ -102,44 +102,123 @@ function report() {
     })
   }, 300)
 }
-let lastOfferKey = ''
-let lastOfferTime = 0
 
-function inspectAndOffer(target) {
+// --- Secure Password Detection & Autofill ---
+function extractCredentials(container) {
   try {
-    if (!target) return
-    const container = (typeof target.querySelectorAll === 'function')
-      ? target
-      : (target.closest && (target.closest('form') || target.closest('div')))
-    if (!container || typeof container.querySelectorAll !== 'function') return
-    const passwordInput = container.querySelector('input[type="password"]')
-    if (passwordInput && passwordInput.value && passwordInput.value.length >= 2) {
-      const usernameInput = container.querySelector('input[type="text"], input[type="email"], input[name*="user" i], input[name*="login" i], input[autocomplete="username"]')
-      const username = usernameInput?.value?.trim() || ''
-      const password = passwordInput.value
-      const origin = window.location.origin
-      const title = document.title || window.location.hostname
-      const key = `${origin}:${username}:${password}`
-      const now = Date.now()
-      if (key === lastOfferKey && (now - lastOfferTime) < 3000) return
-      lastOfferKey = key
-      lastOfferTime = now
-      if (origin && (origin.startsWith('http://') || origin.startsWith('https://'))) {
-        ipcRenderer.send('page:password-offer', { origin, username, password, title })
-      }
+    if (!container) return null
+    const passwordInputs = Array.from(container.querySelectorAll('input[type="password"]'))
+    const activePassword = passwordInputs.find(inp => inp.value && inp.offsetParent !== null) || passwordInputs.find(inp => inp.value)
+    if (!activePassword || !activePassword.value) return null
+
+    const otherInputs = Array.from(container.querySelectorAll('input:not([type="password"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])'))
+    let usernameInput = otherInputs.find(inp => {
+      const auto = (inp.getAttribute('autocomplete') || '').toLowerCase()
+      const type = (inp.getAttribute('type') || '').toLowerCase()
+      const name = (inp.getAttribute('name') || '').toLowerCase()
+      const id = (inp.getAttribute('id') || '').toLowerCase()
+      return (
+        auto.includes('username') ||
+        auto.includes('email') ||
+        type === 'email' ||
+        name.includes('user') ||
+        name.includes('email') ||
+        name.includes('login') ||
+        id.includes('user') ||
+        id.includes('email') ||
+        id.includes('login')
+      ) && inp.value && inp.offsetParent !== null
+    })
+
+    if (!usernameInput) {
+      usernameInput = otherInputs.find(inp => inp.value && inp.offsetParent !== null)
     }
+
+    const username = (usernameInput ? usernameInput.value : '').trim()
+    const password = activePassword.value
+
+    return { username, password }
   } catch {
-    // safe fallback
+    return null
   }
 }
+
+function trySubmitCredentials(container) {
+  try {
+    const cred = extractCredentials(container)
+    if (cred && cred.password && cred.password.length > 0) {
+      ipcRenderer.send('page:password-submit', {
+        origin: window.location.origin,
+        username: cred.username,
+        password: cred.password
+      })
+    }
+  } catch {}
+}
+
+ipcRenderer.on('page:autofill', (_event, cred) => {
+  try {
+    if (!cred) return
+    const passwordInputs = Array.from(document.querySelectorAll('input[type="password"]'))
+    const activePassword = passwordInputs.find(inp => inp.offsetParent !== null) || passwordInputs[0]
+
+    const otherInputs = Array.from(document.querySelectorAll('input:not([type="password"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])'))
+    let usernameInput = otherInputs.find(inp => {
+      const auto = (inp.getAttribute('autocomplete') || '').toLowerCase()
+      const type = (inp.getAttribute('type') || '').toLowerCase()
+      const name = (inp.getAttribute('name') || '').toLowerCase()
+      const id = (inp.getAttribute('id') || '').toLowerCase()
+      return (
+        auto.includes('username') ||
+        auto.includes('email') ||
+        type === 'email' ||
+        name.includes('user') ||
+        name.includes('email') ||
+        name.includes('login') ||
+        id.includes('user') ||
+        id.includes('email') ||
+        id.includes('login')
+      ) && inp.offsetParent !== null
+    }) || otherInputs.find(inp => inp.offsetParent !== null)
+
+    const setNativeValue = (element, value) => {
+      const proto = Object.getPrototypeOf(element)
+      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value') || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+      if (descriptor && descriptor.set) {
+        descriptor.set.call(element, value)
+      } else {
+        element.value = value
+      }
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    if (usernameInput && cred.username) {
+      setNativeValue(usernameInput, cred.username)
+    }
+    if (activePassword && cred.password) {
+      setNativeValue(activePassword, cred.password)
+    }
+  } catch {}
+})
 
 window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('input', event => { if (event.target.matches('input:not([type=search]),textarea,[contenteditable=true]')) dirty = true; report() }, true)
   document.addEventListener('change', event => { if (event.target.matches('select,input[type=checkbox],input[type=radio]')) dirty = true; report() }, true)
-  document.addEventListener('submit', event => { dirty = false; report(); inspectAndOffer(event.target) }, true)
+  document.addEventListener('submit', event => {
+    dirty = false
+    trySubmitCredentials(event.target)
+    report()
+  }, true)
   document.addEventListener('click', event => {
-    const btn = event.target?.closest?.('button, input[type="submit"]')
-    if (btn) inspectAndOffer(btn)
+    const target = event.target
+    if (target && target.closest) {
+      const btn = target.closest('button, input[type="submit"]')
+      if (btn) {
+        const formOrContainer = btn.closest('form, [role="form"], [role="dialog"], .modal, main, body')
+        trySubmitCredentials(formOrContainer)
+      }
+    }
   }, true)
   for (const name of ['play', 'pause', 'ended']) document.addEventListener(name, report, true)
   window.addEventListener('scroll', report, { passive: true })

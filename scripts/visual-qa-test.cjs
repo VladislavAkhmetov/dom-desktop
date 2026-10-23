@@ -30,6 +30,25 @@ const renderer = (fn) => window.webContents.executeJavaScript(`(${fn.toString()}
 async function run() {
   const ssDir = path.resolve(__dirname, '../qa/screenshots/visual-qa')
   fs.mkdirSync(ssDir, { recursive: true })
+  const writeShot = (name, png) => {
+    const target = path.join(ssDir, name)
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        fs.writeFileSync(target, png)
+        return
+      } catch (error) {
+        if (attempt === 5) {
+          const fallbackDir = path.join(ssDir, 'latest')
+          fs.mkdirSync(fallbackDir, { recursive: true })
+          fs.writeFileSync(path.join(fallbackDir, name), png)
+          console.warn(`  -> ${name} занят другим процессом, снимок записан в visual-qa/latest`)
+          return
+        }
+        const until = Date.now() + 200
+        while (Date.now() < until) { /* файл снимка может быть кратко занят просмотрщиком */ }
+      }
+    }
+  }
 
   // 1. Local HTTP server for realistic WebContentsView testing
   server = http.createServer((req, res) => {
@@ -183,7 +202,7 @@ async function run() {
   // --- СЦЕНАРИЙ 1: Главная дашборда (Мой день) ---
   console.log('Тестирование сценария 1: Главная дашборда...')
   let shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '01-dashboard-home.png'), shot.toPNG())
+  writeShot('01-dashboard-home.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 01-dashboard-home.png')
 
   const profileBtnInfo = await renderer(() => {
@@ -203,7 +222,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 500))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '02-profile-popover.png'), shot.toPNG())
+  writeShot('02-profile-popover.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 02-profile-popover.png')
 
   // --- СЦЕНАРИЙ 3: Кастомизация профиля (выбор тона "Лаванда" и эмодзи 🚀) ---
@@ -221,7 +240,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 500))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '03-profile-customized.png'), shot.toPNG())
+  writeShot('03-profile-customized.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 03-profile-customized.png')
 
   // --- СЦЕНАРИЙ 4: Переход в настройки профиля ---
@@ -235,7 +254,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 600))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '04-settings-profile.png'), shot.toPNG())
+  writeShot('04-settings-profile.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 04-settings-profile.png')
 
   // --- СЦЕНАРИЙ 5: Раздел обоев оформления через Настройки главной ---
@@ -273,7 +292,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 600))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '05-settings-wallpaper.png'), shot.toPNG())
+  writeShot('05-settings-wallpaper.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 05-settings-wallpaper.png')
 
   // Закрываем диалог обоев («Готово»)
@@ -306,7 +325,7 @@ async function run() {
   assert.equal(isBrowsingNow, false, 'Выбор кабинета в дашборде не должен выбивать в полноэкранный браузер')
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '06-cabinet-dashboard-view.png'), shot.toPNG())
+  writeShot('06-cabinet-dashboard-view.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 06-cabinet-dashboard-view.png')
 
   // --- СЦЕНАРИЙ 7: Контекстное меню действий с материалом или кабинетом ---
@@ -319,7 +338,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 500))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '07-cabinet-context-menu.png'), shot.toPNG())
+  writeShot('07-cabinet-context-menu.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 07-cabinet-context-menu.png')
 
   // Закрываем меню через pointerdown вне меню
@@ -341,7 +360,7 @@ async function run() {
   assert.equal(await renderer(() => Boolean(document.querySelector('.app-shell.browsing'))), false, 'Создание кабинета из дашборда не включает браузер')
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '08-cabinet-created.png'), shot.toPNG())
+  writeShot('08-cabinet-created.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 08-cabinet-created.png')
 
   // --- СЦЕНАРИЙ 9: Переход в браузерный режим (Workstage) и WebContentsView ---
@@ -380,7 +399,7 @@ async function run() {
   await waitFor(() => liveTab.view.webContents.executeJavaScript('Boolean(document.querySelector(".badge"))').catch(() => false), 'Загрузка тестовой страницы в WebContentsView')
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '09-browser-workstage.png'), shot.toPNG())
+  writeShot('09-browser-workstage.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 09-browser-workstage.png')
 
   // --- СЦЕНАРИЙ 10: Боковая панель дня и материалов в браузере ---
@@ -388,6 +407,11 @@ async function run() {
   await renderer(() => {
     const toggleBtn = document.querySelector('.browser-day-pulse, button[aria-label*="Мой день"]')
     if (toggleBtn) toggleBtn.click()
+  })
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.browser-island-day'))), 'Остров внимания открывает план дня')
+  await renderer(() => {
+    const dayBtn = document.querySelector('.browser-island-day')
+    if (dayBtn) dayBtn.click()
   })
   await waitFor(() => renderer(() => Boolean(document.querySelector('.browser-day-panel, #browser-day-panel'))), 'Открытие боковой панели дня')
   await new Promise(r => setTimeout(r, 500))
@@ -401,7 +425,7 @@ async function run() {
   await new Promise(r => setTimeout(r, 400))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '10-browser-day-panel.png'), shot.toPNG())
+  writeShot('10-browser-day-panel.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 10-browser-day-panel.png')
 
   // --- СЦЕНАРИЙ 11: Возврат в дашборд («Мой день») ---
@@ -417,13 +441,90 @@ async function run() {
   await new Promise(r => setTimeout(r, 600))
 
   shot = await window.webContents.capturePage()
-  fs.writeFileSync(path.join(ssDir, '11-return-to-dashboard.png'), shot.toPNG())
+  writeShot('11-return-to-dashboard.png', shot.toPNG())
   console.log('  -> Снимок сохранён: 11-return-to-dashboard.png')
+
+  // --- СЦЕНАРИЙ 12: Каталог «Все пространства» и меню три точки на карточке ---
+  console.log('Тестирование сценария 12: Каталог «Все пространства» и меню три точки...')
+  await renderer(() => {
+    const allSpacesBtn = [...document.querySelectorAll('.chrome-spaces-actions button')].find(b => b.textContent.includes('Все пространства'))
+    if (allSpacesBtn) allSpacesBtn.click()
+  })
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.spaces-stage') && document.querySelector('.overview-space-menu'))), 'Открытие каталога пространств')
+  await new Promise(r => setTimeout(r, 600))
+
+  // Открываем меню три точки на первой карточке
+  await renderer(() => {
+    const menuBtn = document.querySelector('.overview-space-menu button')
+    if (menuBtn) menuBtn.click()
+  })
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.action-menu-popover'))), 'Открытие меню три точки карточки пространства')
+  await new Promise(r => setTimeout(r, 500))
+
+  shot = await window.webContents.capturePage()
+  writeShot('12-spaces-overview-menu.png', shot.toPNG())
+  console.log('  -> Снимок сохранён: 12-spaces-overview-menu.png')
+
+  // Закрываем поповер кликом
+  await renderer(() => {
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  })
+  await waitFor(() => renderer(() => !document.querySelector('.action-menu-popover')), 'Закрытие меню три точки')
+  await new Promise(r => setTimeout(r, 400))
+
+  // --- СЦЕНАРИЙ 13: Перетаскивание табов пространств в верхней полосе ---
+  console.log('Тестирование сценария 13: Перетаскивание табов пространств...')
+  await renderer(() => {
+    const homeBtn = document.querySelector('.chrome-spaces-home .chrome-space')
+    if (homeBtn) homeBtn.click()
+  })
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.app-shell:not(.browsing)') && !document.querySelector('.spaces-stage'))), 'Возврат на дашборд')
+  await new Promise(r => setTimeout(r, 500))
+
+  await renderer(() => {
+    const tabs = [...document.querySelectorAll('.chrome-spaces-track .chrome-space')]
+    if (tabs.length >= 2) {
+      const rect = tabs[0].getBoundingClientRect()
+      const nextRect = tabs[1].getBoundingClientRect()
+      tabs[0].dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        button: 0,
+        pointerId: 1,
+        bubbles: true
+      }))
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: nextRect.right + 30,
+        clientY: nextRect.top + rect.height / 2,
+        button: 0,
+        pointerId: 1,
+        bubbles: true
+      }))
+    }
+  })
+  await waitFor(() => renderer(() => Boolean(document.querySelector('.chrome-space-drag-preview'))), 'Появление плавающего превью таба')
+  await new Promise(r => setTimeout(r, 500))
+
+  shot = await window.webContents.capturePage()
+  writeShot('13-space-tab-drag.png', shot.toPNG())
+  console.log('  -> Снимок сохранён: 13-space-tab-drag.png')
+
+  // Завершаем перетаскивание
+  await renderer(() => {
+    window.dispatchEvent(new PointerEvent('pointerup', {
+      clientX: 500,
+      clientY: 30,
+      button: 0,
+      pointerId: 1,
+      bubbles: true
+    }))
+  })
+  await new Promise(r => setTimeout(r, 500))
 
   // Завершение
   server.close()
   console.log('\n=============================================')
-  console.log('ВСЕ 11 ВИЗУАЛЬНЫХ СЦЕНАРИЕВ УСПЕШНО ПРОЙДЕНЫ!')
+  console.log('ВСЕ 13 ВИЗУАЛЬНЫХ СЦЕНАРИЕВ УСПЕШНО ПРОЙДЕНЫ!')
   console.log('Снимки сохранены в qa/screenshots/visual-qa/')
   console.log('=============================================')
   app.exit(0)

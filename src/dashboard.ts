@@ -10,6 +10,16 @@ export interface DashboardPresetDef {
 
 export const builtinDashboardPresets: DashboardPresetDef[] = [
   {
+    id: 'overview',
+    name: 'Обзор (Стандартный)',
+    description: 'Сбалансированный вид: продолжение работы, дела на день и материалы на потом.',
+    widgets: [
+      { id: 'resume', type: 'resume', size: 'M', colSpan: 6, rowSpan: 4 },
+      { id: 'day', type: 'day', size: 'M', colSpan: 6, rowSpan: 5 },
+      { id: 'reading', type: 'reading', size: 'M', colSpan: 6, rowSpan: 4 }
+    ]
+  },
+  {
     id: 'calm',
     name: 'Спокойный (Фокус)',
     description: 'Без новостей и почты. Только текущие дела, глубокий фокус и заметки.',
@@ -31,16 +41,6 @@ export const builtinDashboardPresets: DashboardPresetDef[] = [
       { id: 'news', type: 'news', size: 'M', detail: 'titles', colSpan: 6, rowSpan: 4 },
       { id: 'spaces', type: 'spaces', size: 'M', colSpan: 6, rowSpan: 4 },
       { id: 'weather', type: 'weather', size: 'M', colSpan: 6, rowSpan: 4 }
-    ]
-  },
-  {
-    id: 'overview',
-    name: 'Обзор (Стандартный)',
-    description: 'Сбалансированный вид: продолжение работы, дела на день и дайджест.',
-    widgets: [
-      { id: 'resume', type: 'resume', size: 'M', colSpan: 6, rowSpan: 4 },
-      { id: 'day', type: 'day', size: 'M', colSpan: 6, rowSpan: 5 },
-      { id: 'news', type: 'news', size: 'M', detail: 'titles', colSpan: 6, rowSpan: 4 }
     ]
   },
   {
@@ -70,7 +70,7 @@ export const builtinDashboardPresets: DashboardPresetDef[] = [
 export const defaultWidgets: WidgetConfig[] = builtinDashboardPresets.find(p => p.id === 'overview')?.widgets || [
   { id: 'resume', type: 'resume', size: 'M', colSpan: 6, rowSpan: 4 },
   { id: 'day', type: 'day', size: 'M', colSpan: 6, rowSpan: 5 },
-  { id: 'news', type: 'news', size: 'M', detail: 'titles', colSpan: 6, rowSpan: 4 }
+  { id: 'reading', type: 'reading', size: 'M', colSpan: 6, rowSpan: 4 }
 ]
 
 export function getPresetWidgets(
@@ -86,8 +86,17 @@ export function getPresetWidgets(
 
 export function dashboardWidgets(widgets?: WidgetConfig[], gridVersion?: number): WidgetConfig[] {
   if (!widgets) return defaultWidgets
-  const oldDefault = widgets.length === 3 && widgets.every((widget, index) => widget.type === ['resume', 'day', 'capture'][index] && widget.size === ['M', 'M', 'L'][index])
-  if (oldDefault) return defaultWidgets
+  if (widgets.length === 0) return []
+
+  // Миграция устаревших дефолтных раскладок на новое строгое ядро из 3 карточек:
+  // 1. Старый дефолт с быстрой записью: ['resume', 'day', 'capture']
+  // 2. Старый дефолт с новостями: ['resume', 'day', 'news']
+  // 3. Старый 6-карточный кокпит: ['resume', 'day', 'mail', 'news', 'spaces', 'weather']
+  const oldCapture = widgets.length === 3 && widgets.every((widget, index) => widget.type === ['resume', 'day', 'capture'][index])
+  const oldNews = widgets.length === 3 && widgets.every((widget, index) => widget.type === ['resume', 'day', 'news'][index])
+  const oldWork = widgets.length === 6 && widgets.every((widget, index) => widget.type === ['resume', 'day', 'mail', 'news', 'spaces', 'weather'][index])
+  if (oldCapture || oldNews || oldWork) return defaultWidgets
+
   if (gridVersion && gridVersion >= 2) return widgets
 
   // Migrate old 6-column / 4-row layout to 12-column / 8-row layout:
@@ -121,6 +130,33 @@ export const widgetNames: Record<WidgetType, string> = {
   map: 'Карты и пробки',
   habits: 'Забота и привычки'
 }
+
+/**
+ * Виджеты, скрытые из активного выбора (припаркованы до следующих версий)
+ * ради снижения когнитивной нагрузки и устранения рисков (Calm Tech).
+ */
+export const parkedWidgetTypes: readonly WidgetType[] = [
+  'mail',
+  'map',
+  'habits',
+  'weather'
+] as const
+
+/**
+ * Виджеты, доступные пользователю в меню добавления на дашборд.
+ * Включает обязательное ядро (Продолжить, Дела, Чтение), рабочие карточки (Запись, Пространства, Заметки, Фокус)
+ * и опциональный Дайджест новостей.
+ */
+export const availableWidgetTypes: readonly WidgetType[] = [
+  'resume',
+  'day',
+  'reading',
+  'news',
+  'capture',
+  'spaces',
+  'notes',
+  'focus'
+] as const
 
 export const widgetConstraints: Record<WidgetType, { minCol: number; maxCol: number; minRow: number; maxRow: number }> = {
   resume: { minCol: 2, maxCol: 12, minRow: 1, maxRow: 8 },

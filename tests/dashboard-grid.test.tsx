@@ -146,10 +146,12 @@ describe('Dashboard Grid Model & Constraints', () => {
 describe('ScratchpadWidget & ReadingShelfWidget UI', () => {
   let root: Root
   beforeEach(() => {
+    localStorage.removeItem('dombro:reading-shelf-view')
     document.body.innerHTML = '<div id="test-root"></div>'
     root = createRoot(document.getElementById('test-root')!)
   })
   afterEach(async () => {
+    localStorage.removeItem('dombro:reading-shelf-view')
     await act(async () => root.unmount())
   })
 
@@ -263,6 +265,145 @@ describe('ScratchpadWidget & ReadingShelfWidget UI', () => {
     const updater = onChange.mock.calls[0][0]
     const nextState = updater(stateWithLinks)
     expect(nextState.spaces[0].resources.find((r: Resource) => r.id === linkRes1.id)?.completedAt).toBeDefined()
+  })
+
+  it('переключает режим отображения между списком и плитками и отображает квадратные миниатюры', async () => {
+    const linkRes: Resource = {
+      id: 'res-grid-1',
+      name: 'Дизайн систем и типографика',
+      kind: 'link',
+      target: 'https://habr.com/ru/articles/123456/',
+      createdAt: new Date().toISOString()
+    }
+    const stateWithLink: AppState = {
+      version: 2,
+      spaces: [{ id: 'space-1', name: 'Дизайн', tone: 'sage', resources: [linkRes] }],
+      reminders: [],
+      dismissedUntil: null
+    }
+
+    await act(async () => {
+      root.render(<ReadingShelfWidget state={stateWithLink} onChange={vi.fn()} onOpen={vi.fn()} onAddLink={vi.fn()} />)
+    })
+
+    // Default list view
+    expect(document.querySelector('.reading-shelf-list')).not.toBeNull()
+    expect(document.querySelector('.reading-shelf-grid')).toBeNull()
+
+    // Switch to grid view
+    const gridBtn = document.querySelector('button[aria-label="Отображение плитками"]') as HTMLButtonElement
+    expect(gridBtn).not.toBeNull()
+    await act(async () => {
+      gridBtn.click()
+    })
+
+    expect(document.querySelector('.reading-shelf-grid')).not.toBeNull()
+    expect(document.querySelector('.reading-shelf-list')).toBeNull()
+
+    // Check square thumbnail structure
+    const tile = document.querySelector('.reading-shelf-tile') as HTMLElement
+    expect(tile).not.toBeNull()
+    const thumb = tile.querySelector('.reading-tile-thumb') as HTMLElement
+    expect(thumb).not.toBeNull()
+    expect(thumb.textContent).toContain('мин')
+    expect(thumb.textContent).toContain('H') // Monogram for habr
+
+    const tileTitle = tile.querySelector('.reading-tile-title') as HTMLElement
+    expect(tileTitle.textContent).toContain('Дизайн систем и типографика')
+
+    // Switch back to list view
+    const listBtn = document.querySelector('button[aria-label="Отображение списком"]') as HTMLButtonElement
+    await act(async () => {
+      listBtn.click()
+    })
+    expect(document.querySelector('.reading-shelf-list')).not.toBeNull()
+    expect(document.querySelector('.reading-shelf-grid')).toBeNull()
+  })
+
+  it('отображает скриншот из covers при совпадении адреса вкладки в режиме плиток', async () => {
+    const linkRes: Resource = {
+      id: 'res-cover-1',
+      name: 'Документация React',
+      kind: 'link',
+      target: 'https://react.dev/learn',
+      createdAt: new Date().toISOString()
+    }
+    const fakeCoverData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    const stateWithTab: AppState = {
+      version: 2,
+      spaces: [{
+        id: 'sp-1',
+        name: 'Разработка',
+        tone: 'sage',
+        resources: [linkRes],
+        session: { tabs: [{ id: 'tab-react-1', title: 'React', url: 'https://react.dev/learn' }], activeTabId: 'tab-react-1' }
+      }],
+      reminders: [],
+      dismissedUntil: null
+    }
+
+    await act(async () => {
+      root.render(
+        <ReadingShelfWidget
+          state={stateWithTab}
+          onChange={vi.fn()}
+          onOpen={vi.fn()}
+          onAddLink={vi.fn()}
+          covers={{ 'tab-react-1': fakeCoverData }}
+        />
+      )
+    })
+
+    const gridBtn = document.querySelector('button[aria-label="Отображение плитками"]') as HTMLButtonElement
+    expect(gridBtn).not.toBeNull()
+    await act(async () => {
+      gridBtn.click()
+    })
+
+    const coverImg = document.querySelector('.reading-tile-cover-img') as HTMLImageElement
+    expect(coverImg).not.toBeNull()
+    expect(coverImg.src).toBe(fakeCoverData)
+  })
+
+  it('выполняет порционную подгрузку при скролле для длинных списков', async () => {
+    const manyResources: Resource[] = Array.from({ length: 25 }, (_, i) => ({
+      id: `link-${i}`,
+      name: `Материал номер ${i + 1}`,
+      kind: 'link',
+      target: `https://example.com/item-${i + 1}`,
+      createdAt: new Date(Date.now() - i * 1000).toISOString()
+    }))
+
+    const stateWithMany: AppState = {
+      version: 2,
+      spaces: [{ id: 'space-1', name: 'Чтение', tone: 'sage', resources: manyResources }],
+      reminders: [],
+      dismissedUntil: null
+    }
+
+    await act(async () => {
+      root.render(<ReadingShelfWidget state={stateWithMany} onChange={vi.fn()} onOpen={vi.fn()} onAddLink={vi.fn()} />)
+    })
+
+    // Initially loads first batch (12 items)
+    const rowsInitial = document.querySelectorAll('.reading-shelf-row')
+    expect(rowsInitial.length).toBe(12)
+
+    // Simulate scroll to near bottom
+    const scrollContainer = document.querySelector('.reading-shelf-scroll') as HTMLDivElement
+    expect(scrollContainer).not.toBeNull()
+
+    Object.defineProperty(scrollContainer, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(scrollContainer, 'clientHeight', { value: 300, configurable: true })
+    Object.defineProperty(scrollContainer, 'scrollTop', { value: 680, configurable: true }) // 680 + 300 = 980 >= 1000 - 60
+
+    await act(async () => {
+      scrollContainer.dispatchEvent(new Event('scroll'))
+    })
+
+    // Next batch loaded (12 + 12 = 24 items)
+    const rowsAfter = document.querySelectorAll('.reading-shelf-row')
+    expect(rowsAfter.length).toBe(24)
   })
 })
 

@@ -13,6 +13,7 @@ class BrowserManager {
     this.blocked = false
     this.partition = partitionName
     this.permissions = new Map()
+    this.pendingPermissions = new Map()
     const profile = session.fromPartition(partitionName)
 
     const chromeVersion = process.versions.chrome || '132.0.0.0'
@@ -298,6 +299,65 @@ class BrowserManager {
       lang: record.lang
     })
   }
+  pagePasswordSubmit(sender, data) {
+    if (!data || typeof data !== 'object') return
+    const record = [...this.tabs.values()].find(item => item.view.webContents.id === sender.id)
+    if (!record || record.view.webContents.isDestroyed()) return
+
+    let currentUrl = ''
+    try {
+      currentUrl = record.view.webContents.getURL()
+    } catch {}
+    if (!currentUrl) return
+
+    let pageOrigin = ''
+    let hostname = ''
+    try {
+      const parsed = new URL(currentUrl)
+      pageOrigin = parsed.origin
+      hostname = parsed.hostname
+    } catch {}
+    if (!pageOrigin || data.origin !== pageOrigin) return
+
+    const username = typeof data.username === 'string' ? data.username.trim() : ''
+    const password = typeof data.password === 'string' ? data.password : ''
+    if (!password) return
+
+    this.send({
+      type: 'password-save-offer',
+      tabId: record.id,
+      origin: pageOrigin,
+      hostname: hostname || pageOrigin,
+      username,
+      password
+    })
+  }
+  async autofill(tabId, cred) {
+    const record = this.tabs.get(tabId)
+    if (!record || record.view.webContents.isDestroyed()) return false
+    if (!cred || typeof cred !== 'object') return false
+
+    let currentUrl = ''
+    try {
+      currentUrl = record.view.webContents.getURL()
+    } catch {}
+    if (!currentUrl) return false
+
+    if (cred.origin) {
+      try {
+        const pageOrigin = new URL(currentUrl).origin
+        if (cred.origin.toLowerCase() !== pageOrigin.toLowerCase()) return false
+      } catch {
+        return false
+      }
+    }
+
+    record.view.webContents.send('page:autofill', {
+      username: cred.username || '',
+      password: cred.password || ''
+    })
+    return true
+  }
   async applyDarkMode(tabId, enabled) {
     const record = this.tabs.get(tabId)
     if (!record || record.view.webContents.isDestroyed()) return
@@ -347,17 +407,6 @@ class BrowserManager {
       console.warn('[Translate] Ошибка перевода:', err)
       return { ok: false, error: err.message }
     }
-  }
-  passwordOffer(sender, data) {
-    const record = [...this.tabs.values()].find(item => item.view.webContents.id === sender.id)
-    if (!record || !data || !data.origin || !data.password) return
-    this.send({
-      type: 'password-offer',
-      origin: data.origin,
-      username: data.username || '',
-      password: data.password,
-      title: data.title || ''
-    })
   }
   action(id, action) {
     const contents = this.tabs.get(id)?.view.webContents
