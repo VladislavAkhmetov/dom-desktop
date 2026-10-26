@@ -2139,7 +2139,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -13px;
+  bottom: -13px !important;
   height: 2.5px;
   background: #355e43;
   border-radius: 2px;
@@ -2431,35 +2431,82 @@
   letter-spacing: -0.015em;
 }
 
-/* UI Tabs: 24 / 30 px, Literata Medium for active tab, muted for inactive tab */
-.calm-tabs button.selected,
-.calm-tabs button[aria-pressed=true] {
-  font-family: var(--font-display) !important;
-  font-size: 24px !important;
-  font-weight: 500 !important;
-  line-height: 30px !important;
-  color: #1c2621 !important;
-  letter-spacing: -0.015em;
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
+/* UI Tabs: Serene Underline Tabs (Manrope 14px, zero layout shift, calm underline) */
+.calm-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 20px !important;
+  min-width: 0;
+  height: 100%;
 }
 
 .calm-tabs button {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 30px;
-  color: #7b8b81;
-  background: transparent;
-  border: none;
-  padding: 0;
+  font-family: var(--font-ui) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+  letter-spacing: -0.01em !important;
+  color: #607668 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 3px 2px 5px 2px !important;
+  margin: 0 !important;
   cursor: pointer;
+  position: relative;
+  white-space: nowrap;
   transition: color 0.15s ease;
+  flex-shrink: 0;
 }
 
-.calm-tabs button:hover:not(.selected) {
-  color: #1c2621;
+.calm-tabs button:hover {
+  color: #1c2621 !important;
+}
+
+.calm-tabs button.selected,
+.calm-tabs button[aria-selected="true"],
+.calm-tabs button[aria-pressed="true"] {
+  font-family: var(--font-ui) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 20px !important;
+  color: #1c2621 !important;
+  letter-spacing: -0.01em !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 3px 2px 5px 2px !important;
+}
+
+.calm-tabs button.selected::after,
+.calm-tabs button[aria-selected="true"]::after,
+.calm-tabs button[aria-pressed="true"]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0px;
+  height: 2px;
+  background: #2a4736;
+  border-radius: 2px;
+  animation: calmTabLineIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes calmTabLineIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calm-tabs button.selected::after,
+  .calm-tabs button[aria-selected="true"]::after,
+  .calm-tabs button[aria-pressed="true"]::after {
+    animation: none;
+  }
 }
 
 /* Header Action Buttons (max 1-2 icons on right, + or ⋯ or calendar) */

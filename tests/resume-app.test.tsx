@@ -7,6 +7,7 @@ import { contextSession } from '../src/workContexts'
 import App from '../src/App'
 
 const native = vi.hoisted(() => ({ openResource: vi.fn(), pickResource: vi.fn(), show: vi.fn(), hide: vi.fn(), close: vi.fn(), park: vi.fn(), listener: undefined as undefined | ((event: NativeBrowserEvent) => void) }))
+vi.mock('../src/cabinetMode', () => ({ isCabinetPreview: false }))
 vi.mock('../src/bridge', () => ({ isDesktop: true, bridge: {
   platform: 'win32', openResource: native.openResource, pickResource: native.pickResource,
   getAutostart: async () => false, onFocusCapture: () => () => {},

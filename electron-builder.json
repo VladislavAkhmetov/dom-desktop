@@ -8,6 +8,9 @@
   },
   "files": [
     "dist/**/*",
+    "!dist/win-unpacked/**",
+    "!dist/*.7z",
+    "!dist/*.exe",
     "electron/**/*",
     "shared/**/*",
     "public/**/*",

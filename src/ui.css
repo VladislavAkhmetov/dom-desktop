@@ -95,8 +95,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .resume-recent button:hover { color: #213e2b; }
 .resume-context-link { font-size: var(--text-meta); color: #6d7f6c; display: flex; align-items: center; gap: 7px; align-self: flex-start; }
 .plan-card { background: rgba(227,236,216,.96); padding: 29px 30px 24px; gap: 22px; }
-.plan-card .calm-tabs { gap: 23px; }
-.plan-card .calm-tabs button { font-size: var(--text-body); }
+.plan-card .calm-tabs { gap: 20px; }
+
 .plan-card .calm-icon { background: transparent; border-radius: 8px; width: 30px; height: 30px; }
 .plan-card .calm-icon:hover { background: rgba(64,89,52,.08); }
 .calm-plan-list { gap: 0; }

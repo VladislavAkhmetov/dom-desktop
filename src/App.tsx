@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
-  AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, History, Pencil,
+  AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Compass, History, Pencil,
   ExternalLink, FileText, Folder, Globe2, Link2,
   Bookmark, LayoutGrid, Pin, Plus, Search, Settings2, Sparkles, SquarePlus, Trash2, X
 } from 'lucide-react'
@@ -1753,7 +1753,7 @@ function App() {
                 >
                   <FluidGroup as="div" className={`chrome-spaces-track ${spacesTabDrag.dragId ? 'is-reordering' : ''}`} itemSelector=":scope > .chrome-space">
                     {visibleTopSpaces.map(space => {
-                      const displayName = formatSpaceDisplayName(space)
+                      const displayName = formatSpaceDisplayName(space, visibleTopSpaces)
                       const isDragging = spacesTabDrag.dragId === space.id
                       const interactions = spaceInteractions(space, true)
                       return (
@@ -1812,7 +1812,7 @@ function App() {
                       width: spacesTabDrag.dragLayout.current.width
                     }}
                   >
-                    <span>{formatSpaceDisplayName(spacesTabDrag.draggedSpace)}</span>
+                    <span>{formatSpaceDisplayName(spacesTabDrag.draggedSpace, visibleTopSpaces)}</span>
                   </div>,
                   document.body
                 )}
@@ -1939,53 +1939,92 @@ function App() {
         ) : showSpaces && !currentSpace ? (
           <SpacesOverview spaces={availableTopSpaces} hasArchive={state.spaces.some(space => space.archivedAt)} onOpen={openSpace} onCreate={createStream} onArchive={() => setModal('archive')}
             onPin={toggleSpacePin} onRename={renameCabinet} onArchiveSpace={archiveSpace} onDelete={space => { setSpaceActionId(space.id); setModal('deleteSpace') }} interactions={spaceInteractions} actionsForSpace={spaceActions} dropSpaceId={cabinetDrop?.id} />
-        ) : currentSpace && (
-          <main className={`collection-stage space-detail tone-context-${currentSpace.tone}${isCabinetPreview ? ' cabinet-detail' : ''}`} aria-label={currentSpace.name}>
-            <div className="collection-header">
-              <div>
-                <button className="back-button" onClick={() => setRoute({ type: 'spaces' })}><ChevronLeft size={18} /> Пространства</button>
-                <div className="space-title-row" {...spaceInteractions(currentSpace)}>
-                  <h1 title={currentSpace.name}>{currentSpace.name}</h1>
-                  <button className="calm-icon" aria-label="Переименовать пространство" onClick={() => { if (isCabinetPreview) renameCabinet(currentSpace); else { setNewSpaceName(currentSpace.name); setModal('renameSpace') } }}><Pencil size={17} /></button>
+        ) : currentSpace && (() => {
+          const cabinetTabsCount = currentSpace.activeSession?.tabs.filter(tab => Boolean(tab.url)).length || 0
+          const cabinetMaterialsCount = currentSpace.resources.length
+          const isSpaceActive = isCabinetPreview && state.activeSpaceId === currentSpace.id
+          const statusText = isCabinetPreview
+            ? cabinetTabsCount === 0 && cabinetMaterialsCount === 0
+              ? 'Новый кабинет · Готов к работе'
+              : `${isSpaceActive ? 'Активен сейчас' : 'В спящем режиме · Память свободна'}${spaceContents(currentSpace) ? ` · ${spaceContents(currentSpace)}` : ''}`
+            : spaceContents(currentSpace)
+
+          return (
+            <main className={`collection-stage space-detail tone-context-${currentSpace.tone}${isCabinetPreview ? ' cabinet-detail' : ''}`} aria-label={currentSpace.name}>
+              <div className="collection-header">
+                <div>
+                  <button className="back-button" onClick={() => setRoute({ type: 'spaces' })}><ChevronLeft size={18} /> Пространства</button>
+                  <div className="space-title-row" {...spaceInteractions(currentSpace)}>
+                    <h1 title={currentSpace.name}>{currentSpace.name}</h1>
+                    <button className="calm-icon" aria-label="Переименовать пространство" onClick={() => { if (isCabinetPreview) renameCabinet(currentSpace); else { setNewSpaceName(currentSpace.name); setModal('renameSpace') } }}><Pencil size={17} /></button>
+                  </div>
+                  {statusText && <p className="space-detail-meta">{statusText}</p>}
                 </div>
-                {spaceContents(currentSpace) && <p className="space-detail-meta">{spaceContents(currentSpace)}</p>}
+                <div className="space-add-actions">
+                  {(!isCabinetPreview || cabinetTabsCount > 0) && (
+                    <button className="space-open-tabs" data-workspace-navigation onClick={() => openWorkstage(currentSpace.id)}>
+                      <Globe2 size={18} /> Открыть вкладки
+                    </button>
+                  )}
+                  <ActionMenu label="Добавить в пространство" triggerContent={<><Plus size={18} />Добавить<ChevronDown size={14} /></>} actions={[
+                    { label: 'Сайт', icon: <Link2 size={17} />, onSelect: () => startLink(currentSpace.id) },
+                    { label: 'Документ', icon: <FileText size={17} />, onSelect: () => addDocumentReference(currentSpace.id) },
+                    { label: 'Открытое окно', icon: <AppWindow size={17} />, onSelect: () => openWindowPicker(currentSpace.id) },
+                    { label: 'Приложение', icon: <AppWindow size={17} />, onSelect: () => addPicked('app', currentSpace.id) }
+                  ]} />
+                  <ActionMenu label="Действия с пространством" actions={[
+                    ...(isCabinetPreview ? [
+                      { label: 'Настроить продолжение пространства', icon: <Pencil size={17} />, onSelect: () => editContext(currentSpace.id) },
+                      ...spaceActions(currentSpace)
+                    ] : []),
+                    { label: 'Что изменилось', icon: <History size={17} />, onSelect: () => setModal('changes') },
+                    ...(!isCabinetPreview ? [{ label: 'В архив', icon: <Archive size={17} />, onSelect: () => archiveSpace(currentSpace) }] : [])
+                  ]} />
+                </div>
               </div>
-              <div className="space-add-actions">
-                <button className="space-open-tabs" data-workspace-navigation onClick={() => openWorkstage(currentSpace.id)}>
-                  <Globe2 size={18} /> Открыть вкладки
-                </button>
-                <ActionMenu label="Добавить в пространство" triggerContent={<><Plus size={18} />Добавить<ChevronDown size={14} /></>} actions={[
-                  { label: 'Сайт', icon: <Link2 size={17} />, onSelect: () => startLink(currentSpace.id) },
-                  { label: 'Документ', icon: <FileText size={17} />, onSelect: () => addDocumentReference(currentSpace.id) },
-                  { label: 'Открытое окно', icon: <AppWindow size={17} />, onSelect: () => openWindowPicker(currentSpace.id) },
-                  { label: 'Приложение', icon: <AppWindow size={17} />, onSelect: () => addPicked('app', currentSpace.id) }
-                ]} />
-                <ActionMenu label="Действия с пространством" actions={[
-                  ...(isCabinetPreview ? [
-                    { label: 'Настроить продолжение пространства', icon: <Pencil size={17} />, onSelect: () => editContext(currentSpace.id) },
-                    ...spaceActions(currentSpace)
-                  ] : []),
-                  { label: 'Что изменилось', icon: <History size={17} />, onSelect: () => setModal('changes') },
-                  ...(!isCabinetPreview ? [{ label: 'В архив', icon: <Archive size={17} />, onSelect: () => archiveSpace(currentSpace) }] : [])
-                ]} />
-              </div>
-            </div>
-            {!isCabinetPreview && <nav className="space-contexts" aria-label="Текущее дело для открываемых документов"><span>Дело</span>{normalizeSpace(currentSpace).workContexts!.map(context => <button className="soft-button" key={context.id} aria-pressed={context.id === currentContext(currentSpace).id} title={`Открываемые документы добавятся в «${contextTitle(currentSpace, context)}»`} onClick={() => commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id === currentSpace.id ? activateContext(space, context.id) : space) }))}><span>{contextTitle(currentSpace, context)}{context.completedAt ? ' · завершено' : ''}</span></button>)}<button className="calm-text-button" onClick={() => editContext(currentSpace.id, undefined, true)}><Plus size={15} />Новое дело</button><button className="calm-icon" title="Настроить продолжение текущего дела" aria-label="Настроить продолжение текущего дела" onClick={() => editContext(currentSpace.id)}><Pencil size={15} /></button></nav>}
-            {visibleSpaceCheckpoint && <section className="space-continuation card">
-              <div className="continuation-copy"><time className="continuation-kicker" dateTime={visibleSpaceCheckpoint.savedAt}>{new Date(visibleSpaceCheckpoint.savedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time><h2>{visibleSpaceCheckpoint.nextStep || (isCabinetPreview ? 'Продолжить работу' : 'Продолжить дело')}</h2>{visibleSpaceCheckpoint.note && <p>{visibleSpaceCheckpoint.note}</p>}</div>
-              {isCabinetPreview ? <button className="primary-button" onClick={() => editContext(currentSpace.id)}>Настроить <Pencil size={18} /></button> : <button className="primary-button" onClick={() => resumeContext(currentSpace.id, currentContext(currentSpace).id)}>Продолжить <ArrowRight size={18} /></button>}
-              {Boolean(currentSpace.checkpointHistory?.length) && <details><summary><History size={15} />Предыдущие сохранения</summary>{currentSpace.checkpointHistory?.filter(point => (point.contextId || `${currentSpace.id}:context`) === currentContext(currentSpace).id).map(point => <p key={point.id}>{new Date(point.savedAt).toLocaleString('ru-RU')} · {point.nextStep || point.note || 'Вкладки сохранены'}</p>)}</details>}
-            </section>}
-            {isCabinetPreview ? <CabinetContents key={currentSpace.id} space={currentSpace} destinations={availableTopSpaces.filter(space => space.id !== currentSpace.id)} covers={tabCovers} drag={cabinetDrag}
-              pointerTabTarget={cabinetTabDrop} onPointerStart={pointerCabinet.start}
-              onSelectTab={id => selectExistingTab(currentSpace.id, id)} onCloseTab={id => handleCloseTab(id, currentSpace.id)} onSaveTab={tab => requestSaveTab(tab, currentSpace.id)}
-              onMoveTab={(id, destination) => moveTab(currentSpace.id, id, destination)} onReorderTab={(id, target, after) => reorderTab(currentSpace.id, currentContext(currentSpace).id, id, target, after)}
-              onOpen={resource => { void openResource(resource) }} onRemove={removeResource} onCopy={copyToCabinet} onAddDocument={() => addDocumentReference(currentSpace.id)} onAddLink={() => startLink(currentSpace.id)}
-              onStartDrag={startCabinetDrag} onFinishDrag={finishCabinetDrag}
-              suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, currentSpace.id)} onDismissRecentFile={dismissRecentDocument} /> : currentSpace.resources.length ? <><div className="resource-grid" style={{ '--resource-rows': resourceRows, gridTemplateColumns: `repeat(${collectionColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${resourceRows}, minmax(0, 1fr))` } as React.CSSProperties}>{sortedResources.slice(visibleResourcePage * resourcePageSize, visibleResourcePage * resourcePageSize + resourcePageSize).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name" title={resource.name}>{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div></> : <div className="empty-space card"><span className="empty-space-icon"><Folder size={28} strokeWidth={1.3} /></span><div className="empty-space-copy"><h2>Нет материалов</h2></div><div className="empty-space-actions"><button onClick={() => startLink(currentSpace.id)}><Link2 size={17} />Сохранить сайт</button><button onClick={() => addDocumentReference(currentSpace.id)}><Plus size={17} />Документ</button></div></div>}
-            {!isCabinetPreview && currentSpace.resources.length > resourcePageSize && <div className="page-controls"><div><button onClick={() => setResourcePage(visibleResourcePage - 1)} disabled={visibleResourcePage === 0} aria-label="Предыдущая страница"><ChevronLeft size={20} /></button><span>{visibleResourcePage + 1} / {resourcePages}</span><button onClick={() => setResourcePage(visibleResourcePage + 1)} disabled={visibleResourcePage >= resourcePages - 1} aria-label="Следующая страница"><ChevronRight size={20} /></button></div></div>}
-          </main>
-        )}
+              {!isCabinetPreview && <nav className="space-contexts" aria-label="Текущее дело для открываемых документов"><span>Дело</span>{normalizeSpace(currentSpace).workContexts!.map(context => <button className="soft-button" key={context.id} aria-pressed={context.id === currentContext(currentSpace).id} title={`Открываемые документы добавятся в «${contextTitle(currentSpace, context)}»`} onClick={() => commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id === currentSpace.id ? activateContext(space, context.id) : space) }))}><span>{contextTitle(currentSpace, context)}{context.completedAt ? ' · завершено' : ''}</span></button>)}<button className="calm-text-button" onClick={() => editContext(currentSpace.id, undefined, true)}><Plus size={15} />Новое дело</button><button className="calm-icon" title="Настроить продолжение текущего дела" aria-label="Настроить продолжение текущего дела" onClick={() => editContext(currentSpace.id)}><Pencil size={15} /></button></nav>}
+              {visibleSpaceCheckpoint && (
+                isCabinetPreview ? (
+                  <div className="cabinet-continuation-banner" role="region" aria-label="Точка возвращения к задаче">
+                    <div className="cabinet-continuation-body">
+                      <span className="cabinet-continuation-icon" aria-hidden="true"><Compass size={17} /></span>
+                      <div className="cabinet-continuation-copy">
+                        <strong className="cabinet-continuation-step">{visibleSpaceCheckpoint.nextStep || 'Продолжить работу'}</strong>
+                        {visibleSpaceCheckpoint.note && <span className="cabinet-continuation-note"> · {visibleSpaceCheckpoint.note}</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="cabinet-continuation-edit"
+                      onClick={() => editContext(currentSpace.id)}
+                      title="Настроить следующий шаг"
+                      aria-label="Настроить следующий шаг"
+                    >
+                      <Pencil size={14} />
+                      <span>Настроить</span>
+                    </button>
+                  </div>
+                ) : (
+                  <section className="space-continuation card">
+                    <div className="continuation-copy"><time className="continuation-kicker" dateTime={visibleSpaceCheckpoint.savedAt}>{new Date(visibleSpaceCheckpoint.savedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time><h2>{visibleSpaceCheckpoint.nextStep || 'Продолжить дело'}</h2>{visibleSpaceCheckpoint.note && <p>{visibleSpaceCheckpoint.note}</p>}</div>
+                    <button className="primary-button" onClick={() => resumeContext(currentSpace.id, currentContext(currentSpace).id)}>Продолжить <ArrowRight size={18} /></button>
+                    {Boolean(currentSpace.checkpointHistory?.length) && <details><summary><History size={15} />Предыдущие сохранения</summary>{currentSpace.checkpointHistory?.filter(point => (point.contextId || `${currentSpace.id}:context`) === currentContext(currentSpace).id).map(point => <p key={point.id}>{new Date(point.savedAt).toLocaleString('ru-RU')} · {point.nextStep || point.note || 'Вкладки сохранены'}</p>)}</details>}
+                  </section>
+                )
+              )}
+              {isCabinetPreview ? <CabinetContents key={currentSpace.id} space={currentSpace} destinations={availableTopSpaces.filter(space => space.id !== currentSpace.id)} covers={tabCovers} drag={cabinetDrag}
+                pointerTabTarget={cabinetTabDrop} onPointerStart={pointerCabinet.start}
+                onSelectTab={id => selectExistingTab(currentSpace.id, id)} onCloseTab={id => handleCloseTab(id, currentSpace.id)} onSaveTab={tab => requestSaveTab(tab, currentSpace.id)}
+                onMoveTab={(id, destination) => moveTab(currentSpace.id, id, destination)} onReorderTab={(id, target, after) => reorderTab(currentSpace.id, currentContext(currentSpace).id, id, target, after)}
+                onOpen={resource => { void openResource(resource) }} onRemove={removeResource} onCopy={copyToCabinet} onAddDocument={() => addDocumentReference(currentSpace.id)} onAddLink={() => startLink(currentSpace.id)}
+                onAddWindow={() => openWindowPicker(currentSpace.id)}
+                onOpenTabs={() => openWorkstage(currentSpace.id)}
+                onStartDrag={startCabinetDrag} onFinishDrag={finishCabinetDrag}
+                suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, currentSpace.id)} onDismissRecentFile={dismissRecentDocument} /> : currentSpace.resources.length ? <><div className="resource-grid" style={{ '--resource-rows': resourceRows, gridTemplateColumns: `repeat(${collectionColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${resourceRows}, minmax(0, 1fr))` } as React.CSSProperties}>{sortedResources.slice(visibleResourcePage * resourcePageSize, visibleResourcePage * resourcePageSize + resourcePageSize).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name" title={resource.name}>{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div></> : <div className="empty-space card"><span className="empty-space-icon"><Folder size={28} strokeWidth={1.3} /></span><div className="empty-space-copy"><h2>Нет материалов</h2></div><div className="empty-space-actions"><button onClick={() => startLink(currentSpace.id)}><Link2 size={17} />Сохранить сайт</button><button onClick={() => addDocumentReference(currentSpace.id)}><Plus size={17} />Документ</button></div></div>}
+              {!isCabinetPreview && currentSpace.resources.length > resourcePageSize && <div className="page-controls"><div><button onClick={() => setResourcePage(visibleResourcePage - 1)} disabled={visibleResourcePage === 0} aria-label="Предыдущая страница"><ChevronLeft size={20} /></button><span>{visibleResourcePage + 1} / {resourcePages}</span><button onClick={() => setResourcePage(visibleResourcePage + 1)} disabled={visibleResourcePage >= resourcePages - 1} aria-label="Следующая страница"><ChevronRight size={20} /></button></div></div>}
+            </main>
+          )
+        })()}
         </div>
         {!isWorkstageOpen && <BottomDock
           state={state}

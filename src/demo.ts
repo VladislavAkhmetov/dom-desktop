@@ -10,7 +10,7 @@ const additionalSpaces: Space[] = [
 
 export function exampleDay(): AppState {
   try {
-    const saved = sessionStorage.getItem(KEY)
+    const saved = sessionStorage.getItem(KEY) || sessionStorage.getItem('dom-example-day-v2')
     if (saved) {
       const state = JSON.parse(saved) as AppState
       const missing = additionalSpaces.filter(space => !state.spaces.some(item => item.id === space.id))

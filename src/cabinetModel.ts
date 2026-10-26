@@ -70,7 +70,7 @@ export function newCabinet(state: AppState, id: string, tabId: string, tone: Spa
   return { ...state, activeSpaceId: id, spaces: [...state.spaces, space] }
 }
 
-export function formatSpaceDisplayName(space: Space): string {
+export function formatSpaceDisplayName(space: Space, allSpaces?: Space[]): string {
   const rawName = space.name?.trim() || ''
   const isGeneric = !rawName || /^(Поток:\s*\d|Поток$|Новое пространство)/i.test(rawName) || space.nameOrigin === 'temporary' || space.nameOrigin === 'suggested'
   if (!isGeneric) {
@@ -94,15 +94,38 @@ export function formatSpaceDisplayName(space: Space): string {
       } else {
         domainLabel = host
       }
-      return `Поток · ${domainLabel}`
+      return domainLabel
     } catch {}
   }
   const material = space.resources?.find(r => r.kind !== 'app')
   if (material) {
     const label = material.name.replace(/\.[a-z0-9]+$/i, '').trim()
-    if (label) return `Поток · ${label}`
+    if (label) return label
   }
-  return rawName || 'Новое пространство'
+
+  // Fallback for generic empty spaces: convert archaic prototype labels like "Поток: 24 сент." to clean names
+  const cleanRaw = /^(Поток:\s*\d|Поток$)/i.test(rawName) ? 'Новое пространство' : (rawName || 'Новое пространство')
+
+  if (allSpaces && allSpaces.length > 1) {
+    const genericMatches = allSpaces.filter(s => {
+      const sRaw = s.name?.trim() || ''
+      const isSGeneric = !sRaw || /^(Поток:\s*\d|Поток$|Новое пространство)/i.test(sRaw) || s.nameOrigin === 'temporary' || s.nameOrigin === 'suggested'
+      if (!isSGeneric) return false
+      const sSession = contextSession(s)
+      const hasContent = (sSession?.tabs || []).some(t => Boolean(t.url)) || (s.resources || []).some(r => r.kind !== 'app')
+      return !hasContent
+    })
+    if (genericMatches.length > 1) {
+      const idx = genericMatches.findIndex(s => s.id === space.id)
+      if (idx > 0) {
+        return `Новое пространство ${idx + 1}`
+      } else if (idx === 0) {
+        return 'Новое пространство'
+      }
+    }
+  }
+
+  return cleanRaw
 }
 
 /** A transparent metadata fallback; it does not call or pretend to be AI. */
