@@ -222,6 +222,11 @@ async function run() {
     const spaceBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Работа' || b.getAttribute('aria-label')?.includes('Работа'))
     if (spaceBtn) spaceBtn.click()
   })
+  await waitFor(async () => {
+    const s = await storage.get()
+    return s.activeSpaceId === 'space-work'
+  }, 'активное пространство переключено на Работа в SQLite')
+  await waitFor(() => renderer(() => document.querySelector('.chrome-space.selected')?.textContent?.trim() === 'Работа'), 'пространство Работа выбрано в React')
   assert.equal(await renderer(() => Boolean(document.querySelector('.app-shell.browsing'))), false, 'Выбор пространства в дашборде остаётся в дашборде')
 
   // 11. Verify adding a document reference on desktop uses bridge.pickResource directly
@@ -265,8 +270,10 @@ async function run() {
 
   // 13. Verify explicit browser action opens browser workstage
   const entry = await renderer(async () => {
-    const openBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Открыть вкладки' || b.getAttribute('aria-label') === 'Браузер')
-    if (openBtn) openBtn.click()
+    const openBtn = document.querySelector('.space-threshold .resume-primary, .space-threshold [data-workspace-navigation]')
+      || [...document.querySelectorAll('button')].find(b => b.textContent?.includes('Открыть вкладки'))
+    if (!openBtn) throw new Error('openBtn not found in DOM!')
+    openBtn.click()
     // React commits the click after its event batch; the 320ms journey is still running.
     while (!document.querySelector('#root .app-shell.browsing')) await new Promise(resolve => setTimeout(resolve, 0))
     return { live: Boolean(document.querySelector('#root .app-shell.browsing')), journey: Boolean(document.querySelector('[data-workspace-transition]')) }
@@ -358,7 +365,7 @@ async function run() {
   await waitFor(() => !liveTab.desired, 'страница скрыта при возврате в дашборд')
   assert.equal(liveTab.desired, false, 'Нативная страница скрыта при возврате в дашборд')
   await waitFor(() => renderer(() => !document.querySelector('[data-workspace-transition]')), 'обратный переход завершён')
-  await renderer(() => document.querySelector('#root .space-open-tabs').click())
+  await renderer(() => (document.querySelector('#root .space-threshold .resume-primary, #root .space-threshold [data-workspace-navigation], #root .space-open-tabs'))?.click())
   await waitFor(() => liveTab.desired && !manager.blocked, 'повторный вход в браузер')
   assert.equal(await liveTab.view.webContents.executeJavaScript('document.querySelector("#test-input").value'), 'Продолжаем работу', 'Возврат сохраняет ввод на живой странице')
 
