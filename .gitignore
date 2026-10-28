@@ -10,4 +10,6 @@ release/
 .env
 .env.*
 qa/screenshots/
+.figma/
+.mise.toml
 
