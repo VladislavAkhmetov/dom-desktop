@@ -36,7 +36,7 @@
     "electron-updater": "^6.8.9",
     "ical.js": "^2.2.1",
     "jsdom": "^26.1.0",
-    "koffi": "^3.3.3",
+    "koffi": "^3.3.4",
     "lucide-react": "^1.47.0",
     "motion": "^14.0.0",
     "react": "^19.3.0",
