@@ -17,3 +17,24 @@ export function resourceAppLabel(resource: Resource): string {
   }
   return 'Программа по умолчанию'
 }
+
+// «.psd · Photoshop» for files; site or app label otherwise. Shared by the space page and the new tab.
+export function documentFormat(resource: Resource) {
+  const extension = resource.target.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+  if (extension) {
+    switch (extension) {
+      case 'psd': return '.psd · Photoshop'
+      case 'ai': return '.ai · Illustrator'
+      case 'fig': return 'Figma · Документ'
+      case 'pdf': return '.pdf · Документ'
+      case 'docx':
+      case 'doc': return `.${extension} · Word`
+      case 'xlsx':
+      case 'xls': return `.${extension} · Excel`
+      case 'pptx':
+      case 'ppt': return `.${extension} · PowerPoint`
+      default: return `.${extension} · Документ`
+    }
+  }
+  return resourceAppLabel(resource)
+}

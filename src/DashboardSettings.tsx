@@ -1,17 +1,18 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, BookmarkPlus, Check, Plus, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, BookmarkPlus, Check, CloudSun, Coffee, Plus, Sparkles, Sprout, Trash2, Wind, X, Zap, type LucideIcon } from 'lucide-react'
 import type { DashboardCustomPreset, WidgetConfig } from './types'
 import { Dialog } from './Dialog'
 import { availableWidgetTypes, builtinDashboardPresets, defaultWidgets, widgetDefaultSpan, widgetNames } from './dashboard'
 import { WallpaperPicker } from './WallpaperPicker'
 
-const PRESET_ICONS: Record<string, string> = {
-  overview: '☕',
-  calm: '🧘',
-  work: '⚡',
-  city: '🌤️',
-  balance: '🌱'
+const PRESET_ICONS: Record<string, LucideIcon> = {
+  overview: Coffee,
+  calm: Wind,
+  work: Zap,
+  city: CloudSun,
+  balance: Sprout
 }
+function PresetIcon({ id }: { id: string }) { const Icon = PRESET_ICONS[id] || Sparkles; return <Icon size={18} aria-hidden="true" /> }
 
 export function DashboardSettings({
   widgets,
@@ -237,7 +238,7 @@ export function DashboardSettings({
                     }}
                   >
                     <div className="preset-icon-badge" aria-hidden="true">
-                      {PRESET_ICONS[p.id] || '✨'}
+                      <PresetIcon id={p.id} />
                     </div>
                     <div className="preset-card-info">
                       <strong>{p.name}</strong>
@@ -289,7 +290,7 @@ export function DashboardSettings({
                       }}
                     >
                       <div className="preset-icon-badge" aria-hidden="true">
-                        🔖
+                        <Bookmark size={18} aria-hidden="true" />
                       </div>
                       <div className="preset-card-info">
                         <strong>{cp.name}</strong>

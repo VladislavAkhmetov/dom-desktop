@@ -28,7 +28,8 @@ export interface OpenWindowItem {
 export interface BookmarkGroup { id: string; name: string }
 export interface BookmarkDestination { spaceId: string; groupId?: string }
 
-export type SpaceKind = 'base' | 'stream' | 'web'
+/** 'day': the «Сегодня» draft and past days (src/dayDraft.ts). */
+export type SpaceKind = 'base' | 'stream' | 'web' | 'day'
 
 export interface RecentFile {
   name: string
@@ -89,6 +90,10 @@ export interface Space {
   name: string
   tone: SpaceTone
   kind?: SpaceKind
+  /** Day drafts only: YYYY-MM-DD of the day (boundary 04:00). */
+  day?: string
+  /** Day drafts only: retired into «Прошлые дни» (renamed to its date). */
+  dayRetired?: boolean
   resources: Resource[]
   bookmarkGroups?: BookmarkGroup[]
   lastActiveAt?: string
@@ -248,7 +253,10 @@ export interface AppState {
     customPresets?: DashboardCustomPreset[]
     resumeDismissed?: boolean
   }
+  /** «Анимация напоминаний»: on unless explicitly turned off (row hint in the plan, bell sway in the island). */
   liveHints?: boolean
+  /** Off by default: typed search text goes to Google only after the user turns this on (docs/security.md). */
+  searchSuggestions?: boolean
   dismissedNotices?: string[]
   notifiedNotices?: string[]
   mailAccounts?: MailAccount[]
@@ -291,6 +299,9 @@ export interface SavedCredential {
   updatedAt: string
 }
 
+/** What the interface receives from the vault: never the password (see docs/security.md). */
+export type CredentialSummary = Omit<SavedCredential, 'password'>
+
 export interface OpenResult { ok: boolean; error?: string }
 
 export interface DomBridge {
@@ -303,10 +314,17 @@ export interface DomBridge {
   backup(): Promise<boolean>
   closeCapture?(): Promise<void>
   vault?: {
-    listCredentials(origin?: string): Promise<SavedCredential[]>
-    saveCredential(cred: { id?: string; origin: string; username: string; password: string; title?: string }): Promise<SavedCredential>
+    /** With a page address or host: only that exact site (www. ignored). */
+    listCredentials(site?: string): Promise<CredentialSummary[]>
+    /** One password, for an explicit user action in settings. */
+    revealPassword(id: string): Promise<string>
+    saveCredential(cred: { id?: string; origin: string; username: string; password: string; title?: string }): Promise<CredentialSummary>
+    /** Saves the password captured from a page; it never left the main process. `password` overrides it. */
+    saveOffer(token: string, username: string, password?: string): Promise<CredentialSummary>
     removeCredential(id: string): Promise<boolean>
     importCredentials(csv: string): Promise<number>
+    /** Writes a Bitwarden-compatible CSV via a save dialog; false when cancelled. */
+    exportCredentials(): Promise<boolean>
   }
   integrations?: {
     configureGoogle(clientId: string): Promise<void>
@@ -344,7 +362,7 @@ export interface DomBridge {
     getReaderContent?(tabId: string): Promise<ReaderArticle | null>
     translateText?(text: string, targetLang?: string): Promise<string>
     translateTab?(tabId: string): Promise<{ ok: boolean; count?: number; error?: string }>
-    autofill?(tabId: string, cred: { username?: string; password?: string; origin?: string }): Promise<boolean>
+    autofill?(tabId: string, credentialId: string): Promise<boolean>
   }
   bitwardenStatus?(): Promise<BitwardenExtensionStatus>
   pickResource(kind: 'app' | 'file'): Promise<string | null>
@@ -364,7 +382,8 @@ export interface DomBridge {
   setTitleBarOverlay?(options?: { color?: string; symbolColor?: string; height?: number }): Promise<boolean>
   getRecentFiles?(): Promise<RecentFile[]>
   onToast?(callback: (message: string) => void): () => void
-  onUpdateReady?(callback: (update: { version: string }) => void): () => void
+  onUpdateReady?(callback: (update: AppUpdate) => void): () => void
+  openReleasePage?(): Promise<boolean>
   onFocusCapture(callback: () => void): () => void
   onVoiceToggle?(callback: () => void): () => void
   onStateChanged(callback: (state: AppState) => void): () => void
@@ -434,7 +453,8 @@ export interface PasswordSavePromptInfo {
   origin: string
   hostname: string
   username: string
-  password: string
+  /** Opaque handle of the password kept in the main process. */
+  token: string
 }
 
 export type NativeBrowserEvent =
@@ -444,5 +464,10 @@ export type NativeBrowserEvent =
   | { type: 'cover'; tabId: string; image: string }
   | { type: 'permission-request'; id: string; tabId?: string; hostname: string; origin: string; permission: string; details?: string }
   | { type: 'adblock-stats'; tabId: string; count: number }
-  | { type: 'password-save-offer'; tabId: string; origin: string; hostname: string; username: string; password: string }
+  | { type: 'password-save-offer'; tabId: string; origin: string; hostname: string; username: string; token: string }
 
+/** manual: portable build — a newer release exists and has to be downloaded from its page. */
+export interface AppUpdate {
+  version: string
+  manual?: boolean
+}

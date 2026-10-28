@@ -7,24 +7,42 @@ import { normalizeSpace } from '../shared/state'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
-it('показывает верхний фрагмент только по запросу из готового снимка, не открывая страницу и не меняя материалы', async () => {
-  const space = normalizeSpace({ id: 'logo', name: 'Логотип', tone: 'sage', resources: [], activeSession: { tabs: [{ id: 'ref', title: 'Референс', url: 'https://ref.test/' }], activeTabId: 'ref' } })
+it('при наведении показывает готовый снимок вкладки, не открывая страницу и не меняя материалы', async () => {
+  const space = normalizeSpace({ id: 'logo', name: 'Логотип', tone: 'sage', resources: [], activeSession: { tabs: [{ id: 'ref', title: 'Референс', url: 'https://ref.test/' }, { id: 'fresh', title: 'Без снимка', url: 'https://fresh.test/' }], activeTabId: 'ref' } })
   const before = structuredClone(space)
   const open = vi.fn(), close = vi.fn(), save = vi.fn(), move = vi.fn(), reorder = vi.fn(), remove = vi.fn(), copy = vi.fn(), add = vi.fn(), drag = vi.fn(), finish = vi.fn()
-  const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jS1sAAAAASUVORK5CYII='
+  const image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ=='
   const container = document.createElement('div'); document.body.append(container)
   const root = createRoot(container)
+  const row = (id: string) => container.querySelector<HTMLElement>(`[data-tab-id="${id}"] .cabinet-tab-open`)!
+  const hover = (element: HTMLElement) => element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
+  const leave = (element: HTMLElement) => element.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+  vi.useFakeTimers()
   try {
     await act(async () => root.render(<CabinetContents space={space} destinations={[]} covers={{ ref: image }} drag={null} onSelectTab={open} onCloseTab={close} onSaveTab={save} onMoveTab={move} onReorderTab={reorder} onOpen={open} onRemove={remove} onCopy={copy} onAddDocument={add} onAddLink={add} onStartDrag={drag} onFinishDrag={finish} />))
-    expect(container.querySelector('.cabinet-page-fragment')).toBeNull()
-    const toggle = container.querySelector<HTMLButtonElement>('.cabinet-preview-toggle')!
-    await act(async () => toggle.click())
-    expect(container.querySelector('.cabinet-page-fragment img')?.getAttribute('src')).toBe(image)
-    await act(async () => toggle.click())
-    expect(container.querySelector('.cabinet-page-fragment')).toBeNull()
+    expect(container.querySelector('.cabinet-preview-toggle')).toBeNull()
+    expect(row('ref').hasAttribute('data-tooltip-off')).toBe(true)
+
+    await act(async () => { hover(row('ref')); vi.advanceTimersByTime(200) })
+    expect(document.querySelector('.tab-peek')).toBeNull()
+    await act(async () => { vi.advanceTimersByTime(400) })
+    expect(document.querySelector('.tab-peek img')?.getAttribute('src')).toBe(image)
+    expect(document.querySelector('.tab-peek-caption')?.textContent).toBe('ref.test')
+
+    await act(async () => { leave(row('ref')) })
+    expect(document.querySelector('.tab-peek')).toBeNull()
+
+    await act(async () => { hover(row('fresh')); vi.advanceTimersByTime(1000) })
+    expect(document.querySelector('.tab-peek')).toBeNull()
+
+    await act(async () => { hover(row('ref')); vi.advanceTimersByTime(600) })
+    expect(document.querySelector('.tab-peek')).not.toBeNull()
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(document.querySelector('.tab-peek')).toBeNull()
+
     for (const callback of [open, close, save, move, reorder, remove, copy, add, drag, finish]) expect(callback).not.toHaveBeenCalled()
     expect(space).toEqual(before)
-  } finally { await act(async () => root.unmount()); container.remove() }
+  } finally { vi.useRealTimers(); await act(async () => root.unmount()); container.remove() }
 })
 
 it('отображает чип недавнего файла и позволяет добавить его в материалы в 1 клик', async () => {

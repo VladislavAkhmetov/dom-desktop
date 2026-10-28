@@ -602,7 +602,7 @@ export function HabitsWidget({
       {isAllCompleted && (
         <div className="habits-all-done-banner" role="status">
           <Sparkles size={15} className="banner-icon" />
-          <span>День проведён с заботой о себе. Всё выполнено без спешки 🌱</span>
+          <span>День проведён с заботой о себе. Всё выполнено без спешки</span>
         </div>
       )}
     </div>

@@ -1,9 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { MotionConfig } from 'motion/react'
-import '@fontsource/inter/400.css'
-import '@fontsource/inter/500.css'
-import '@fontsource/inter/600.css'
+import { calmTween } from './motion'
 import '@fontsource/manrope/400.css'
 import '@fontsource/manrope/500.css'
 import '@fontsource/manrope/600.css'
@@ -15,6 +13,7 @@ import '@fontsource/literata/600.css'
 import '@fontsource/literata/700.css'
 import App from './App'
 import { CaptureSurface } from './CaptureSurface'
+import './tokens.css'
 import './styles.css'
 import './ui.css'
 import './glass.css'
@@ -23,7 +22,9 @@ import './browser/browsing.css'
 import './browser/browser-shell.css'
 import './browser/browser-attention.css'
 import './motion.css'
+import './card-system.css'
+import './controls.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><MotionConfig reducedMotion="user">{window.location.hash === '#capture' ? <CaptureSurface /> : <App />}</MotionConfig></React.StrictMode>
+  <React.StrictMode><MotionConfig reducedMotion="user" transition={calmTween()}>{window.location.hash === '#capture' ? <CaptureSurface /> : <App />}</MotionConfig></React.StrictMode>
 )

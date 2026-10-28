@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { motion } from 'motion/react'
-import { fluidInstant, fluidSpring, useFluidReducedMotion } from './motion'
+import { calmTween, enterOffset, fluidInstant, useFluidReducedMotion } from './motion'
 
 export function Dialog({ title, children, onClose, onEscape = onClose, className = '' }: { title: string; children: ReactNode; onClose: () => void; onEscape?: () => void; className?: string }) {
   const titleId = useId()
@@ -38,7 +38,7 @@ export function Dialog({ title, children, onClose, onEscape = onClose, className
     return () => { observer.disconnect(); document.removeEventListener('focusin', keepFocus); document.removeEventListener('keydown', keyboard, true); if (previous?.isConnected) previous.focus() }
   }, [])
   return createPortal(<div className="calm-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <motion.div className={`calm-dialog fluid-surface ${className}`} initial={reduced ? false : { opacity: 0, y: 6, scale: .992 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduced ? fluidInstant : fluidSpring.slow} ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <motion.div className={`calm-dialog fluid-surface ${className}`} initial={reduced ? false : { opacity: 0, y: enterOffset.y, scale: enterOffset.scale }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduced ? fluidInstant : calmTween()} ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="calm-dialog-heading"><h2 id={titleId}>{title}</h2><button className="calm-icon" aria-label="Закрыть" onClick={onClose}><X size={20} /></button></div>
       {children}
     </motion.div>

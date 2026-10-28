@@ -2,11 +2,8 @@ import ICAL from 'ical.js'
 import type { CalendarEvent } from '../types'
 import { extractMeetingUrl } from './ical'
 
-export function calendarRange(reference: Date) {
-  const start = new Date(reference); start.setDate(start.getDate() - 31); start.setHours(0, 0, 0, 0)
-  const end = new Date(reference); end.setDate(end.getDate() + 93); end.setHours(23, 59, 59, 999)
-  return { start, end }
-}
+import { calendarRange } from './range'
+export { calendarRange }
 
 function toDate(time: ICAL.Time, zone: string): Date {
   if (time.isDate || !zone || zone === 'floating') return new Date(time.year, time.month - 1, time.day, time.hour, time.minute, time.second)

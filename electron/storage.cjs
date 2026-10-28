@@ -17,6 +17,16 @@ function createStorage(directory) {
   worker.on('error', error => { failReady(error); for (const request of pending.values()) request.reject(error); pending.clear() })
   worker.on('exit', code => { const error = new Error(`Хранилище остановлено (${code}). Данные сохранены на диске.`); failReady(error); for (const request of pending.values()) request.reject(error); pending.clear() })
   const call = async (action, args = {}) => { await ready; return new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); worker.postMessage({ id, action, ...args }) }) }
-  return { ready, get: () => call('get'), apply: changes => call('apply', { changes }), search: query => call('search', { query }), backup: () => call('backup'), close: () => worker.terminate() }
+  // All writes go through this wrapper, so the last state it saw is current once pending writes settle.
+  // Callers must treat it as read-only (they only diff and spread it).
+  let latest = null
+  let writes = Promise.resolve()
+  const get = async () => { await writes; if (!latest) latest = await call('get'); return latest }
+  const apply = changes => {
+    const request = call('apply', { changes }).then(state => { latest = state; return state })
+    writes = request.catch(() => undefined)
+    return request
+  }
+  return { ready, get, apply, search: query => call('search', { query }), backup: () => call('backup'), close: () => worker.terminate() }
 }
 module.exports = { createStorage }

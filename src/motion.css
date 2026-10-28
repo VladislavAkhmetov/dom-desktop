@@ -1,19 +1,54 @@
+/* ══ Motion DNA (docs/motion.md) ══════════════════════════════════════════════
+ * One curve, six durations, one entrance — slow enough to be felt, soft enough to stay calm. Mirrored for Motion/WAAPI in src/motion.ts.
+ * Hover and press never move or scale things (scale blurs text); entrances travel 4px; loops only mean «working».
+ */
+:root {
+  /* curves */
+  --ease-calm: cubic-bezier(0.32, 0.72, 0, 1);  /* everything that appears, changes or moves: confident start, long quiet glide */
+  --ease-exit: cubic-bezier(0.4, 0, 0.7, 0.2);  /* leaving: eases away, never lingers */
+  --ease-breathe: cubic-bezier(0.4, 0, 0.6, 1); /* symmetric, for «working» loops only */
+
+  /* durations */
+  --motion-press: 120ms;   /* :active settle */
+  --motion-hover: 240ms;   /* hover/focus colour, background, border, shadow, opacity */
+  --motion-state: 320ms;   /* selection, toggles, chevrons, indicators moving inside a control */
+  --motion-enter: 420ms;   /* menus, popovers, toasts, panels appearing */
+  --motion-exit: 240ms;    /* the same surfaces leaving */
+  --motion-layout: 480ms;  /* size changes and spatial transitions between screens */
+  --motion-stagger: 50ms;  /* between siblings entering together (max 6 steps) */
+  --motion-spin: 1s;       /* spinners, linear */
+  --motion-breathe: 3.2s;  /* pulses of a live state (recording, focus) */
+  --motion-ring: 1100ms;   /* one sway of the reminder bell (island-bell, twice) */
+
+  /* distances */
+  --enter-x: 0px;
+  --enter-y: 8px;          /* positive rises from below, negative drops from above */
+  --enter-scale: 1;        /* surfaces anchored to a trigger use .97 */
+  --press-opacity: .88;    /* :active, instead of scale */
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --enter-x: 0px; --enter-y: 0px; --enter-scale: 1; --motion-layout: 1ms; --motion-state: 1ms; }
+}
+
+/* Individual translate/scale compose with an element's own transform (e.g. translateX(-50%) centring). */
+@keyframes calm-in { from { opacity: 0; translate: var(--enter-x) var(--enter-y); scale: var(--enter-scale); } }
+@keyframes calm-spin { to { rotate: 360deg; } }
+@keyframes calm-breathe { 50% { opacity: .45; } }
+
 /* Moving layers inherit each control's existing surface, radius and typography. */
 .fluid-group { position: relative; isolation: isolate; }
-.fluid-selection, .fluid-hover { position: absolute; top: 0; left: 0; pointer-events: none; border-radius: var(--fluid-radius, 18px); }
+.fluid-selection, .fluid-hover { position: absolute; top: 0; left: 0; pointer-events: none; border-radius: var(--fluid-radius, var(--radius-control)); }
 .fluid-selection { z-index: -2; background: var(--fluid-selected, rgba(255,255,255,.62)); box-shadow: var(--fluid-shadow, 0 2px 5px rgba(51,80,61,.035)); }
 .fluid-hover { z-index: -1; background: var(--fluid-preview, rgba(255,255,255,.36)); }
 .chrome-spaces.fluid-group .chrome-space.selected, .chrome-spaces.fluid-group .chrome-space:hover,
 .chrome-spaces-track.fluid-group .chrome-space.selected, .chrome-spaces-track.fluid-group .chrome-space:hover { background: transparent; box-shadow: none; }
 .chrome-spaces-track.is-reordering .fluid-selection,
 .chrome-spaces-track.is-reordering .fluid-hover { opacity: 0 !important; pointer-events: none !important; }
-.chrome-spaces-track.is-reordering .chrome-space:not(.is-dragging) { transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1); }
-.settings-nav.fluid-group { --fluid-radius: 12px; --fluid-selected: rgba(207,225,202,.65); --fluid-preview: rgba(219,233,215,.45); --fluid-shadow: none; }
+.chrome-spaces-track.is-reordering .chrome-space:not(.is-dragging) { transition: transform var(--motion-state) var(--ease-calm); }
+.settings-nav.fluid-group { --fluid-radius: var(--radius-md); --fluid-selected: rgba(207,225,202,.65); --fluid-preview: rgba(219,233,215,.45); --fluid-shadow: none; }
 .settings-nav.fluid-group button[aria-current], .settings-nav.fluid-group button:hover { background: transparent; }
-.fluid-menu-items { --fluid-radius: 6px; --fluid-preview: #e8edde; }
-.browser-menu .fluid-menu-items { --fluid-radius: 13px; }
 .action-menu-popover .fluid-menu-items button:hover, .action-menu-popover .fluid-menu-items button:focus { background: transparent; }
-.browser-menu.action-menu-popover .fluid-menu-items > button { min-height: 38px; gap: 10px; padding: 9px 12px; font-size: var(--text-ui); border-radius: 13px; }
+.browser-menu.action-menu-popover .fluid-menu-items > button { min-height: 38px; gap: 10px; padding: 9px 12px; font-size: var(--text-ui); border-radius: var(--radius-md); }
 .browser-menu.action-menu-popover .fluid-menu-items > button > span { overflow-wrap: anywhere; }
 .fluid-button { transition-property: background-color, color, border-color, box-shadow, opacity; }
 .fluid-button:active:not(:disabled) { transform: none; }
@@ -34,5 +69,5 @@
 .workspace-transition .workspace-scene { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; pointer-events: none; isolation: isolate; }
 .workspace-aperture { position: absolute; inset: 0; overflow: hidden; will-change: clip-path; }
 .workspace-aperture .workspace-scene { transform-origin: 50% 50%; }
-.workspace-transition-frame { position: absolute; pointer-events: none; border: 1px solid rgba(255,255,255,.8); box-shadow: 0 10px 36px rgba(34,63,47,.08); }
+.workspace-transition-frame { position: absolute; pointer-events: none; border: 1px solid var(--line-glass); box-shadow: 0 10px 36px rgba(34,63,47,.08); }
 .workspace-transition-title { position: absolute; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 1.35; pointer-events: none; }

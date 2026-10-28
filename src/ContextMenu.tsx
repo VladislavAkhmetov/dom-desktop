@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { MenuAction } from './ActionMenu'
+import { MenuItems, type MenuAction } from './ActionMenu'
 import { AnimatePresence, useIsPresent } from 'motion/react'
 import { FluidGroup, FluidSurface } from './FluidMotion'
 
@@ -32,19 +32,19 @@ function ContextMenu({ request, onClose }: { request: MenuRequest; onClose: () =
     if (!present) return
     const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) onClose() }
     const dismiss = () => onClose()
-    document.addEventListener('pointerdown', outside)
+    document.addEventListener('pointerdown', outside, true) // capture: see ActionMenu
     window.addEventListener('resize', dismiss); window.addEventListener('blur', dismiss)
-    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', dismiss); window.removeEventListener('blur', dismiss) }
+    return () => { document.removeEventListener('pointerdown', outside, true); window.removeEventListener('resize', dismiss); window.removeEventListener('blur', dismiss) }
   }, [onClose, present])
   function finish() { onClose(); request.origin.focus({ preventScroll: true }) }
   return createPortal(<FluidSurface ref={menu} role="menu" aria-label={request.label} className="action-menu-popover cabinet-context-menu" style={{ position: 'fixed', ...position, zIndex: 130, maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto', transformOrigin: 'top left' }} onContextMenu={event => event.preventDefault()} onKeyDown={event => {
     if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); event.stopPropagation(); finish() }
     if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
       event.preventDefault()
-      const items = [...menu.current!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      const items = [...menu.current!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')]
       const current = items.indexOf(document.activeElement as HTMLButtonElement)
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
       items[next]?.focus()
     }
-  }}><FluidGroup className="fluid-menu-items" axis="y">{request.actions.map(action => <button role="menuitem" key={action.id || action.label} onClick={() => { finish(); action.onSelect() }}>{action.icon}<span>{action.label}</span></button>)}</FluidGroup></FluidSurface>, document.body)
+  }}><FluidGroup className="fluid-menu-items" axis="y"><MenuItems actions={request.actions} onPick={action => { finish(); action.onSelect() }} /></FluidGroup></FluidSurface>, document.body)
 }

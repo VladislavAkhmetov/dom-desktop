@@ -14,13 +14,20 @@ export const PROFILE_TONES: { tone: SpaceTone; label: string }[] = [
   { tone: 'blue', label: 'Лазурь' }
 ]
 
-export const PROFILE_EMOJIS = ['🌿', '☕', '⚡', '🎨', '📚', '💻', '🚀', '✳']
+export const PROFILE_ICON_IDS = ['leaf', 'coffee', 'zap', 'palette', 'book', 'laptop', 'rocket', 'sparkle'] as const
+export type ProfileIconId = typeof PROFILE_ICON_IDS[number]
+// Profiles saved before the icon set stored the emoji itself.
+const LEGACY_EMOJI: Record<string, ProfileIconId> = { '🌿': 'leaf', '☕': 'coffee', '⚡': 'zap', '🎨': 'palette', '📚': 'book', '💻': 'laptop', '🚀': 'rocket', '✳': 'sparkle' }
+export function profileIconId(value?: string): ProfileIconId | '' {
+  const id = value ? LEGACY_EMOJI[value] || value : ''
+  return (PROFILE_ICON_IDS as readonly string[]).includes(id) ? id as ProfileIconId : ''
+}
 
 export function getUserProfile(state?: AppState | null): UserProfile {
   return {
     name: state?.userProfile?.name?.trim() || DEFAULT_PROFILE.name,
     avatarTone: state?.userProfile?.avatarTone || DEFAULT_PROFILE.avatarTone,
-    avatarEmoji: state?.userProfile?.avatarEmoji || '',
+    avatarEmoji: profileIconId(state?.userProfile?.avatarEmoji),
     status: state?.userProfile?.status || ''
   }
 }

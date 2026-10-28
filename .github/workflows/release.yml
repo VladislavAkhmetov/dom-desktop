@@ -1,0 +1,41 @@
+# Release: push a tag vX.Y.Z that equals "version" in package.json.
+# The workflow tests the tag, builds NSIS + portable and uploads them with latest.yml
+# to a DRAFT GitHub release (electron-builder.json → publish.releaseType = draft).
+# Nothing reaches users until a maintainer publishes the draft by hand.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Tag matches package.json
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:cabinet-native
+      - name: Build and upload to the draft release
+        run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional Windows code signing. Without these secrets the build is unsigned
+          # (SmartScreen warns; update integrity then relies on the release's sha512 only).
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}

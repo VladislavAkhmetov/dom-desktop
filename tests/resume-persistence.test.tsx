@@ -116,7 +116,8 @@ describe('Карточка «Продолжить» на дашборде', () =
     const resumeCard = document.querySelector('.resume-card')
     expect(resumeCard).not.toBeNull()
     expect(resumeCard?.textContent).toContain('Новое пространство')
-    expect(resumeCard?.textContent).toContain('Пространство готово к работе')
+    // Cabinet mode: the space name is the heading; an empty space gets a hint instead of «Чистый лист».
+    expect(resumeCard?.textContent).toContain('Откройте вкладки или добавьте файлы')
     expect(resumeCard?.textContent).toContain('Продолжить')
   })
 

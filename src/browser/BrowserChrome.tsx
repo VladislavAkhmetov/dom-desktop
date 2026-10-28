@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, Globe2, History, KeyRound, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer, X } from 'lucide-react'
-import type { BrowserTab, HistoryItem, PasswordSavePromptInfo, SavedCredential, Space, UserProfile } from '../types'
+import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, History, KeyRound, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer, X } from 'lucide-react'
+import type { BrowserTab, CredentialSummary, HistoryItem, PasswordSavePromptInfo, Space, UserProfile } from '../types'
 import { audioManager } from '../player/audioStream'
 import { getUserProfile } from '../userProfile'
 import { ActionMenu } from '../ActionMenu'
 import { isCabinetPreview } from '../cabinetMode'
 import { isAssistantEnabled } from '../assistantModel'
 import { buildOmniboxSuggestions, type OmniboxSuggestionItem } from './omniboxSuggestions'
+import { OmniboxSuggestionList } from './OmniboxSuggestionList'
 import { bridge } from '../bridge'
 import { PermissionPrompt, type PermissionRequestInfo } from './PermissionPrompt'
 import { PasswordSavePrompt } from './PasswordSavePrompt'
@@ -14,6 +15,7 @@ import { AdblockShield } from './AdblockShield'
 import { TranslateButton } from './TranslateButton'
 import '../cabinet.css'
 import '../profile.css'
+import { ProfileGlyph } from '../ProfileGlyph'
 
 export interface BrowserChromeProps {
   space: Space
@@ -60,7 +62,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [googleSuggestions, setGoogleSuggestions] = useState<string[]>([])
-  const [matchingCredentials, setMatchingCredentials] = useState<SavedCredential[]>([])
+  const [matchingCredentials, setMatchingCredentials] = useState<CredentialSummary[]>([])
   const [showAutofillPopover, setShowAutofillPopover] = useState(false)
   const [hoveredControl, setHoveredControl] = useState(false)
   const [focusedControl, setFocusedControl] = useState(false)
@@ -79,18 +81,14 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
       return
     }
     let origin = ''
-    let hostname = ''
-    try {
-      const u = new URL(tab.url)
-      origin = u.origin
-      hostname = u.hostname
-    } catch {}
-    if (!origin) {
+    try { origin = new URL(tab.url).origin } catch {}
+    if (!origin || origin === 'null') {
       setMatchingCredentials([])
       setShowAutofillPopover(false)
       return
     }
-    bridge.vault.listCredentials(hostname || origin)
+    // Exact site only; the list carries usernames, never passwords.
+    bridge.vault.listCredentials(tab.url)
       .then(list => setMatchingCredentials(list || []))
       .catch(() => setMatchingCredentials([]))
   }, [tab?.url, passwordPrompt])
@@ -100,7 +98,6 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
     setShowSuggestions(false)
     setSelectedIndex(-1)
     setAddress(tab?.url || '')
-    if (!tab?.url) input.current?.focus()
   }, [tab?.id, space.id])
 
   useEffect(() => {
@@ -217,8 +214,9 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
       <button className="brand browser-home" data-workspace-navigation onClick={onHome} aria-label="Вернуться в дашборд" title="Вернуться в дашборд"><span className="brand-mark">✳</span><span>dombro<span className="brand-dot">.</span></span></button>
       <ActionMenu className="browser-menu browser-context-menu" label="Выбрать пространство" triggerContent={<><span>{space.kind === 'web' ? 'Браузинг' : space.name}</span><ChevronDown size={14} /></>} actions={[
         ...(space.kind !== 'web' ? [{ id: 'current-space', label: 'Материалы пространства', icon: <Folder size={17} />, onSelect: onSpaceDashboard }] : []),
-        { id: 'web', label: isCabinetPreview ? 'Избранное' : 'Браузинг и избранное', icon: space.kind === 'web' ? <Check size={17} /> : <Star size={17} />, onSelect: onWeb },
-        ...spaces.filter(item => !item.archivedAt && item.kind !== 'web').map(item => ({ id: item.id, label: item.name, icon: item.id === space.id ? <Check size={17} /> : <Folder size={17} />, onSelect: () => onSpace(item.id) })),
+        // Cabinet mode: free browsing is the «Сегодня» day draft, listed first below; Избранное lives on the new tab.
+        ...(!isCabinetPreview ? [{ id: 'web', label: 'Браузинг и избранное', icon: space.kind === 'web' ? <Check size={17} /> : <Star size={17} />, onSelect: onWeb }] : []),
+        ...spaces.filter(item => !item.archivedAt && item.kind !== 'web' && !(item.kind === 'day' && item.dayRetired)).sort((a, b) => Number(b.kind === 'day') - Number(a.kind === 'day')).map(item => ({ id: item.id, label: item.name, icon: item.id === space.id ? <Check size={17} /> : <Folder size={17} />, onSelect: () => onSpace(item.id) })),
         { id: 'spaces', label: 'Все пространства', icon: <LayoutGrid size={17} />, onSelect: onAllSpaces },
         ...(isCabinetPreview && space.kind !== 'web' ? [
           { id: 'pin-space', label: space.pinned ? 'Открепить от меню' : 'Закрепить в меню', icon: <Pin size={17} />, onSelect: () => onPinSpace?.() },
@@ -301,11 +299,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
                     className="autofill-item"
                     onClick={async () => {
                       if (tab?.id && bridge.browser?.autofill) {
-                        await bridge.browser.autofill(tab.id, {
-                          username: cred.username,
-                          password: cred.password,
-                          origin: cred.origin
-                        })
+                        await bridge.browser.autofill(tab.id, cred.id)
                       }
                       setShowAutofillPopover(false)
                     }}
@@ -314,7 +308,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
                       <span className="autofill-item-user">{cred.username}</span>
                       <span className="autofill-item-dots">••••••••</span>
                     </div>
-                    <button type="button" className="password-btn password-btn-save" style={{ minWidth: 60, height: 26, fontSize: 12 }}>
+                    <button type="button" className="password-btn password-btn-save" style={{ minWidth: 60, height: 26, fontSize: 'var(--fs-meta)' }}>
                       Вставить
                     </button>
                   </div>
@@ -341,44 +335,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
         )}
 
         {showSuggestions && suggestions.length > 0 && (
-          <div className="omnibox-dropdown" role="listbox" aria-label="Подсказки адресной строки">
-            {suggestions.map((item, index) => {
-              const isSelected = index === selectedIndex
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={`omnibox-suggestion-item ${isSelected ? 'is-selected' : ''}`}
-                  onMouseDown={event => {
-                    event.preventDefault()
-                    handleSelectSuggestion(item)
-                  }}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                >
-                  <span className="omnibox-suggestion-icon" aria-hidden="true">
-                    {item.type === 'search' && <Search size={15} />}
-                    {item.type === 'url' && <Globe2 size={15} />}
-                    {item.type === 'tab' && <SquarePlus size={15} />}
-                    {item.type === 'bookmark' && <Bookmark size={15} />}
-                    {item.type === 'history' && <History size={15} />}
-                  </span>
-                  <span className="omnibox-suggestion-content">
-                    <span className="omnibox-suggestion-title">{item.title}</span>
-                    {item.subtitle && <span className="omnibox-suggestion-subtitle">{item.subtitle}</span>}
-                  </span>
-                  <span className="omnibox-suggestion-badge">
-                    {item.type === 'search' && 'Google'}
-                    {item.type === 'url' && 'Сайт'}
-                    {item.type === 'tab' && 'Вкладка'}
-                    {item.type === 'bookmark' && 'Избранное'}
-                    {item.type === 'history' && 'История'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <OmniboxSuggestionList items={suggestions} selectedIndex={selectedIndex} onSelect={handleSelectSuggestion} onHover={setSelectedIndex} />
         )}
       </form>
       {attentionIsland(hoveredControl || focusedControl)}
@@ -396,7 +353,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
             title={`Профиль: ${userProfile.name}`}
           >
             <span className={`profile-avatar-pill tone-${userProfile.avatarTone || 'sage'}`}>
-              {userProfile.avatarEmoji || (userProfile.name.trim().charAt(0).toUpperCase() || 'П')}
+              <ProfileGlyph profile={userProfile} size={15} />
             </span>
           </button>
         )

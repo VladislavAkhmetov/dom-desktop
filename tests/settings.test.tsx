@@ -107,6 +107,10 @@ describe('разделы настроек', () => {
 
   it('сохраняет переключатель и действия общих настроек', async () => {
     await mount()
+    // On by default; the first press turns reminder motion off, the second back on.
+    expect(document.querySelector('[aria-label="Анимация напоминаний"]')?.getAttribute('aria-checked')).toBe('true')
+    await click(document.querySelector('[aria-label="Анимация напоминаний"]')!)
+    expect(current.liveHints).toBe(false)
     await click(document.querySelector('[aria-label="Анимация напоминаний"]')!)
     expect(current.liveHints).toBe(true)
     await click(button('Настроить'))

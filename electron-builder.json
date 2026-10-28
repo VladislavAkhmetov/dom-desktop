@@ -20,11 +20,15 @@
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       },
       {
         "target": "portable",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
     "icon": "build/icon.ico"
@@ -43,14 +47,26 @@
     "artifactName": "${productName}-${version}-Portable.exe"
   },
   "mac": {
-    "target": ["dmg", "zip"],
+    "target": [
+      "dmg",
+      "zip"
+    ],
     "category": "public.app-category.productivity"
+  },
+  "electronFuses": {
+    "runAsNode": false,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableCookieEncryption": true,
+    "enableEmbeddedAsarIntegrityValidation": true,
+    "onlyLoadAppFromAsar": true
   },
   "publish": [
     {
       "provider": "github",
-      "owner": "owner",
-      "repo": "dombro-releases"
+      "owner": "VladislavAkhmetov",
+      "repo": "dom-desktop",
+      "releaseType": "draft"
     }
   ]
 }

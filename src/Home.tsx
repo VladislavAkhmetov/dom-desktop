@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Pencil, Plus, PlusCircle, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
+import { saveCheckpoint } from './checkpoints'
+import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Lightbulb, Pencil, Sun, Plus, PlusCircle, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
 import type { AppState, AIContext, CalendarEvent, Reminder, Resource, WidgetConfig, WidgetType } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
 import { isRealReminder, postponeReminder, realEvents, remindersForDay, rescheduleTaskToToday } from './dayModel'
@@ -23,6 +24,7 @@ import type { CalendarMode } from './calendar/model'
 import { zenTimer } from './focus/zenTimer'
 import './dashboard.css'
 import { MailWidget, NewsWidget } from './FeedWidgets'
+import { sound } from './sound'
 
 interface Props {
   viewportWidth: number
@@ -354,12 +356,14 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
 
   function changeTask(item: Reminder, patch: Partial<Reminder>, label: string) {
     const restore = Object.fromEntries(Object.keys(patch).map(key => [key, item[key as keyof Reminder]]))
+    if (patch.done === true && !item.done) sound.playTaskDone()
     onChange(previous => ({ ...previous, reminders: previous.reminders.map(value => value.id === item.id ? { ...value, ...patch } : value) }))
     setUndo({ label, restore: () => onChange(previous => ({ ...previous, reminders: previous.reminders.map(value => value.id === item.id ? { ...value, ...restore } : value) })) })
   }
 
   function postponeTask(item: Reminder, choice: 'hour' | 'tomorrow') {
     const postponed = postponeReminder(item, choice)
+    sound.playReminderLater()
     changeTask(item, { dueAt: postponed.dueAt, plannedDate: postponed.plannedDate, kind: 'task', notifiedAt: undefined }, choice === 'hour' ? 'Перенесено на час' : 'Перенесено на завтра')
   }
 
@@ -367,6 +371,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
   function showEvent(event: CalendarEvent) { setEventId(event.id); setDialog('event') }
   const selectedEvent = state.events?.find(event => event.id === eventId)
   const pickDate = (date: Date) => { const midnight = new Date(now); midnight.setHours(0, 0, 0, 0); const chosen = new Date(date); chosen.setHours(0, 0, 0, 0); setDay(Math.round((chosen.getTime() - midnight.getTime()) / 86400000)) }
+  const undatedCount = state.reminders.filter(item => !item.done && !item.plannedDate && !item.dueAt).length
   function openCalendar(mode: CalendarMode) { setCalendarMode(mode); setCalendarOpen(true) }
 
   return <>
@@ -402,6 +407,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                   onResume={retry => continuation && onResume(continuation.space.id, continuation.context.id, retry)}
                   onSpace={() => continuation ? onSpace(continuation.space.id) : onNewSpace ? onNewSpace() : onSpace('')}
                   onEdit={() => continuation && onEditContext(continuation.space.id, continuation.context.id)}
+                  onSaveStep={step => { if (continuation) onChange(previous => saveCheckpoint(previous, continuation.space.id, { contextId: continuation.context.id, nextStep: step })) }}
                   onComplete={() => continuation && onCompleteContext(continuation.space.id, continuation.context.id)}
                   onDocument={document => continuation && onOpenDocument(document, continuation.context.id)}
                   onTabs={() => continuation && onOpenContext(continuation.space.id, continuation.context.id)}
@@ -423,6 +429,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                   aria-label="План дня"
                 >
                   <div className="calm-card-heading">
+                    <span className="card-icon-tile" aria-hidden="true"><Sun size={18} /></span>
                     <div className="calm-tabs" aria-label="День плана">
                       <button aria-pressed={day === 0} className={day === 0 ? 'selected' : ''} onClick={() => setDay(0)}>Сегодня</button>
                       <button aria-pressed={day === 1} className={day === 1 ? 'selected' : ''} onClick={() => setDay(1)}>Завтра</button>
@@ -435,7 +442,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                   </div>
                   <div className="calm-plan-list">
                     {schedule.slice(0, 3).map(item => (
-                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 15 * 60000 ? 'live-hint' : ''}`}>
+                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints !== false && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 15 * 60000 ? 'live-hint' : ''}`}>
                         {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
                         <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
                         {item.event?.meetingUrl ? (
@@ -495,7 +502,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                           </div>
                         ) : (
                           <>
-                            <div className="plan-empty-label">{day === 0 ? 'На сегодня дел нет' : day === 1 ? 'На завтра пока нет дел' : 'На этот день дел нет'}</div>
+                            <div className="plan-empty-label card-accent">{day === 0 ? 'День свободен' : day === 1 ? 'Завтра пока свободно' : 'Этот день свободен'}</div>
                             <button type="button" className="plan-add-task-row" onClick={() => onPlan(day)}>
                               <PlusCircle size={20} />
                               <span>{day === 0 ? 'Добавить дело на сегодня' : day === 1 ? 'Добавить дело на завтра' : 'Добавить дело на этот день'}</span>
@@ -516,9 +523,9 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                     {earlier.length > 0 && (schedule.length > 0 || earlier.length > 2) && <button className="calm-text-button" onClick={() => showDigest()}>Осталось с прошлых дней · {earlier.length}</button>}
                     <button className="plan-undated-pill" onClick={() => showDigest('notes')} title="Открыть мысли и дела без даты">
                       <span className="plan-undated-left">
-                        <span className="plan-undated-icon">💭</span>
+                        <span className="plan-undated-icon"><Lightbulb size={18} /></span>
                         <span>Мысли без даты</span>
-                        <span className="plan-undated-count">{state.reminders.filter(item => !item.done && !item.plannedDate && !item.dueAt).length}</span>
+                        {undatedCount > 0 && <span className="plan-undated-count">{undatedCount}</span>}
                       </span>
                       <ChevronRight size={16} />
                     </button>

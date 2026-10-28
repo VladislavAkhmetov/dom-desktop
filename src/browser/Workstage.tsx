@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Columns2, FolderInput, Globe2, LayoutGrid, Plus, X, Pin, Archive, BookmarkPlus, GitBranch, FileInput, Pencil, Shield } from 'lucide-react'
-import type { BrowserTab, ReaderArticle, ResearchSource, Resource, Space } from '../types'
+import type { BrowserTab, HistoryItem, ReaderArticle, ResearchSource, Resource, Space } from '../types'
 import { NativePane } from './NativePane'
 import { ReaderView } from './ReaderView'
 import './browser.css'
@@ -40,6 +40,7 @@ export interface WorkstageProps {
   onNewContext: () => void
   onEditContext: () => void
   spaces: Space[]
+  history?: HistoryItem[]
   onReorderTab: (tabId: string, targetId: string, after: boolean) => void
   onMoveTab: (tabId: string, spaceId: string) => void
   onSplitTab: (tabId: string) => void
@@ -75,6 +76,7 @@ export function Workstage({
   onNewContext,
   onEditContext,
   spaces,
+  history,
   onReorderTab,
   onMoveTab,
   onSplitTab,
@@ -108,15 +110,18 @@ export function Workstage({
       const tab = list.querySelector<HTMLElement>('.horizontal-tab')
       const listStyle = getComputedStyle(list), plusStyle = getComputedStyle(plus)
       const minimum = tab ? parseFloat(getComputedStyle(tab).minWidth) : 64
+      // Pinned tabs are icon-only with a fixed width; only the others share the remaining room.
+      const pinnedTabs = [...list.querySelectorAll<HTMLElement>('.horizontal-tab.is-pinned')]
+      const pinnedWidth = pinnedTabs.reduce((sum, node) => sum + node.offsetWidth, 0)
       const available = element.clientWidth - plus.offsetWidth - parseFloat(plusStyle.marginLeft) - parseFloat(plusStyle.marginRight)
-        - parseFloat(listStyle.paddingLeft) - parseFloat(listStyle.paddingRight) - parseFloat(listStyle.columnGap) * Math.max(0, tabs.length - 1)
-      setTabWidth(Math.max(minimum, Math.min(210, available / Math.max(1, tabs.length))))
+        - parseFloat(listStyle.paddingLeft) - parseFloat(listStyle.paddingRight) - parseFloat(listStyle.columnGap) * Math.max(0, tabs.length - 1) - pinnedWidth
+      setTabWidth(Math.max(minimum, Math.min(210, available / Math.max(1, tabs.length - pinnedTabs.length))))
     }
     resizeTabs()
     const observer = new ResizeObserver(resizeTabs)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [tabs.length, dragId])
+  }, [tabs.length, tabs.filter(tab => tab.pinned).length, dragId])
   useEffect(() => {
     const element = strip.current!
     const revealActive = () => {
@@ -152,7 +157,9 @@ export function Workstage({
   const splitTab = tabs.find(tab => tab.id === splitTabId && tab.id !== activeTab?.id)
   const context = currentContext(space)
   const activeIndex = sortedTabs.findIndex(tab => tab.id === activeTab?.id)
-  const destinations = spaces.filter(item => item.id !== space.id && !item.archivedAt)
+  // «Избранное» lives outside spaces: the hidden bookmarks space, shown on every new tab.
+  const favorites = isCabinetPreview ? spaces.find(item => item.kind === 'web' && !item.archivedAt) : undefined
+  const destinations = spaces.filter(item => item.id !== space.id && !item.archivedAt && !(item.kind === 'day' && item.dayRetired))
   const canShowContext = !isCabinetPreview && space.kind !== 'web' && (Boolean(context.title) || normalizeSpace(space).workContexts!.length > 1)
   const finishDrag = () => { dragLayout.current = null; setDragId(null); setPreviewIds([]); setDragPointer(null); setDropAction('') }
 
@@ -285,7 +292,7 @@ export function Workstage({
   }
 
   function pane(tab?: BrowserTab, secondary = false) {
-    if (!tab) return <NativePane space={space} isSplit={false} onCloseSplit={onCloseSplit} onSaveTab={onSaveTab} onOpenExternal={onOpenTab} onOpenResource={onOpenResource} onAddLink={onAddLink} onNavigate={onNavigate} onFocusAddress={onFocusAddress} />
+    if (!tab) return <NativePane space={space} spaces={spaces} history={history} favorites={favorites} isSplit={false} onCloseSplit={onCloseSplit} onSaveTab={onSaveTab} onOpenExternal={onOpenTab} onOpenResource={onOpenResource} onAddLink={onAddLink} onNavigate={onNavigate} onFocusAddress={onFocusAddress} />
 
     if (tab.url.startsWith('research://')) {
       const artifact = space.researchArtifacts?.find(item => item.id === tab.url.slice('research://'.length))
@@ -316,6 +323,9 @@ export function Workstage({
 
     return (
       <NativePane
+        spaces={spaces}
+        history={history}
+        favorites={favorites}
         key={tab.id}
         tab={tab}
         space={space}
@@ -361,7 +371,7 @@ export function Workstage({
           const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length
           items[nextIndex]?.focus(); items[nextIndex]?.click()
         }}>
-          {sortedTabs.map(tab => <div key={tab.id} data-tab-id={tab.id} draggable style={previewStyle(tab.id)} className={`horizontal-tab ${tab.id === activeTab?.id ? 'active' : ''} ${tab.id === splitTab?.id ? 'split-active' : ''} ${dragId === tab.id ? 'is-dragging' : ''}`}
+          {sortedTabs.map(tab => <div key={tab.id} data-tab-id={tab.id} draggable style={previewStyle(tab.id)} className={`horizontal-tab ${tab.pinned ? 'is-pinned' : ''} ${tab.id === activeTab?.id ? 'active' : ''} ${tab.id === splitTab?.id ? 'split-active' : ''} ${dragId === tab.id ? 'is-dragging' : ''}`}
             onPointerDown={event => {
               if (event.button !== 0 || (event.target as HTMLElement).closest('.horizontal-tab-close')) return
               event.preventDefault()

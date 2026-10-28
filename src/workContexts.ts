@@ -74,7 +74,8 @@ export function documentPathKey(target: string): string {
 }
 
 export function latestContinuation(state: AppState) {
-  return state.spaces.filter(space => !space.archivedAt && space.kind !== 'web').flatMap(original => {
+  // Past days are looked back at, not continued: «Продолжить» never offers yesterday's draft.
+  return state.spaces.filter(space => !space.archivedAt && space.kind !== 'web' && !(space.kind === 'day' && space.dayRetired)).flatMap(original => {
     const space = normalizeSpace(original)
     return space.workContexts!.flatMap(context => {
       if (context.completedAt) return []

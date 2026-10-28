@@ -3,6 +3,7 @@ import { applyChanges, diffState, emptyState, migrateState } from '../shared/sta
 import { searchState } from './search'
 import { isCabinetPreview } from './cabinetMode'
 import { upgradeCabinets } from './cabinetModel'
+import { withPreviewDemoData, withPreviewFixture } from './previewFixture'
 
 const STORAGE_KEY = isCabinetPreview ? 'dom-cabinet-preview-v1' : 'dom-browser-preview-v1'
 
@@ -75,27 +76,39 @@ async function transaction(update?: (value: AppState) => AppState): Promise<AppS
     tx.onabort = () => reject(tx.error || new Error('Запись отменена'))
   })
 }
+const PREVIEW_CREDENTIALS = 'dom-vault-credentials'
+function readPreviewCredentials(): import('./types').SavedCredential[] {
+  try { return JSON.parse(localStorage.getItem(PREVIEW_CREDENTIALS) || '[]') } catch { return [] }
+}
+// Same rule as electron/vault.cjs → siteHost: exact host, www. ignored.
+function siteHost(value: string) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return ''
+  try { return new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`).hostname.replace(/^www\./, '') } catch { return '' }
+}
+
 const browserBridge: DomBridge = {
   async getState() {
-    return transaction(value => isCabinetPreview ? upgradeCabinets(migrateState(value)) : migrateState(value))
+    return transaction(value => withPreviewDemoData(withPreviewFixture(isCabinetPreview ? upgradeCabinets(migrateState(value)) : migrateState(value))))
   },
   async saveState(state) { const previous = await transaction(); await transaction(value => applyChanges(value, diffState(previous, state))); return true },
   async applyChanges(changes) { return transaction(value => applyChanges(value, changes)) },
   async search(query) { return searchState(await transaction(), query) },
   async backup() { const value = await transaction(); localStorage.setItem(`${STORAGE_KEY}-backup`, JSON.stringify(value)); return true },
   vault: {
-    async listCredentials(origin?: string) {
-      try {
-        const raw = localStorage.getItem('dom-vault-credentials')
-        const list: import('./types').SavedCredential[] = raw ? JSON.parse(raw) : []
-        if (!origin) return list
-        const norm = origin.trim().toLowerCase()
-        return list.filter(item => item.origin.toLowerCase().includes(norm) || (item.title && item.title.toLowerCase().includes(norm)))
-      } catch { return [] }
+    // Browser preview only (localStorage, not encrypted). Mirrors the desktop contract: lists never carry passwords.
+    async listCredentials(site?: string) {
+      const host = site ? siteHost(site) : ''
+      if (site && !host) return []
+      return readPreviewCredentials().filter(item => !host || siteHost(item.origin) === host).map(({ password: _password, ...rest }) => rest)
+    },
+    async revealPassword(id: string) {
+      const item = readPreviewCredentials().find(entry => entry.id === id)
+      if (!item) throw new Error('Пароль не найден')
+      return item.password
     },
     async saveCredential(cred: { id?: string; origin: string; username: string; password: string; title?: string }) {
-      const raw = localStorage.getItem('dom-vault-credentials')
-      const list: import('./types').SavedCredential[] = raw ? JSON.parse(raw) : []
+      const list = readPreviewCredentials()
       const id = cred.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `cred-${Date.now()}`)
       const entry: import('./types').SavedCredential = {
         id,
@@ -108,13 +121,13 @@ const browserBridge: DomBridge = {
       const existing = list.findIndex(item => item.id === id || (item.origin.toLowerCase() === entry.origin.toLowerCase() && item.username.toLowerCase() === entry.username.toLowerCase()))
       if (existing >= 0) list[existing] = { ...list[existing], ...entry, id: list[existing].id }
       else list.push(entry)
-      localStorage.setItem('dom-vault-credentials', JSON.stringify(list))
-      return entry
+      localStorage.setItem(PREVIEW_CREDENTIALS, JSON.stringify(list))
+      const { password: _password, ...summary } = entry
+      return summary
     },
+    async saveOffer() { throw new Error('Сохранение паролей со страниц доступно в настольной версии.') },
     async removeCredential(id: string) {
-      const raw = localStorage.getItem('dom-vault-credentials')
-      const list: import('./types').SavedCredential[] = raw ? JSON.parse(raw) : []
-      localStorage.setItem('dom-vault-credentials', JSON.stringify(list.filter(item => item.id !== id)))
+      localStorage.setItem(PREVIEW_CREDENTIALS, JSON.stringify(readPreviewCredentials().filter(item => item.id !== id)))
       return true
     },
     async importCredentials(csv: string) {
@@ -134,6 +147,19 @@ const browserBridge: DomBridge = {
         }
       }
       return count
+    },
+    async exportCredentials() {
+      const list = readPreviewCredentials()
+      if (!list.length) return false
+      const escape = (value: string) => `"${(value || '').replace(/"/g, '""')}"`
+      const csv = 'name,url,username,password\n' + list.map(item => [item.title || item.origin, item.origin, item.username, item.password].map(escape).join(',')).join('\n')
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `dombro-passwords-bitwarden-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+      return true
     }
   },
   browser: {
@@ -225,7 +251,9 @@ const browserBridge: DomBridge = {
     return await res.text()
   },
   async fetchSuggestions(query: string) {
-    if (!query.trim()) return []
+    // Same rule as electron/main.cjs → browser:suggest: opt-in, never addresses, paths, e-mails or tokens.
+    const q = query.trim()
+    if (!q || /[\/\\:@]/.test(q) || /^\S+\.\S+$/.test(q) || /^\S{24,}$/.test(q) || (await transaction()).searchSuggestions !== true) return []
     try {
       const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query.trim())}`)
       if (!res.ok) return []
@@ -250,6 +278,7 @@ const browserBridge: DomBridge = {
   async getRecentFiles() { return [] },
   onToast() { return () => undefined },
   onUpdateReady() { return () => undefined },
+  async openReleasePage() { return false },
   onFocusCapture() { return () => undefined },
   onVoiceToggle() { return () => undefined },
   onStateChanged() { return () => undefined }

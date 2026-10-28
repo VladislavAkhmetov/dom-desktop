@@ -4,7 +4,22 @@ const { AdblockManager } = require('./adblock.cjs')
 const { parseReaderContent, applyDarkMode } = require('./reader.cjs')
 const { translateText } = require('./translate.cjs')
 
+// Executables and scripts that Windows runs on double-click. dombro has no download malware scanning
+// (Electron ships without Safe Browsing), so these get one explicit question before saving.
+const RUNNABLE_DOWNLOAD = /\.(exe|msi|msix|appx|bat|cmd|com|scr|pif|ps1|vbs|vbe|js|jse|wsf|wsh|hta|cpl|reg|lnk|jar|dll)$/i
+// Site permission decisions: "https://site.example|media" → true/false, remembered across restarts.
+function permissionKey(contents, permission) {
+  try { const origin = new URL(contents.getURL()).origin; return origin && origin !== 'null' ? `${origin}|${permission}` : '' } catch { return '' }
+}
+
+const { idleTabs } = require('./tab-memory.cjs')
+
 function validURL(value) { try { return ['https:', 'http:'].includes(new URL(value).protocol) } catch { return false } }
+// Tab covers live only in renderer memory (≤40). JPEG keeps a 1000px frame several times smaller than PNG.
+function coverImage(frame) {
+  const image = frame.resize({ width: Math.min(1000, frame.getSize().width) })
+  return `data:image/jpeg;base64,${image.toJPEG(82).toString('base64')}`
+}
 
 class BrowserManager {
   constructor(window, partitionName = 'persist:dom-browser') {
@@ -12,8 +27,14 @@ class BrowserManager {
     this.tabs = new Map()
     this.blocked = false
     this.partition = partitionName
+    this.permissionsFile = path.join(app.getPath('userData'), 'site-permissions.json')
     this.permissions = new Map()
+    try { for (const [key, value] of Object.entries(JSON.parse(require('node:fs').readFileSync(this.permissionsFile, 'utf8')))) if (typeof value === 'boolean' && key.includes('|')) this.permissions.set(key, value) } catch { /* no saved decisions yet */ }
     this.pendingPermissions = new Map()
+    // Passwords captured from a page stay here until the user answers the save prompt.
+    // The interface only gets a token (see takePasswordOffer).
+    this.passwordOffers = new Map()
+    this.discardTimer = setInterval(() => { this.discardIdle().catch(() => undefined) }, 60_000)
     const profile = session.fromPartition(partitionName)
 
     const chromeVersion = process.versions.chrome || '132.0.0.0'
@@ -67,7 +88,8 @@ class BrowserManager {
       if (!['media', 'geolocation', 'notifications', 'clipboard-read'].includes(permission)) return callback(false)
       let hostname
       try { hostname = new URL(contents.getURL()).hostname } catch { return callback(false) }
-      const key = `${hostname}:${permission}`
+      const key = permissionKey(contents, permission)
+      if (!key) return callback(false)
       if (this.permissions.has(key)) return callback(this.permissions.get(key))
 
       const tabRecord = [...this.tabs.values()].find(item => item.view.webContents.id === contents.id)
@@ -85,13 +107,15 @@ class BrowserManager {
       })
     })
     profile.setPermissionCheckHandler((contents, permission) => {
-      let hostname
-      try { hostname = new URL(contents.getURL()).hostname } catch { return false }
-      const key = `${hostname}:${permission}`
-      if (this.permissions.has(key)) return this.permissions.get(key)
-      return false
+      const key = contents ? permissionKey(contents, permission) : ''
+      return Boolean(key) && this.permissions.get(key) === true
     })
-    profile.on('will-download', (_event, item) => item.setSaveDialogOptions({ title: 'Сохранить загрузку', defaultPath: item.getFilename() }))
+    profile.on('will-download', (_event, item) => {
+      item.setSaveDialogOptions({ title: 'Сохранить загрузку', defaultPath: item.getFilename() })
+      if (!RUNNABLE_DOWNLOAD.test(item.getFilename())) return
+      const choice = dialog.showMessageBoxSync(this.window, { type: 'warning', title: 'Файл запускает программы', message: `«${item.getFilename()}» — исполняемый файл.`, detail: 'dombro не проверяет загрузки на вирусы. Скачивайте такие файлы только с сайтов, которым доверяете.', buttons: ['Не скачивать', 'Скачать'], defaultId: 0, cancelId: 0, noLink: true })
+      if (choice !== 1) item.cancel()
+    })
   }
   send(message) { if (!this.window.isDestroyed()) this.window.webContents.send('browser:event', message) }
   metadata(record, updates) { this.send({ type: 'update', tabId: record.id, spaceId: record.spaceId, updates }) }
@@ -167,6 +191,7 @@ class BrowserManager {
     }
     record.spaceId = spaceId
     record.desired = true
+    record.hiddenAt = undefined
     record.bounds = { x: Math.max(0, Math.round(bounds.x)), y: Math.max(0, Math.round(bounds.y)), width: Math.max(1, Math.round(bounds.width)), height: Math.max(1, Math.round(bounds.height)) }
     record.view.setBounds(record.bounds)
     record.view.setVisible(!this.blocked)
@@ -176,10 +201,17 @@ class BrowserManager {
     const record = this.tabs.get(id)
     if (!record) return
     if (record.desired && !record.view.webContents.isDestroyed()) record.view.webContents.capturePage().then(frame => {
-      if (this.tabs.get(id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: id, image: frame.resize({ width: Math.min(1000, frame.getSize().width) }).toDataURL() })
+      if (this.tabs.get(id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: id, image: coverImage(frame) })
     }).catch(() => undefined)
     record.desired = false
+    record.hiddenAt = Date.now()
     record.view.setVisible(false)
+  }
+  // Memory Saver (tab-memory.cjs). close(id, false) also keeps pages that ask to stay (beforeunload).
+  async discardIdle(now = Date.now()) {
+    const idle = idleTabs([...this.tabs.values()].filter(record => !record.view.webContents.isDestroyed()), now)
+    for (const record of idle) await this.close(record.id, false)
+    return idle.length
   }
   async block(value) {
     if (this.blocked === Boolean(value)) return
@@ -188,7 +220,7 @@ class BrowserManager {
       if (this.blocked && record.desired) {
         // The trusted UI gets a frozen page while the native page is blocked.
         record.view.webContents.capturePage().then(frame => {
-          if (this.tabs.get(record.id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: record.id, image: frame.resize({ width: Math.min(1000, frame.getSize().width) }).toDataURL() })
+          if (this.tabs.get(record.id) === record && !frame.isEmpty()) this.send({ type: 'cover', tabId: record.id, image: coverImage(frame) })
         }).catch(() => undefined)
       }
       record.view.setVisible(record.desired && !this.blocked)
@@ -228,6 +260,7 @@ class BrowserManager {
     }
     this.window.contentView.removeChildView(record.view)
     this.tabs.delete(id)
+    for (const [key, offer] of this.passwordOffers) if (offer.tabId === id) this.passwordOffers.delete(key)
     return true
   }
   respondPermission(id, allowed) {
@@ -236,6 +269,11 @@ class BrowserManager {
     this.pendingPermissions.delete(id)
     if (allowed !== null && allowed !== undefined) {
       this.permissions.set(pending.key, Boolean(allowed))
+      try {
+        const temporary = `${this.permissionsFile}.tmp`
+        require('node:fs').writeFileSync(temporary, JSON.stringify(Object.fromEntries(this.permissions)), { mode: 0o600 })
+        require('node:fs').renameSync(temporary, this.permissionsFile)
+      } catch { /* the decision still applies for this session */ }
     }
     pending.callback(Boolean(allowed))
   }
@@ -322,40 +360,35 @@ class BrowserManager {
     const username = typeof data.username === 'string' ? data.username.trim() : ''
     const password = typeof data.password === 'string' ? data.password : ''
     if (!password) return
-
+    const now = Date.now()
+    for (const [key, offer] of this.passwordOffers) if (offer.expires < now || offer.tabId === record.id) this.passwordOffers.delete(key)
+    if (this.passwordOffers.size >= 20) this.passwordOffers.delete(this.passwordOffers.keys().next().value)
+    const token = require('node:crypto').randomUUID()
+    this.passwordOffers.set(token, { tabId: record.id, origin: pageOrigin, hostname: hostname || pageOrigin, username, password, expires: now + 10 * 60_000 })
     this.send({
       type: 'password-save-offer',
       tabId: record.id,
       origin: pageOrigin,
       hostname: hostname || pageOrigin,
       username,
-      password
+      token
     })
   }
-  async autofill(tabId, cred) {
+  takePasswordOffer(token) {
+    const offer = typeof token === 'string' ? this.passwordOffers.get(token) : undefined
+    if (!offer) return null
+    this.passwordOffers.delete(token)
+    return offer.expires >= Date.now() ? offer : null
+  }
+  // `resolve(pageUrl)` returns the credential only if it belongs to the page's site (Vault.credentialFor).
+  async autofill(tabId, resolve) {
     const record = this.tabs.get(tabId)
-    if (!record || record.view.webContents.isDestroyed()) return false
-    if (!cred || typeof cred !== 'object') return false
-
+    if (!record || record.view.webContents.isDestroyed() || typeof resolve !== 'function') return false
     let currentUrl = ''
-    try {
-      currentUrl = record.view.webContents.getURL()
-    } catch {}
-    if (!currentUrl) return false
-
-    if (cred.origin) {
-      try {
-        const pageOrigin = new URL(currentUrl).origin
-        if (cred.origin.toLowerCase() !== pageOrigin.toLowerCase()) return false
-      } catch {
-        return false
-      }
-    }
-
-    record.view.webContents.send('page:autofill', {
-      username: cred.username || '',
-      password: cred.password || ''
-    })
+    try { currentUrl = record.view.webContents.getURL() } catch {}
+    const cred = currentUrl ? resolve(currentUrl) : null
+    if (!cred) return false
+    record.view.webContents.send('page:autofill', { username: cred.username || '', password: cred.password || '' })
     return true
   }
   async applyDarkMode(tabId, enabled) {
@@ -425,6 +458,7 @@ class BrowserManager {
     return { url: contents.getURL(), title: contents.getTitle(), text: await contents.executeJavaScript("window.getSelection()?.toString() || document.querySelector('article, main')?.innerText || document.body.innerText").then(text => String(text).slice(0, 50000)) }
   }
   dispose() {
+    clearInterval(this.discardTimer)
     for (const pending of this.pendingPermissions.values()) {
       pending.callback(false)
     }

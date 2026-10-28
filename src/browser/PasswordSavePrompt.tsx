@@ -11,7 +11,8 @@ export interface PasswordSavePromptProps {
 
 export function PasswordSavePrompt({ prompt, onSave, onDismiss }: PasswordSavePromptProps) {
   const [username, setUsername] = useState(prompt.username || '')
-  const [password, setPassword] = useState(prompt.password || '')
+  // Empty = keep the password typed on the page (held by the main process). Typing here replaces it.
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const saveBtnRef = useRef<HTMLButtonElement>(null)
 
@@ -33,7 +34,6 @@ export function PasswordSavePrompt({ prompt, onSave, onDismiss }: PasswordSavePr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!password) return
     onSave(username.trim(), password)
   }
 
@@ -102,10 +102,9 @@ export function PasswordSavePrompt({ prompt, onSave, onDismiss }: PasswordSavePr
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Пароль"
+              placeholder="Как ввели на странице"
               autoComplete="off"
               spellCheck={false}
-              required
             />
             <button
               type="button"
@@ -135,7 +134,6 @@ export function PasswordSavePrompt({ prompt, onSave, onDismiss }: PasswordSavePr
             ref={saveBtnRef}
             type="submit"
             className="password-btn password-btn-save"
-            disabled={!password}
           >
             Сохранить
           </button>

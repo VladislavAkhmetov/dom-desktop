@@ -64,8 +64,18 @@ export function diffState(before, after, path = []) {
   return [{ op: after === undefined ? 'remove' : 'set', path, ...(after === undefined ? {} : { value: structuredClone(after) }) }]
 }
 
+// Structural sharing: only containers on a changed path are copied; untouched subtrees keep their
+// identity (cheap for the storage worker, and React can skip unchanged branches). `input` is never mutated.
 export function applyChanges(input, changes) {
-  const state = structuredClone(input)
+  const owned = new WeakSet()
+  const own = value => {
+    if (owned.has(value)) return value
+    const copy = Array.isArray(value) ? value.slice() : { ...value }
+    owned.add(copy)
+    return copy
+  }
+  const fresh = value => { owned.add(value); return value }
+  const state = own(input)
   for (const change of changes) {
     const { path, op, value } = change
     if (!Array.isArray(path) || !path.length || path.length > 24 || path.some(key => typeof key !== 'string' || forbidden.has(key)) || path[0] === 'revision' || path[0] === 'version' || !['set', 'remove', 'order'].includes(op)) throw new Error('Некорректная операция хранения')
@@ -73,23 +83,26 @@ export function applyChanges(input, changes) {
     let missing = false
     for (const key of path.slice(0, -1)) {
       if (key.startsWith('@') && Array.isArray(parent)) {
-        parent = parent.find(item => item.id === key.slice(1))
-        if (!parent) { missing = true; break }
+        const index = parent.findIndex(item => item?.id === key.slice(1))
+        if (index < 0) { missing = true; break }
+        if (!parent[index] || typeof parent[index] !== 'object') throw new Error('Некорректный путь хранения')
+        parent = parent[index] = own(parent[index])
       } else {
-        if (parent[key] === undefined) parent[key] = collections.has(key) || key === 'tabs' || key === 'resources' || key === 'checkpointHistory' ? [] : {}
+        if (parent[key] === undefined) parent[key] = fresh(collections.has(key) || key === 'tabs' || key === 'resources' || key === 'checkpointHistory' ? [] : {})
+        else if (!parent[key] || typeof parent[key] !== 'object') throw new Error('Некорректный путь хранения')
+        else parent[key] = own(parent[key])
         parent = parent[key]
       }
-      if (!parent || typeof parent !== 'object') throw new Error('Некорректный путь хранения')
     }
     if (missing) continue // An edit must not resurrect a concurrently removed entity.
     const key = path.at(-1)
     if (op === 'order') {
-      const array = parent[key]
-      if (!Array.isArray(array) || !Array.isArray(value)) throw new Error('Некорректный порядок элементов')
+      if (!Array.isArray(parent[key]) || !Array.isArray(value)) throw new Error('Некорректный порядок элементов')
+      const array = parent[key] = own(parent[key])
       const rank = new Map(value.map((id, index) => [id, index]))
       array.sort((a, b) => (rank.get(a.id) ?? value.length) - (rank.get(b.id) ?? value.length))
     } else if (key.startsWith('@') && Array.isArray(parent)) {
-      const index = parent.findIndex(item => item.id === key.slice(1))
+      const index = parent.findIndex(item => item?.id === key.slice(1))
       if (op === 'remove') { if (index >= 0) parent.splice(index, 1) }
       else if (index >= 0) parent[index] = structuredClone(value)
       else parent.push(structuredClone(value))

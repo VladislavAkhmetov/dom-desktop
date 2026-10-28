@@ -35,8 +35,13 @@ describe('хранилище паролей Vault', () => {
       expect(all[0].username).toBe('designer')
       expect(all[0].password).toBe('secretPassword123')
 
-      expect(vault.getCredentials('github')).toHaveLength(1)
-      expect(vault.getCredentials('google')).toHaveLength(0)
+      // The interface sees summaries for the exact site only, never the password.
+      expect(vault.summaries('https://github.com/login')).toEqual([expect.not.objectContaining({ password: expect.anything() })])
+      expect(vault.summaries('www.github.com')).toHaveLength(1)
+      expect(vault.summaries('google.com')).toHaveLength(0)
+      expect(vault.summaries('evilgithub.com')).toHaveLength(0)
+      expect(vault.summaries('hub.com')).toHaveLength(0)
+      expect(vault.summaries()[0]).not.toHaveProperty('password')
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
     }
@@ -49,9 +54,9 @@ describe('хранилище паролей Vault', () => {
       vault.saveCredential({ origin: 'https://figma.com', username: 'user@test.ru', password: 'old' })
       vault.saveCredential({ origin: 'https://figma.com', username: 'user@test.ru', password: 'new' })
 
-      const list = vault.getCredentials('figma.com')
+      const list = vault.summaries('figma.com')
       expect(list).toHaveLength(1)
-      expect(list[0].password).toBe('new')
+      expect(vault.revealPassword(list[0].id)).toBe('new')
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
     }
@@ -98,16 +103,34 @@ Figma,https://figma.com,designer,pass2`
         title: 'Linear'
       })
 
-      const list = await bridge.vault.listCredentials('linear')
-      expect(list.length).toBeGreaterThanOrEqual(1)
+      expect(await bridge.vault.listCredentials('linear')).toHaveLength(0)
+      const list = await bridge.vault.listCredentials('https://linear.app/team')
       const found = list.find(item => item.origin === 'https://linear.app')
       expect(found).toBeDefined()
       expect(found?.username).toBe('dev@studio.design')
-      expect(found?.password).toBe('linearPassword!')
+      expect(found).not.toHaveProperty('password')
+      expect(await bridge.vault.revealPassword(found!.id)).toBe('linearPassword!')
 
       await bridge.vault.removeCredential(found!.id)
       const after = await bridge.vault.listCredentials('linear.app')
       expect(after.find(item => item.id === found!.id)).toBeUndefined()
+    }
+  })
+
+  it('отдаёт пароль для автозаполнения только своему сайту и экспортирует CSV в главном процессе', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dom-vault-test-'))
+    try {
+      const vault = new Vault(tmp, mockEncryption())
+      const saved = vault.saveCredential({ origin: 'https://bank.ru', username: 'me', password: 'p"1', title: 'Банк' })
+      expect(saved).not.toHaveProperty('password')
+      expect(vault.credentialFor(saved.id, 'https://bank.ru/login')?.password).toBe('p"1')
+      expect(vault.credentialFor(saved.id, 'https://www.bank.ru/')?.password).toBe('p"1')
+      expect(vault.credentialFor(saved.id, 'https://bank.ru.evil.io/')).toBeNull()
+      expect(vault.credentialFor(saved.id, 'https://mybank.ru/')).toBeNull()
+      expect(vault.credentialFor('missing', 'https://bank.ru/')).toBeNull()
+      expect(vault.exportCsv()).toBe('name,url,username,password\n"Банк","https://bank.ru","me","p""1"')
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
     }
   })
 })

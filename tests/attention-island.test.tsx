@@ -102,10 +102,11 @@ describe('контекстные действия уведомления', () =>
 
 describe('динамический остров браузинга', () => {
   async function render(locked = false) { await act(async () => root.render(<Surface browser layoutLocked={locked} />)) }
-  it('остаётся кругом без срочного и открывает план дня за два нажатия', async () => {
+  it('без срочного остаётся тихим колокольчиком без метки и открывает план дня за два нажатия', async () => {
     await render()
     expect(document.querySelector('.browser-attention-island')?.getAttribute('data-wide')).toBe('false')
-    expect(document.querySelector('.browser-day-pulse svg')).toBeNull()
+    expect(document.querySelector('.browser-day-pulse svg.lucide-bell')).not.toBeNull()
+    expect(document.querySelector('.browser-island-dot')).toBeNull()
     expect(document.querySelector('.browser-day-pulse')?.textContent).toBe('')
     await click(document.querySelector<HTMLButtonElement>('.browser-day-pulse')!)
     expect(document.querySelector('.island-details h2')?.textContent).toBe('Нет срочного')

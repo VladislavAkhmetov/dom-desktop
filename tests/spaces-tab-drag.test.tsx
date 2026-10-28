@@ -169,7 +169,7 @@ describe('перетаскивание табов пространств в ве
     expect(document.querySelector('.chrome-space-drag-preview')).toBeNull()
 
     // State updated with new order
-    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web').map(s => s.id)
+    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web' && s.kind !== 'day').map(s => s.id)
     expect(stateOrder).toEqual(['space-2', 'space-1', 'space-3'])
   })
 
@@ -192,7 +192,7 @@ describe('перетаскивание табов пространств в ве
     // Pointer up should not commit reordering
     await pointer('pointerup', window, 200)
 
-    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web').map(s => s.id)
+    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web' && s.kind !== 'day').map(s => s.id)
     expect(stateOrder).toEqual(['space-1', 'space-2', 'space-3'])
   })
 
@@ -226,7 +226,7 @@ describe('перетаскивание табов пространств в ве
 
     await drag('drop', viewport, 200)
 
-    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web').map(s => s.id)
+    const stateOrder = current.spaces.filter(s => !s.archivedAt && s.kind !== 'web' && s.kind !== 'day').map(s => s.id)
     expect(stateOrder).toEqual(['space-2', 'space-1', 'space-3'])
   })
 })

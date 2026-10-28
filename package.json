@@ -26,7 +26,6 @@
     "dist:setup": "npm run build && node --experimental-require-module ./node_modules/electron-builder/cli.js --config electron-builder.json --win nsis"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.3.0",
     "@fontsource/literata": "^5.3.0",
     "@fontsource/manrope": "^5.3.0",
     "@ghostery/adblocker": "^2.20.1",

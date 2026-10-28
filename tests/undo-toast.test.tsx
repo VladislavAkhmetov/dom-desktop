@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '../src/types'
 import { upgradeCabinets } from '../src/cabinetModel'
 import App from '../src/App'
+import { showAllSpaces } from './helpers/spaceSwitcher'
 
 vi.mock('../src/cabinetMode', () => ({ isCabinetPreview: true }))
 const native = vi.hoisted(() => ({ openResource: vi.fn() }))
@@ -104,8 +105,7 @@ describe('Временные плашки отмены и возврата (calm
     await mount()
 
     // Go to "Все пространства"
-    const allSpacesBtn = [...document.querySelectorAll<HTMLButtonElement>('.chrome-spaces-actions button')].find(b => b.textContent?.includes('Все пространства'))
-    await click(allSpacesBtn!)
+    await showAllSpaces()
 
     // Open three dots menu on first card
     const menuBtn = document.querySelector<HTMLButtonElement>('.overview-space-menu button')
@@ -144,8 +144,7 @@ describe('Временные плашки отмены и возврата (calm
   it('наведение курсора мыши приостанавливает таймер скрытия, а уход курсора возобновляет таймер', async () => {
     await mount()
 
-    const allSpacesBtn = [...document.querySelectorAll<HTMLButtonElement>('.chrome-spaces-actions button')].find(b => b.textContent?.includes('Все пространства'))
-    await click(allSpacesBtn!)
+    await showAllSpaces()
 
     const menuBtn = document.querySelector<HTMLButtonElement>('.overview-space-menu button')
     await click(menuBtn!)
@@ -188,8 +187,7 @@ describe('Временные плашки отмены и возврата (calm
   it('клик по кнопке крестик (✕) мгновенно закрывает плашку', async () => {
     await mount()
 
-    const allSpacesBtn = [...document.querySelectorAll<HTMLButtonElement>('.chrome-spaces-actions button')].find(b => b.textContent?.includes('Все пространства'))
-    await click(allSpacesBtn!)
+    await showAllSpaces()
 
     const menuBtn = document.querySelector<HTMLButtonElement>('.overview-space-menu button')
     await click(menuBtn!)
@@ -212,8 +210,7 @@ describe('Временные плашки отмены и возврата (calm
 
     expect(current.spaces.some(s => s.id === 'space-1')).toBe(true)
 
-    const allSpacesBtn = [...document.querySelectorAll<HTMLButtonElement>('.chrome-spaces-actions button')].find(b => b.textContent?.includes('Все пространства'))
-    await click(allSpacesBtn!)
+    await showAllSpaces()
 
     const menuBtn = document.querySelector<HTMLButtonElement>('.overview-space-menu button')
     await click(menuBtn!)

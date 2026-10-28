@@ -151,7 +151,7 @@ export function SpacePanel({
                 label={`Действия с материалом ${resource.name}`}
                 actions={[
                   ...destinations.map(destination => ({
-                    label: `Также в «${destination.name}»`,
+                    group: 'Также в пространстве', label: destination.name,
                     icon: <Folder size={16} />,
                     onSelect: () => onCopy(resource, destination.id)
                   })),

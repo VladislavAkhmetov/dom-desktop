@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
+import { calmTween, fluidExit, motionDuration } from './motion'
 import { Check, Copy, FileText, ListTodo, Trash2 } from 'lucide-react'
 import type { AppState } from './types'
 import { sound } from './sound'
@@ -124,13 +125,13 @@ export function ScratchpadWidget({ state, onChange, onSaveThought }: Props) {
               initial={{ opacity: 1, x: 0, y: 0 }}
               animate={
                 reduced
-                  ? { opacity: 0, transition: { duration: 0.15 } }
+                  ? { opacity: 0, transition: fluidExit }
                   : {
                       opacity: 0,
-                      x: 26,
-                      y: -10,
+                      x: 12,
+                      y: -4,
                       filter: 'url(#calm-wind-dissolve) blur(4px)',
-                      transition: { duration: 0.28, ease: [0.2, 0, 0, 1] },
+                      transition: calmTween(motionDuration.layout),
                     }
               }
             >

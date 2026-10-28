@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState, NativeBrowserEvent, OpenResult, Resource } from '../src/types'
 import { contextSession } from '../src/workContexts'
 import App from '../src/App'
+import { openSpaceFromSwitcher } from './helpers/spaceSwitcher'
 
 const native = vi.hoisted(() => ({ openResource: vi.fn(), pickResource: vi.fn(), show: vi.fn(), hide: vi.fn(), close: vi.fn(), park: vi.fn(), listener: undefined as undefined | ((event: NativeBrowserEvent) => void) }))
 vi.mock('../src/cabinetMode', () => ({ isCabinetPreview: false }))
@@ -96,7 +97,7 @@ describe('карточка продолжения в приложении', () =
   it('сохраняет новый документ в выбранное пространство, но не включает его в продолжение до открытия или выбора', async () => {
     native.pickResource.mockResolvedValue('D:\\Projects\\Бриф.pdf')
     await mount()
-    await click(document.querySelector<HTMLButtonElement>('.chrome-space[title="Продолжить: Работа"]')!)
+    await openSpaceFromSwitcher('Работа')
     await click(document.querySelector<HTMLButtonElement>('[aria-label="Добавить в пространство"]')!)
     await click(button('Документ'))
     const added = current.spaces[0].resources.find(item => item.name === 'Бриф.pdf')!
@@ -107,7 +108,7 @@ describe('карточка продолжения в приложении', () =
   it('успешное открытие из материалов относится к явно выбранному делу; ошибка не добавляет документ', async () => {
     native.openResource.mockResolvedValueOnce({ ok: false, error: 'Файл не найден' }).mockResolvedValueOnce({ ok: true })
     await mount()
-    await click(document.querySelector<HTMLButtonElement>('.chrome-space[title="Продолжить: Работа"]')!)
+    await openSpaceFromSwitcher('Работа')
     await click(document.querySelector<HTMLButtonElement>('[aria-label="Следующая страница"]')!)
     await click(document.querySelector<HTMLButtonElement>('[aria-label="Следующая страница"]')!)
     const resource = [...document.querySelectorAll<HTMLButtonElement>('.resource-open')].find(item => item.textContent?.includes('На потом.ai'))!
@@ -189,15 +190,16 @@ describe('новая вкладка без попапа', () => {
     expect(document.querySelector('.horizontal-tab.active')?.getAttribute('data-tab-id')).toBe(blank.id)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(document.querySelector('.browser-topbar input')).toBeTruthy()
-    expect(document.activeElement).toBe(document.querySelector('.browser-omnibox input'))
-    await typeAddress('.browser-omnibox input', 'reading.test')
-    await click(document.querySelector<HTMLButtonElement>('.browser-omnibox [type="submit"]')!)
+    // A new tab puts the caret into its own field: typing happens where the eye is.
+    expect(document.activeElement).toBe(document.querySelector('.new-page-form input'))
+    await typeAddress('.new-page-form input', 'reading.test')
+    await click(document.querySelector<HTMLButtonElement>('.new-page-form [type="submit"]')!)
     expect(contextSession(web()).tabs).toHaveLength(2)
     expect(contextSession(web()).tabs.at(-1)).toMatchObject({ id: blank.id, url: 'https://reading.test/' })
     await act(async () => native.listener?.({ type: 'shortcut', key: 't', shift: false, alt: false }))
     const searchTab = contextSession(web()).tabs.at(-1)!
-    await typeAddress('.browser-omnibox input', 'дизайн вкладок')
-    await click(document.querySelector<HTMLButtonElement>('.browser-omnibox [type="submit"]')!)
+    await typeAddress('.new-page-form input', 'дизайн вкладок')
+    await click(document.querySelector<HTMLButtonElement>('.new-page-form [type="submit"]')!)
     expect(contextSession(web()).tabs).toHaveLength(3)
     expect(contextSession(web()).tabs.at(-1)).toMatchObject({ id: searchTab.id, title: 'Поиск: дизайн вкладок', url: `https://www.google.com/search?q=${encodeURIComponent('дизайн вкладок')}` })
   })
@@ -234,7 +236,7 @@ describe('новая вкладка без попапа', () => {
     expect(session.tabs).toHaveLength(2)
     expect(session.tabs.at(-1)).toMatchObject({ contextId: 'other', url: '' })
     expect(document.querySelector('[role="dialog"]')).toBeNull()
-    expect(document.activeElement).toBe(document.querySelector('.browser-omnibox input'))
+    expect(document.activeElement).toBe(document.querySelector('.new-page-form input'))
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', ctrlKey: true, bubbles: true })))
     expect(contextSession(current.spaces[0]).activeTabId).toBe('other-tab')
     expect(current.spaces[0].activeSession?.tabs).toHaveLength(2)
@@ -245,9 +247,9 @@ describe('новая вкладка без попапа', () => {
     await click(document.querySelector<HTMLButtonElement>('.chrome-browser')!)
     await click(document.querySelector<HTMLButtonElement>('.horizontal-tab-close')!)
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0)
-    expect(document.activeElement).toBe(document.querySelector('.browser-omnibox input'))
-    await typeAddress('.browser-omnibox input', 'localhost:8080/docs')
-    await click(document.querySelector<HTMLButtonElement>('.browser-omnibox [type="submit"]')!)
+    expect(document.activeElement).toBe(document.querySelector('.new-page-form input'))
+    await typeAddress('.new-page-form input', 'localhost:8080/docs')
+    await click(document.querySelector<HTMLButtonElement>('.new-page-form [type="submit"]')!)
     const tabs = contextSession(current.spaces.find(space => space.kind === 'web')!).tabs
     expect(tabs).toHaveLength(1)
     expect(tabs[0].url).toBe('http://localhost:8080/docs')

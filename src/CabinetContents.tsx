@@ -1,24 +1,26 @@
-import { useRef, useState, type DragEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type PointerEvent } from 'react'
 import {
   AppWindow,
   Bookmark,
+  CalendarDays,
   ChevronDown,
   ChevronUp,
-  Compass,
   FileText,
   Folder,
   Globe2,
-  Image,
   Link2,
   Search,
   X
 } from 'lucide-react'
 import { ActionMenu, type MenuAction } from './ActionMenu'
 import { useContextMenu } from './ContextMenu'
+import { plural } from './ContinuationFooter'
 import { cabinetContents, readCabinetDrag, type CabinetDrag } from './cabinetInteractions'
 import { TabIcon } from './browser/TabIcon'
-import { resourceAppLabel } from './resourcePresentation'
-import type { BrowserTab, RecentFile, Resource, Space } from './types'
+import { FileTypeBadge, SiteMark } from './FileTypeBadge'
+import { documentFormat } from './resourcePresentation'
+import { useTabPeek } from './TabPeek'
+import type { BookmarkGroup, BrowserTab, RecentFile, Resource, Space } from './types'
 
 function pageDomain(url: string) {
   try {
@@ -28,34 +30,13 @@ function pageDomain(url: string) {
   }
 }
 
-function documentFormat(resource: Resource) {
-  const extension = resource.target.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
-  if (extension) {
-    switch (extension) {
-      case 'psd': return '.psd · Photoshop'
-      case 'ai': return '.ai · Illustrator'
-      case 'fig': return 'Figma · Документ'
-      case 'pdf': return '.pdf · Документ'
-      case 'docx':
-      case 'doc': return `.${extension} · Word`
-      case 'xlsx':
-      case 'xls': return `.${extension} · Excel`
-      case 'pptx':
-      case 'ppt': return `.${extension} · PowerPoint`
-      default: return `.${extension} · Документ`
-    }
-  }
-  return resourceAppLabel(resource)
+// Keyboard focus gets the peek too; a mouse click's focus does not (the hover already handled it).
+function focusVisible(element: HTMLElement) {
+  try { return element.matches(':focus-visible') } catch { return false }
 }
 
 function ResourceKindIcon({ resource }: { resource: Resource }) {
-  if (resource.kind === 'file') {
-    const ext = resource.target.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
-    if (ext === 'psd' || ext === 'ai' || ext === 'sketch') {
-      return <Image size={22} className="cabinet-doc-icon creative" />
-    }
-    return <FileText size={22} className="cabinet-doc-icon" />
-  }
+  if (resource.kind === 'file') return <span className="cabinet-doc-mark"><FileTypeBadge name={resource.target} size={22} /></span>
   if (resource.kind === 'window' || resource.kind === 'app') {
     return <AppWindow size={22} className="cabinet-doc-icon window" />
   }
@@ -85,9 +66,20 @@ export function CabinetContents({
   onFinishDrag,
   suggestedRecentFile,
   onAddRecentFile,
-  onDismissRecentFile
+  onDismissRecentFile,
+  favorites = [],
+  favoriteGroups = [],
+  pastDays = [],
+  onOpenFavorite,
+  onOpenDay
 }: {
   space: Space
+  /** Day draft «Сегодня»: Избранное (outside spaces) on the right, past days under the tabs on the left. */
+  favorites?: Resource[]
+  favoriteGroups?: BookmarkGroup[]
+  pastDays?: Space[]
+  onOpenFavorite?: (resource: Resource) => void
+  onOpenDay?: (id: string) => void
   destinations: Space[]
   covers: Record<string, string>
   drag: CabinetDrag | null
@@ -112,9 +104,25 @@ export function CabinetContents({
   onDismissRecentFile?: (target: string) => void
 }) {
   const [query, setQuery] = useState('')
+  // Search stays a magnifier until asked for; it remains open while it holds a query.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInput = useRef<HTMLInputElement>(null)
+  const searchExpanded = searchOpen || Boolean(query)
+  const openSearch = () => { setSearchOpen(true); requestAnimationFrame(() => searchInput.current?.focus()) }
+  const closeSearch = () => { setQuery(''); setFilter('all'); setSearchOpen(false) }
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      event.preventDefault()
+      openSearch()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [filter, setFilter] = useState<'all' | 'file' | 'link'>('all')
   const [expanded, setExpanded] = useState(false)
-  const [previews, setPreviews] = useState(false)
   const [dropTab, setDropTab] = useState('')
   const localDrag = useRef<CabinetDrag | null>(null)
 
@@ -147,7 +155,8 @@ export function CabinetContents({
   const tools = filter === 'all' ? rawTools.filter(resource => matches(resource.name, resource.target)) : []
 
   const shownTabs = expanded || needle ? tabs : tabs.slice(0, 6)
-  const hasCovers = rawTabs.some(tab => /^data:image\/(png|jpeg|webp);base64,/i.test(covers[tab.id] || ''))
+  const peek = useTabPeek(covers)
+  useEffect(() => peek.hide(), [needle, expanded, filter, peek.hide])
 
   const materialActions = (resource: Resource): MenuAction[] => [
     {
@@ -167,7 +176,8 @@ export function CabinetContents({
     },
     ...destinations.map(destination => ({
       id: destination.id,
-      label: `Также в «${destination.name}»`,
+      group: 'Также в пространстве',
+      label: destination.name,
       icon: <Folder size={16} />,
       onSelect: () => onCopy(resource, destination.id)
     })),
@@ -179,188 +189,81 @@ export function CabinetContents({
     { label: 'Сохранить ссылку', icon: <Bookmark size={16} />, onSelect: () => onSaveTab(tab) },
     ...destinations.map(destination => ({
       id: destination.id,
-      label: `Перенести в «${destination.name}»`,
+      group: 'Перенести в',
+      label: destination.name,
       icon: <Folder size={16} />,
       onSelect: () => onMoveTab(tab.id, destination.id)
     })),
     { label: 'Закрыть вкладку', icon: <X size={16} />, onSelect: () => onCloseTab(tab.id) }
   ]
 
-  // Состояние 1: Полностью чистое пространство (0 вкладок и 0 материалов)
-  if (!hasItems && !needle) {
-    return (
-      <section className="cabinet-contents cabinet-contents-empty-state" aria-label={`Содержимое пространства ${space.name}`}>
-        <div className="cabinet-content-empty card">
-          <div className="cabinet-empty-icon" aria-hidden="true">
-            <Compass size={32} strokeWidth={1.5} />
-          </div>
-          <div className="cabinet-empty-copy">
-            <h2>Кабинет готов к работе</h2>
-            <p>Рабочее пространство объединяет всё, что нужно для задачи: вкладки браузера, файлы проекта (Photoshop, Figma, документы) и окна программ Windows. Всё сохранится здесь и уснёт при переключении.</p>
-          </div>
-          <div className="cabinet-empty-actions">
-            <button
-              type="button"
-              className="cabinet-hero-start primary-button"
-              onClick={onOpenTabs || onAddLink}
-            >
-              <Globe2 size={18} />
-              <span>Открыть вкладки</span>
-            </button>
-            <div className="cabinet-secondary-actions">
-              <button
-                type="button"
-                className="cabinet-hero-action"
-                onClick={onAddDocument}
-              >
-                <FileText size={16} />
-                <span>Документ</span>
-              </button>
-              <button
-                type="button"
-                className="cabinet-hero-action"
-                onClick={onAddLink}
-              >
-                <Link2 size={16} />
-                <span>Ссылка</span>
-              </button>
-              {onAddWindow && (
-                <button
-                  type="button"
-                  className="cabinet-hero-action"
-                  onClick={onAddWindow}
-                >
-                  <AppWindow size={16} />
-                  <span>Окно программы</span>
-                </button>
-              )}
-            </div>
-          </div>
-          {suggestedRecentFile && (
-            <div className="cabinet-empty-recent">
-              <span className="cabinet-empty-recent-label">Недавно открывали в системе:</span>
-              <div className="cabinet-recent-chip" title={suggestedRecentFile.target}>
-                <button
-                  type="button"
-                  className="cabinet-recent-chip-btn"
-                  onClick={() => onAddRecentFile?.(suggestedRecentFile)}
-                  aria-label={`Добавить недавний файл «${suggestedRecentFile.name}»`}
-                >
-                  <FileText size={15} />
-                  <span className="cabinet-recent-chip-name">{suggestedRecentFile.name}</span>
-                  <span className="cabinet-recent-chip-add" title="Добавить в материалы">+</span>
-                </button>
-                {onDismissRecentFile && (
-                  <button
-                    type="button"
-                    className="cabinet-recent-chip-dismiss"
-                    onClick={() => onDismissRecentFile(suggestedRecentFile.target)}
-                    aria-label="Скрыть подсказку"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="cabinet-contents" aria-label={`Содержимое пространства ${space.name}`}>
-      {/* Тулбар поиска и фильтрации — только когда есть что искать */}
-      {(hasItems || needle) && (
-        <div className="cabinet-content-toolbar">
-          <label className="cabinet-content-search">
-            <Search size={17} />
-            <input
-              aria-label="Найти в пространстве"
-              placeholder="Найти в пространстве"
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">
-                <X size={15} />
-              </button>
-            )}
-          </label>
-          {hasMultipleTypes && (
-            <div className="cabinet-content-filters" aria-label="Тип содержимого">
-              {([['all', 'Все'], ['file', 'Документы'], ['link', 'Сайты']] as const).map(([value, label]) => (
-                <button key={value} aria-pressed={value === filter} onClick={() => setFilter(value)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          {hasCovers && (
-            <button
-              className="cabinet-preview-toggle"
-              aria-pressed={previews}
-              onClick={() => setPreviews(value => !value)}
-              title="Снимки ранее просмотренных страниц"
-            >
-              <Image size={16} />
-              Миниатюры
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Недавний файл в заполненном кабинете */}
-      {suggestedRecentFile && (
-        <div className="cabinet-recent-banner">
-          <span className="cabinet-empty-recent-label">Недавний документ на компьютере:</span>
-          <div className="cabinet-recent-chip" title={suggestedRecentFile.target}>
-            <button
-              type="button"
-              className="cabinet-recent-chip-btn"
-              onClick={() => onAddRecentFile?.(suggestedRecentFile)}
-              aria-label={`Добавить недавний файл «${suggestedRecentFile.name}»`}
-            >
-              <FileText size={15} />
-              <span className="cabinet-recent-chip-name">{suggestedRecentFile.name}</span>
-              <span className="cabinet-recent-chip-add" title="Добавить в материалы">+</span>
-            </button>
-            {onDismissRecentFile && (
-              <button
-                type="button"
-                className="cabinet-recent-chip-dismiss"
-                onClick={() => onDismissRecentFile(suggestedRecentFile.target)}
-                aria-label="Скрыть подсказку"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="cabinet-contents-scroll">
-        {/* Поиск ничего не нашёл */}
-        {needle && !tabs.length && !materials.length && !tools.length && (
-          <div className="cabinet-content-empty no-results card">
-            <Search size={28} />
-            <h2>Ничего не найдено</h2>
-            <p>По запросу «{query}» совпадений не обнаружено</p>
-            <button
-              type="button"
-              className="cabinet-hero-action"
-              onClick={() => { setQuery(''); setFilter('all') }}
-            >
-              Сбросить поиск
+  // «Сегодня» keeps the space layout even when empty: today on the left, what is always at hand on the right.
+  const isDay = space.kind === 'day'
+  const pageCount = (day: Space) => (day.activeSession?.tabs || []).filter(tab => tab.url).length
+  const groupName = (resource: Resource) => favoriteGroups.find(group => group.id === resource.bookmarkGroupId)?.name || ''
+  const shownFavorites = needle ? favorites.filter(item => matches(item.name, item.target)) : favorites
+  // A fresh space uses the same two-column card instead of a hero: each column says what lands there.
+  const isFresh = !isDay && !hasItems && !needle
+  const columns = isDay || isFresh
+  const emptyTabs = (isDay || isFresh) && !tabs.length && !needle && (
+    <section className="cabinet-content-section" aria-label={isDay ? 'Вкладки дня' : 'Вкладки'}>
+      <div className="cabinet-section-heading"><h2>Вкладки</h2></div>
+      <button type="button" className="cabinet-day-empty" onClick={onOpenTabs || onAddLink}>
+        <Globe2 size={18} aria-hidden="true" />
+        <span>{isDay ? 'Открытые сегодня сайты появятся здесь' : 'Сайты для этой задачи появятся здесь'}</span>
+      </button>
+    </section>
+  )
+  const emptyMaterials = isFresh && (
+    <section className="cabinet-content-section" aria-label="Материалы">
+      <div className="cabinet-section-heading"><h2>Материалы</h2></div>
+      <div className="cabinet-day-empty-list">
+        <button type="button" className="cabinet-day-empty" onClick={onAddDocument}><FileText size={18} aria-hidden="true" /><span>Документ или папка</span></button>
+        <button type="button" className="cabinet-day-empty" onClick={onAddLink}><Link2 size={18} aria-hidden="true" /><span>Ссылка</span></button>
+        {onAddWindow && <button type="button" className="cabinet-day-empty" onClick={onAddWindow}><AppWindow size={18} aria-hidden="true" /><span>Окно программы</span></button>}
+      </div>
+    </section>
+  )
+  const pastDaysSection = isDay && pastDays.length > 0 && !needle && (
+    <section className="cabinet-content-section" aria-label="Прошлые дни">
+      <div className="cabinet-section-heading"><h2>Прошлые дни <span>{pastDays.length}</span></h2></div>
+      <div className="cabinet-tab-grid">
+        {pastDays.slice(0, 7).map(day => (
+          <div key={day.id} className="cabinet-tab-card card">
+            <button type="button" className="cabinet-tab-open" onClick={() => onOpenDay?.(day.id)}>
+              <span className="cabinet-tab-copy">
+                <span className="cabinet-day-mark" aria-hidden="true"><CalendarDays size={16} /></span>
+                <span><strong>{day.name}</strong><small>{pageCount(day)} {plural(pageCount(day), 'вкладка', 'вкладки', 'вкладок')}</small></span>
+              </span>
             </button>
           </div>
-        )}
+        ))}
+      </div>
+    </section>
+  )
+  const favoritesSection = isDay && shownFavorites.length > 0 && (
+    <section className="cabinet-content-section" aria-label="Избранное">
+      <div className="cabinet-section-heading"><h2>Избранное <span>{shownFavorites.length}</span></h2></div>
+      <div className="cabinet-material-grid">
+        {shownFavorites.map(resource => (
+          <div key={resource.id} className="cabinet-material-card card">
+            <button type="button" className="cabinet-material-open" onClick={() => onOpenFavorite?.(resource)} title={resource.target}>
+              <SiteMark url={resource.target} title={resource.name} />
+              <span><strong>{resource.name}</strong><small>{[groupName(resource), pageDomain(resource.target)].filter(Boolean).join(' · ')}</small></span>
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 
+  const tabsBlock = (
+    <>
         {/* Секция вкладок сессии */}
         {tabs.length > 0 && (
           <section className="cabinet-content-section" aria-label="Вкладки пространства">
             <div className="cabinet-section-heading">
-              <h2>Вкладки сессии <span>{tabs.length}</span></h2>
+              <h2>Вкладки <span>{tabs.length}</span></h2>
               {!needle && tabs.length > 6 && (
                 <button aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>
                   {expanded ? 'Свернуть' : `Показать все · ${tabs.length}`}
@@ -368,10 +271,9 @@ export function CabinetContents({
                 </button>
               )}
             </div>
-            <div className={`cabinet-tab-grid${previews ? ' with-previews' : ''}`}>
+            <div className="cabinet-tab-grid">
               {shownTabs.map(tab => {
                 const saved = space.resources.some(resource => resource.kind === 'link' && resource.target === tab.url)
-                const cover = previews && /^data:image\/(png|jpeg|webp);base64,/i.test(covers[tab.id] || '') ? covers[tab.id] : ''
                 const actions = tabActions(tab)
                 const label = `Действия с вкладкой «${tab.title}»`
                 return (
@@ -381,8 +283,8 @@ export function CabinetContents({
                     data-cabinet-owner={space.id}
                     className={`cabinet-tab-card card${dropTab === tab.id || pointerTabTarget === tab.id ? ' is-drop-target' : ''}`}
                     draggable
-                    onPointerDown={event => onPointerStart?.(event, { kind: 'tab', spaceId: space.id, id: tab.id })}
-                    onDragStart={event => beginDrag(event, { kind: 'tab', spaceId: space.id, id: tab.id })}
+                    onPointerDown={event => { peek.hide(); onPointerStart?.(event, { kind: 'tab', spaceId: space.id, id: tab.id }) }}
+                    onDragStart={event => { peek.hide(); beginDrag(event, { kind: 'tab', spaceId: space.id, id: tab.id }) }}
                     onDragEnd={finishDrag}
                     onDragOver={event => {
                       const dragging = localDrag.current || drag
@@ -408,15 +310,15 @@ export function CabinetContents({
                       draggable
                       className="cabinet-tab-open"
                       aria-label={`Открыть вкладку «${tab.title}»`}
-                      onClick={() => onSelectTab(tab.id)}
+                      data-tooltip-off=""
+                      onClick={() => { peek.hide(); onSelectTab(tab.id) }}
+                      onMouseEnter={event => peek.show(event.currentTarget.closest<HTMLElement>('.cabinet-tab-card') || event.currentTarget, tab.id, pageDomain(tab.url))}
+                      onMouseLeave={peek.hide}
+                      onFocus={event => { if (focusVisible(event.currentTarget)) peek.show(event.currentTarget.closest<HTMLElement>('.cabinet-tab-card') || event.currentTarget, tab.id, pageDomain(tab.url)) }}
+                      onBlur={peek.hide}
                     >
-                      {cover && (
-                        <span className="cabinet-page-fragment">
-                          <img src={cover} alt="" loading="lazy" decoding="async" draggable={false} />
-                        </span>
-                      )}
                       <span className="cabinet-tab-copy">
-                        <TabIcon tab={tab} />
+                        {tab.favicon ? <span className="cabinet-site-icon"><TabIcon tab={tab} /></span> : <SiteMark url={tab.url} title={tab.title} />}
                         <span>
                           <strong title={tab.title}>{tab.title || pageDomain(tab.url)}</strong>
                           <small>
@@ -439,11 +341,15 @@ export function CabinetContents({
           </section>
         )}
 
+    </>
+  )
+  const restBlock = (
+    <>
         {/* Секция документов и приложений */}
         {materials.length > 0 && (
           <section className="cabinet-content-section" aria-label="Документы и материалы">
             <div className="cabinet-section-heading">
-              <h2>Документы и программы <span>{materials.length}</span></h2>
+              <h2>{materials.some(resource => resource.kind === 'link') ? 'Материалы' : 'Файлы и программы'} <span>{materials.length}</span></h2>
             </div>
             <div className="cabinet-material-grid">
               {materials.map(resource => {
@@ -483,7 +389,7 @@ export function CabinetContents({
         )}
 
         {/* Быстрое добавление материала, когда есть вкладки, но нет документов */}
-        {!needle && filter === 'all' && !materials.length && (tabs.length > 0 || tools.length > 0) && (
+        {!isDay && !needle && filter === 'all' && !materials.length && (tabs.length > 0 || tools.length > 0) && (
           <div className="cabinet-add-material">
             <button type="button" onClick={onAddDocument}>
               <FileText size={16} />
@@ -535,8 +441,104 @@ export function CabinetContents({
             </div>
           </section>
         )}
+    </>
+  )
+
+  return (
+    <section className={columns ? 'cabinet-contents is-hug' : 'cabinet-contents'} aria-label={`Содержимое пространства ${space.name}`}>
+      {/* Тулбар поиска и фильтрации — только когда есть что искать */}
+      {(hasItems || needle) && (
+        <div className={`cabinet-content-toolbar${searchExpanded ? ' is-open' : ''}`}>
+          {!searchExpanded && (
+            <button type="button" className="cabinet-search-toggle" onClick={openSearch} aria-label="Поиск в пространстве" title="Поиск · /">
+              <Search size={20} />
+            </button>
+          )}
+          <label className="cabinet-content-search" aria-hidden={!searchExpanded || undefined}>
+            <Search size={18} />
+            <input
+              ref={searchInput}
+              aria-label="Найти в пространстве"
+              placeholder="Найти вкладку или файл"
+              tabIndex={searchExpanded ? 0 : -1}
+              value={query}
+              onChange={event => { setQuery(event.target.value); if (!event.target.value.trim()) setFilter('all') }}
+              onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeSearch() } }}
+              onBlur={() => { if (!query.trim()) setSearchOpen(false) }}
+            />
+            {searchExpanded && (
+              <button type="button" onMouseDown={event => event.preventDefault()} onClick={closeSearch} aria-label="Закрыть поиск">
+                <X size={18} />
+              </button>
+            )}
+          </label>
+          {hasMultipleTypes && needle && (
+            <div className="cabinet-content-filters" aria-label="Тип содержимого">
+              {([['all', 'Все'], ['file', 'Документы'], ['link', 'Сайты']] as const).map(([value, label]) => (
+                <button key={value} aria-pressed={value === filter} onClick={() => setFilter(value)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Недавний файл в заполненном кабинете */}
+      {!isDay && suggestedRecentFile && (
+        <div className="cabinet-recent-banner">
+          <span className="cabinet-empty-recent-label">Недавний документ на компьютере:</span>
+          <div className="cabinet-recent-chip" title={suggestedRecentFile.target}>
+            <button
+              type="button"
+              className="cabinet-recent-chip-btn"
+              onClick={() => onAddRecentFile?.(suggestedRecentFile)}
+              aria-label={`Добавить недавний файл «${suggestedRecentFile.name}»`}
+            >
+              <FileText size={15} />
+              <span className="cabinet-recent-chip-name">{suggestedRecentFile.name}</span>
+              <span className="cabinet-recent-chip-add" title="Добавить в материалы">+</span>
+            </button>
+            {onDismissRecentFile && (
+              <button
+                type="button"
+                className="cabinet-recent-chip-dismiss"
+                onClick={() => onDismissRecentFile(suggestedRecentFile.target)}
+                aria-label="Скрыть подсказку"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="cabinet-contents-scroll">
+        {/* Поиск ничего не нашёл */}
+        {needle && !tabs.length && !materials.length && !tools.length && (
+          <div className="cabinet-content-empty no-results card">
+            <Search size={28} />
+            <h2>Ничего не найдено</h2>
+            <p>По запросу «{query}» совпадений не обнаружено</p>
+            <button
+              type="button"
+              className="cabinet-hero-action"
+              onClick={() => { setQuery(''); setFilter('all') }}
+            >
+              Сбросить поиск
+            </button>
+          </div>
+        )}
+
+        {columns ? (
+          <>
+            <div className="cabinet-day-column">{tabsBlock}{emptyTabs}{pastDaysSection}</div>
+            <div className="cabinet-day-column">{restBlock}{emptyMaterials}{favoritesSection}</div>
+          </>
+        ) : <>{tabsBlock}{restBlock}</>}
       </div>
       {context.menu}
+      {peek.node}
     </section>
   )
 }

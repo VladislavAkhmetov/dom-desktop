@@ -121,7 +121,8 @@ export function ReadingShelfWidget({ state, onChange, onOpen, onAddLink, colSpan
   const links = useMemo(() => {
     const list: { resource: Resource; spaceId: string; spaceName: string }[] = []
     for (const space of state.spaces) {
-      if (space.archivedAt) continue
+      // «Избранное» (bookmarks of the browsing space) is a separate shelf: the new tab in «Браузинг».
+      if (space.archivedAt || space.kind === 'web') continue
       for (const res of space.resources) {
         if (res.kind === 'link' && !res.completedAt && !/figma\.com\/(design|file)/i.test(res.target)) {
           list.push({ resource: res, spaceId: space.id, spaceName: space.name })
@@ -235,7 +236,7 @@ export function ReadingShelfWidget({ state, onChange, onOpen, onAddLink, colSpan
 
       {links.length === 0 ? (
         <div className="reading-shelf-empty">
-          <p>Все сохранённые материалы прочитаны</p>
+          <p className="card-accent">Всё прочитано</p>
           <button type="button" className="calm-text-button" onClick={onAddLink}>
             Сохранить ссылку <Plus size={14} />
           </button>
@@ -259,6 +260,11 @@ export function ReadingShelfWidget({ state, onChange, onOpen, onAddLink, colSpan
                       onClick={() => onOpen(resource)}
                       title={`${resource.name}\n${resource.target}`}
                     >
+                      <span className="reading-row-icon" aria-hidden="true">
+                        {domain ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} alt="" onError={e => { e.currentTarget.style.display = 'none' }} /> : null}
+                        <span>{getMonogram(domain, resource.name)}</span>
+                      </span>
+                      <span className="reading-row-text">
                       <span className="reading-shelf-name">{resource.name}</span>
                       <div className="reading-shelf-meta">
                         <span className="reading-shelf-domain">
@@ -271,6 +277,7 @@ export function ReadingShelfWidget({ state, onChange, onOpen, onAddLink, colSpan
                             .join(' · ')}
                         </span>
                       </div>
+                      </span>
                     </button>
                     <div className="reading-shelf-actions">
                       <button

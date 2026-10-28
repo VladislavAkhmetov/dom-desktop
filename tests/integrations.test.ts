@@ -78,3 +78,20 @@ describe('облачный ИИ', () => {
   })
 })
 it('ограничивает сетевые ответы и отказывает небезопасным протоколам', async () => { await expect(fetchLimited('file:///private')).rejects.toThrow(); await expect(fetchLimited('https://example.com', {}, 3, async () => new Response('four'))).rejects.toThrow('слишком большой') })
+
+describe('загрузка лент, календарей и ссылок только из интернета', () => {
+  const { fetchPublic, isPrivateHost } = require('../electron/network.cjs')
+  it('распознаёт этот компьютер и локальные сети', () => {
+    for (const host of ['localhost', 'app.localhost', 'nas.local', '127.0.0.1', '10.0.0.5', '172.20.1.1', '192.168.1.1', '169.254.1.1', '100.64.0.1', '0.0.0.0', '[::1]', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1']) expect(isPrivateHost(host)).toBe(true)
+    for (const host of ['example.com', '8.8.8.8', '172.32.0.1', '192.169.0.1', '[2001:db8::1]']) expect(isPrivateHost(host)).toBe(false)
+  })
+  it('не идёт в локальную сеть ни напрямую, ни через перенаправление', async () => {
+    await expect(fetchPublic('http://192.168.0.1/admin', {}, 100, async () => new Response('router'))).rejects.toThrow('локальной сети')
+    const calls: string[] = []
+    const fetcher = async (url: string, options: any) => { calls.push(url); expect(options.redirect).toBe('manual'); return url.includes('feed') ? new Response(null, { status: 302, headers: { location: 'http://127.0.0.1:8080/secret' } }) : new Response('secret') }
+    await expect(fetchPublic('https://example.com/feed', {}, 100, fetcher)).rejects.toThrow('локальной сети')
+    expect(calls).toEqual(['https://example.com/feed'])
+    const ok = async (url: string) => url.endsWith('/a') ? new Response(null, { status: 301, headers: { location: '/b' } }) : new Response('лента')
+    await expect(fetchPublic('https://example.com/a', {}, 100, ok)).resolves.toBe('лента')
+  })
+})

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type Ref } from 'react'
 import { motion, useIsPresent, type HTMLMotionProps } from 'motion/react'
-import { fluidExit, fluidInstant, fluidSpring, useFluidReducedMotion } from './motion'
+import { calmTween, enterOffset, fluidExit, fluidInstant, fluidSpring, motionDuration, pressOpacity, useFluidReducedMotion } from './motion'
 
 type Rect = { x: number; y: number; width: number; height: number }
 type Item = Rect & { element: HTMLButtonElement; selected: boolean }
@@ -117,20 +117,20 @@ export function FluidGroup({ as: Tag = 'div', axis = 'x', itemSelector = ':scope
     onBlur?.(event)
     if (!event.currentTarget.contains(event.relatedTarget as Node) && !pointerInside.current) setHovered(null)
   }}>
-    {selected && <motion.span aria-hidden="true" className="fluid-selection" initial={false} animate={{ ...target(selected), opacity: preview ? .85 : 1 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: { duration: .2, ease: 'easeOut' } }} />}
-    {hover && <motion.span aria-hidden="true" className="fluid-hover" initial={false} animate={{ ...target(hover), opacity: preview ? 1 : 0 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: { duration: .2, ease: 'easeOut' } }} />}
+    {selected && <motion.span aria-hidden="true" className="fluid-selection" initial={false} animate={{ ...target(selected), opacity: preview ? .85 : 1 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: calmTween(motionDuration.hover) }} />}
+    {hover && <motion.span aria-hidden="true" className="fluid-hover" initial={false} animate={{ ...target(hover), opacity: preview ? 1 : 0 }} transition={reduced ? fluidInstant : { ...fluidSpring.moderate, opacity: calmTween(motionDuration.hover) }} />}
     {children}
   </Tag>
 }
 
 export function FluidButton({ className = '', ...props }: HTMLMotionProps<'button'>) {
   const reduced = useFluidReducedMotion()
-  return <motion.button initial={false} whileHover={undefined} whileTap={reduced || props.disabled ? undefined : { opacity: 0.88 }} transition={reduced ? fluidInstant : fluidSpring.fast} {...props} className={`fluid-button ${className}`} />
+  return <motion.button initial={false} whileHover={undefined} whileTap={props.disabled ? undefined : { opacity: pressOpacity }} transition={reduced ? fluidInstant : { ...fluidSpring.fast, duration: motionDuration.press }} {...props} className={`fluid-button ${className}`} />
 }
 
 /** Exiting panels become inert immediately while their visual exit completes. */
 export function FluidSurface({ className = '', style, role, ...props }: HTMLMotionProps<'div'>) {
   const reduced = useFluidReducedMotion()
   const present = useIsPresent()
-  return <motion.div initial={reduced ? false : { opacity: 0, y: 5, scale: .992 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reduced ? 0 : 3, scale: reduced ? 1 : .995, transition: reduced ? fluidInstant : fluidExit }} transition={reduced ? fluidInstant : fluidSpring.moderate} {...props} role={present ? role : undefined} inert={!present || undefined} aria-hidden={!present || undefined} className={`fluid-surface ${className}`} style={{ ...style, pointerEvents: present ? style?.pointerEvents : 'none' }} />
+  return <motion.div initial={reduced ? false : { opacity: 0, y: enterOffset.y, scale: enterOffset.scale }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reduced ? 0 : enterOffset.y / 2, transition: reduced ? fluidInstant : fluidExit }} transition={reduced ? fluidInstant : calmTween()} {...props} role={present ? role : undefined} inert={!present || undefined} aria-hidden={!present || undefined} className={`fluid-surface ${className}`} style={{ ...style, pointerEvents: present ? style?.pointerEvents : 'none' }} />
 }

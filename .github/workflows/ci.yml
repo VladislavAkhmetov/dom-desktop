@@ -1,0 +1,45 @@
+# Every push to main and every pull request: type check, build, unit + SQLite tests.
+# Windows runner: better-sqlite3 and koffi are rebuilt for Electron by `postinstall`,
+# and the storage test runs inside the Electron binary (scripts/test-storage.cjs).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  native:
+    # Real Electron windows and pages (tests/cabinet-native.cjs). Needs the desktop session
+    # that GitHub's Windows runners provide.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:cabinet-native

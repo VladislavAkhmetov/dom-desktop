@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { ArrowRight, CalendarDays, Check, FolderInput, KeyRound, Mail, Newspaper, Plus, Search, Settings2, ShieldCheck, User, X } from 'lucide-react'
+import { ArrowRight, CalendarDays, Check, FolderInput, KeyRound, Mail, Newspaper, Play, Plus, Search, Settings2, ShieldCheck, User, X } from 'lucide-react'
 import { bridge, isDesktop } from './bridge'
 import { isDemo } from './demo'
 import { Dialog } from './Dialog'
@@ -9,7 +9,8 @@ import { PasswordSettings } from './PasswordSettings'
 import { PrivacySettings } from './PrivacySettings'
 import { SettingsList } from './SettingsList'
 import type { AppState, SupportedLocale } from './types'
-import { getUserProfile, updateUserProfile, PROFILE_TONES, PROFILE_EMOJIS } from './userProfile'
+import { getUserProfile, updateUserProfile, PROFILE_TONES } from './userProfile'
+import { PROFILE_ICONS, ProfileGlyph } from './ProfileGlyph'
 import { useI18n, SUPPORTED_LOCALES, translate, type TranslationKey } from './i18n'
 import { sound } from './sound'
 import './settings.css'
@@ -108,7 +109,7 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
                 <div className="settings-card">
                   <div className="profile-preview-card">
                     <div className={`profile-avatar-large tone-${profile.avatarTone || 'sage'}`}>
-                      {profile.avatarEmoji || profile.name.charAt(0).toUpperCase() || 'П'}
+                      <ProfileGlyph profile={profile} size={26} />
                     </div>
                     <div className="profile-info">
                       <strong style={{ fontSize: 16, color: 'var(--ink)' }}>{profile.name}</strong>
@@ -140,7 +141,7 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
                 <div className="settings-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <h4 style={{ margin: '0 0 10px' }}>{t('settings.profile.avatar_style')}</h4>
-                    <span style={{ fontSize: 12, color: '#647b6a', display: 'block', marginBottom: 8 }}>{t('settings.profile.color_tone')}</span>
+                    <span style={{ fontSize: 'var(--fs-meta)', color: '#647b6a', display: 'block', marginBottom: 8 }}>{t('settings.profile.color_tone')}</span>
                     <div className="profile-tones-bar" role="radiogroup" aria-label="Цвет профиля">
                       {PROFILE_TONES.map(item => (
                         <button
@@ -161,17 +162,18 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
                   </div>
 
                   <div>
-                    <span style={{ fontSize: 12, color: '#647b6a', display: 'block', marginBottom: 8 }}>{t('settings.profile.emoji_icon')}</span>
+                    <span style={{ fontSize: 'var(--fs-meta)', color: '#647b6a', display: 'block', marginBottom: 8 }}>{t('settings.profile.emoji_icon')}</span>
                     <div className="profile-emojis-bar">
-                      {PROFILE_EMOJIS.map(emoji => (
+                      {PROFILE_ICONS.map(({ id, Icon, label }) => (
                         <button
-                          key={emoji}
+                          key={id}
                           type="button"
-                          className={`profile-emoji-btn ${profile.avatarEmoji === emoji ? 'active' : ''}`}
-                          onClick={() => onChange(prev => updateUserProfile(prev, { avatarEmoji: emoji }))}
-                          aria-label={`Эмодзи ${emoji}`}
+                          className={`profile-emoji-btn ${profile.avatarEmoji === id ? 'active' : ''}`}
+                          onClick={() => onChange(prev => updateUserProfile(prev, { avatarEmoji: id }))}
+                          aria-label={`Значок: ${label}`}
+                          aria-pressed={profile.avatarEmoji === id}
                         >
-                          {emoji}
+                          <Icon size={16} aria-hidden="true" />
                         </button>
                       ))}
                       <button
@@ -188,7 +190,7 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
                   {onImport && (
                     <div style={{ borderTop: '1px solid rgba(69,102,78,.1)', paddingTop: 14 }}>
                       <h4 style={{ margin: '0 0 6px' }}>{t('settings.profile.data_migration')}</h4>
-                      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#647b6a', lineHeight: 1.4 }}>
+                      <p style={{ margin: '0 0 10px', fontSize: 'var(--fs-meta)', color: '#647b6a', lineHeight: 1.4 }}>
                         {t('settings.profile.import_chrome_desc')}
                       </p>
                       <button className="soft-button" onClick={() => { onClose(); onImport() }}>
@@ -206,7 +208,7 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
               <div className="settings-card-heading">
                 <h4>{t('settings.general.language_title')}</h4>
               </div>
-              <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--muted)' }}>
+              <p style={{ margin: '0 0 12px', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
                 {t('settings.general.language_desc')}
               </p>
               <div className="language-selector-grid" role="radiogroup" aria-label={t('settings.general.language_title')}>
@@ -232,7 +234,11 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
             <div className="settings-card">
               {isDesktop && <div className="setting-row"><span><strong>{t('settings.general.autostart_heading')}</strong><small>{t('settings.general.autostart_sub')}</small></span><button className={`toggle ${autostart ? 'on' : ''}`} onClick={() => onAutostart(!autostart)} disabled={isDemo} role="switch" aria-checked={autostart} aria-label={t('settings.general.autostart_heading')}><span /></button></div>}
               <div className="setting-row"><span><strong>{state.locale === 'en' ? 'Calm Tech tactile sound' : 'Тактильные звуки Calm Tech'}</strong><small>{state.locale === 'en' ? 'Soft procedural wood snaps, paper rustle, and exhale without harsh frequencies' : 'Мягкие процедурные щелчки дерева, шелест бумаги и выдох без резких частот'}</small></span><button className={`toggle ${soundEnabled ? 'on' : ''}`} role="switch" aria-checked={soundEnabled} aria-label={state.locale === 'en' ? 'Calm Tech tactile sound' : 'Тактильные звуки Calm Tech'} onClick={handleToggleSound}><span /></button></div>
-              <div className="setting-row"><span><strong>{t('settings.general.hints_heading')}</strong><small>{t('settings.general.hints_sub')}</small></span><button className={`toggle ${state.liveHints ? 'on' : ''}`} role="switch" aria-checked={Boolean(state.liveHints)} aria-label={t('settings.general.hints_heading')} onClick={() => onChange(previous => ({ ...previous, liveHints: !previous.liveHints }))}><span /></button></div>
+              {soundEnabled && <div className="setting-row sound-preview-row"><span><strong>{state.locale === 'en' ? 'Listen' : 'Послушать'}</strong><small>{state.locale === 'en' ? 'Soft plucked and wooden sounds, quieter than the system' : 'Мягкие щипки и дерево — тише системных звуков'}</small></span><div className="sound-preview" role="group" aria-label={state.locale === 'en' ? 'Sound preview' : 'Прослушать звуки'}>
+                {([['Напоминание', 'Reminder', () => sound.playReminderChime()], ['Встреча', 'Meeting', () => sound.playEventSoon()], ['Сделано', 'Done', () => sound.playTaskDone()], ['Позже', 'Later', () => sound.playReminderLater()]] as const).map(([ru, en, play]) => <button key={ru} type="button" className="calm-chip sound-preview-chip" onClick={play}><Play size={14} aria-hidden="true" />{state.locale === 'en' ? en : ru}</button>)}
+              </div></div>}
+              <div className="setting-row"><span><strong>{state.locale === 'en' ? 'Search suggestions from Google' : 'Подсказки поиска от Google'}</strong><small>{state.locale === 'en' ? 'Typed words are sent to Google. Addresses, paths and e-mails are never sent.' : 'Введённые слова уходят в Google. Адреса, пути и почта не отправляются никогда.'}</small></span><button className={`toggle ${state.searchSuggestions ? 'on' : ''}`} role="switch" aria-checked={Boolean(state.searchSuggestions)} aria-label={state.locale === 'en' ? 'Search suggestions from Google' : 'Подсказки поиска от Google'} onClick={() => onChange(previous => ({ ...previous, searchSuggestions: !previous.searchSuggestions }))}><span /></button></div>
+              <div className="setting-row"><span><strong>{t('settings.general.hints_heading')}</strong><small>{t('settings.general.hints_sub')}</small></span><button className={`toggle ${state.liveHints !== false ? 'on' : ''}`} role="switch" aria-checked={state.liveHints !== false} aria-label={t('settings.general.hints_heading')} onClick={() => onChange(previous => ({ ...previous, liveHints: previous.liveHints === false }))}><span /></button></div>
               {!isDemo && <div className="setting-row"><span><strong>{t('settings.general.backup_heading')}</strong><small>{t('settings.general.backup_sub')}</small></span><button className="soft-button" onClick={onBackup}>{t('settings.general.backup_btn')}</button></div>}
             </div>
           </div>}
@@ -249,8 +255,8 @@ export function Settings({ state, onChange, onClose, onDashboard, autostart, onA
                 <button className="soft-button" disabled={!calendarUrl.trim()} onClick={onAddCalendar}><Plus size={15} />{t('common.connect')}</button>
               </div>
               <details className="calm-details" style={{ marginTop: 14 }}>
-                <summary style={{ fontSize: 12, color: 'var(--muted)', cursor: 'pointer' }}>{t('settings.calendars.help_summary')}</summary>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, marginTop: 8 }}>
+                <summary style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', cursor: 'pointer' }}>{t('settings.calendars.help_summary')}</summary>
+                <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5, marginTop: 8 }}>
                   <p style={{ margin: '0 0 6px' }}><strong>Google:</strong> {t('settings.calendars.google_help')}</p>
                   <p style={{ margin: '0 0 6px' }}><strong>Apple iCloud:</strong> {t('settings.calendars.apple_help')}</p>
                   <p style={{ margin: 0 }}><strong>Яндекс / Outlook:</strong> {t('settings.calendars.yandex_help')}</p>

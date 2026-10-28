@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Web preview only needs the renderer deps; skip Electron binary download and
+# native rebuilds (electron-builder install-app-deps) which are not used here.
+exec npm ci --ignore-scripts --no-audit --no-fund

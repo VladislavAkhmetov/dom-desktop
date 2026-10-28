@@ -1,0 +1,119 @@
+/* ══ Controls & menus (docs/design-tokens.md) ═════════════════════════════════
+ * Canonical buttons, chips, fields and menus built only from tokens.css + motion.css.
+ * Loaded last. Context rules may change size or spacing, not colour, radius or states.
+ *
+ *  Family            Class                         Surface                 Radius           Height
+ *  Primary           .calm-primary .primary-button  --accent                --radius-control --control-h
+ *  Quiet primary     .resume-primary                --accent-quiet          --radius-control --control-h
+ *  Secondary         .soft-button                   --surface-control+line  --radius-control --control-h
+ *  Text (ghost)      .calm-text-button              transparent             --radius-control 36px
+ *  Icon              .calm-icon .task-more          transparent             --radius-control --icon-btn
+ *  Danger            .is-danger / [data-tone=danger] on any of the above
+ *
+ *  States: hover → lighter surface or --state-hover; :active → --press-opacity;
+ *  :focus-visible → 2px --focus-ring, offset 2px; selected ([aria-pressed|aria-selected|aria-expanded=true]) → --state-selected;
+ *  disabled / [aria-disabled=true] → --state-disabled surface, --ink-disabled, no shadow, not-allowed.
+ */
+
+/* ── Focus: one ring everywhere ─────────────────────────────────────────── */
+:where(button, a, input, textarea, select, [role="menuitem"], [role="option"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Shared button anatomy ─────────────────────────────────────────────── */
+.calm-primary, .primary-button, .resume-primary, .soft-button, .calm-text-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: auto; border-radius: var(--radius-control);
+  font: var(--t-label); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--motion-hover) var(--ease-calm), border-color var(--motion-hover) var(--ease-calm),
+    color var(--motion-hover) var(--ease-calm), box-shadow var(--motion-hover) var(--ease-calm), opacity var(--motion-press) var(--ease-calm);
+}
+.calm-primary:active:not(:disabled), .primary-button:active:not(:disabled), .resume-primary:active:not(:disabled),
+.soft-button:active:not(:disabled), .calm-text-button:active:not(:disabled), .calm-icon:active:not(:disabled) { opacity: var(--press-opacity); }
+
+/* Primary — one per view: the action that moves the task forward */
+.calm-primary, .primary-button {
+  min-height: var(--control-h); padding: 0 20px; border: 0;
+  background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-control);
+}
+.calm-primary:hover:not(:disabled), .primary-button:hover:not(:disabled) { background: var(--accent-hover); }
+
+/* Quiet primary — the main action inside a card («Продолжить», «Открыть вкладки») */
+.resume-primary {
+  min-height: var(--control-h); padding: 0 16px; border: 0;
+  background: var(--accent-quiet); color: var(--accent-quiet-ink); box-shadow: none;
+}
+.resume-primary:hover:not(:disabled) { background: var(--accent-quiet-hover); }
+
+/* Secondary — alternatives next to a primary, header actions on the wallpaper */
+.soft-button {
+  min-height: var(--control-h); padding: 0 16px;
+  border: 1px solid var(--line-soft); background: var(--surface-control); color: var(--ink-1); box-shadow: var(--shadow-control);
+}
+.soft-button:hover:not(:disabled) { background: var(--surface-control-hover); }
+
+/* Text — tertiary actions inside content («Показать все», «+ Добавить дело») */
+.calm-text-button {
+  min-height: 36px; padding: 0 10px; margin-inline: -10px; border: 0;
+  background: transparent; color: var(--ink-2); box-shadow: none;
+}
+.calm-text-button:hover:not(:disabled) { background: var(--state-hover); color: var(--ink-1); }
+
+/* Icon — square, quiet until hovered */
+.calm-icon {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--icon-btn); height: var(--icon-btn); padding: 0; border: 0; border-radius: var(--radius-control);
+  background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: background-color var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm), opacity var(--motion-press) var(--ease-calm);
+}
+.calm-icon:hover:not(:disabled) { background: var(--state-hover); color: var(--ink-1); }
+.calm-icon[aria-pressed="true"], .calm-icon[aria-expanded="true"],
+.calm-text-button[aria-pressed="true"], .calm-text-button[aria-selected="true"] { background: var(--state-selected); color: var(--ink-1); }
+
+/* Danger — destructive confirmation; never the default focus */
+.calm-primary.is-danger, .primary-button.is-danger { background: var(--danger); color: var(--ink-inverse); }
+.calm-primary.is-danger:hover:not(:disabled), .primary-button.is-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 88%, black); }
+.soft-button.is-danger, .calm-text-button.is-danger, .calm-icon.is-danger { color: var(--danger); }
+.soft-button.is-danger:hover:not(:disabled), .calm-text-button.is-danger:hover:not(:disabled), .calm-icon.is-danger:hover:not(:disabled) { background: var(--danger-soft); }
+
+/* Disabled */
+:is(.calm-primary, .primary-button, .resume-primary, .soft-button, .calm-text-button, .calm-icon):is(:disabled, [aria-disabled="true"]) {
+  background: var(--state-disabled); color: var(--ink-disabled); border-color: transparent; box-shadow: none; cursor: not-allowed; opacity: 1;
+}
+:is(.calm-text-button, .calm-icon):is(:disabled, [aria-disabled="true"]) { background: transparent; }
+
+/* ── Chips & counters ───────────────────────────────────────────────────── */
+.calm-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-h-sm); padding: 0 12px;
+  border-radius: var(--radius-control); background: var(--surface-control); box-shadow: inset 0 0 0 1px var(--line-soft);
+  font: var(--t-meta); color: var(--ink-1);
+}
+.calm-count { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 8px; border-radius: var(--radius-pill); background: var(--state-hover); font: var(--t-meta); color: var(--ink-2); }
+
+/* ── Menus (ActionMenu, ContextMenu, browser menu) ──────────────────────── */
+.action-menu-popover { width: max-content; min-width: 220px; max-width: min(320px, calc(100vw - 16px)); padding: var(--popover-pad); }
+.fluid-menu-items { --fluid-radius: var(--radius-control); --fluid-preview: var(--state-hover); --fluid-selected: var(--state-selected); display: grid; gap: 2px; }
+.action-menu-popover [role="menuitem"] {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--menu-item-h); padding: 0 12px;
+  border: 0; border-radius: var(--radius-control); background: transparent;
+  font: var(--t-control); color: var(--ink-1); text-align: left; cursor: pointer;
+}
+.action-menu-popover [role="menuitem"] > svg { flex: none; width: 18px; height: 18px; color: var(--ink-3); }
+.action-menu-popover [role="menuitem"] > span { min-width: 0; overflow-wrap: anywhere; }
+.action-menu-popover [role="menuitem"]:focus-visible { outline-offset: -2px; }
+.action-menu-popover [role="menuitem"][data-tone="danger"], .action-menu-popover [role="menuitem"][data-tone="danger"] > svg { color: var(--danger); }
+.action-menu-popover [role="menuitem"][aria-disabled="true"] { color: var(--ink-disabled); cursor: not-allowed; }
+.action-menu-popover [role="menuitem"][aria-disabled="true"] > svg { color: var(--ink-disabled); }
+.menu-separator { height: 1px; margin: 4px 12px; background: var(--line-soft); }
+.menu-group-label { padding: 8px 12px 4px; font: var(--t-meta); color: var(--ink-3); }
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
+.calm-field {
+  min-height: var(--control-h); padding: 0 14px; border-radius: var(--radius-control);
+  border: 1px solid var(--line-strong); background: var(--surface-field); font: var(--t-body); color: var(--ink-1);
+  transition: border-color var(--motion-hover) var(--ease-calm), box-shadow var(--motion-hover) var(--ease-calm);
+}
+.calm-field::placeholder { color: var(--ink-3); }
+.calm-field:hover { border-color: color-mix(in srgb, var(--line-strong) 60%, var(--ink-3)); }
+.calm-field:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }

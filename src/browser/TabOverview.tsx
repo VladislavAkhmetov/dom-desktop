@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { SiteMark } from '../FileTypeBadge'
 import { ArrowRight, BookmarkPlus, Check, Columns2, FileInput, FolderInput, Pin, Plus, Search, X } from 'lucide-react'
 import type { AppState } from '../types'
 import { ActionMenu } from '../ActionMenu'
@@ -62,7 +63,7 @@ export function TabOverview({ state, currentSpaceId, initialScope = 'space', cov
   function card(entry: TabEntry, index: number) {
     const { tab, space, contextName } = entry, key = entryId(entry)
     const active = tab.id === space.activeSession?.activeTabId
-    const destinations = state.spaces.filter(item => !item.archivedAt && item.id !== space.id)
+    const destinations = state.spaces.filter(item => !item.archivedAt && item.id !== space.id && !(item.kind === 'day' && item.dayRetired))
     const owner = space.kind === 'web' ? 'Браузер' : space.name
     const contextLabel = contextName && space.kind !== 'web' && space.workContexts!.length > 1 ? contextName : ''
     const subtitle = searching && scope === 'all' ? [owner, contextLabel].filter(Boolean).join(' · ') : contextLabel || tabHost(tab)
@@ -73,7 +74,7 @@ export function TabOverview({ state, currentSpaceId, initialScope = 'space', cov
       onDrop={event => { event.preventDefault(); if (drag && drop?.id === key) onReorder(space.id, entry.contextId, drag.tab.id, tab.id, drop.after); setDrag(null); setDrop(null) }}
       onDragEnd={() => { setDrag(null); setDrop(null) }}>
       <button className="tab-desk-open" onClick={() => choose(entry)} aria-label={`${tabTitle(tab)} · ${space.name}${contextName ? ` · ${contextName}` : ''}`} aria-current={active ? 'page' : undefined}>
-        {hasCover && <div className="tab-desk-preview"><img className="tab-desk-cover" src={covers[tab.id]} alt="" loading="lazy" draggable={false} /></div>}
+        {!searching && <div className={`tab-desk-preview${hasCover ? '' : ' is-placeholder'}`}>{hasCover ? <img className="tab-desk-cover" src={covers[tab.id]} alt="" loading="lazy" draggable={false} /> : <SiteMark className="tab-desk-mark" url={tab.url} title={tabTitle(tab)} />}</div>}
         <div className="tab-desk-caption"><TabIcon tab={tab} /><div><strong>{tabTitle(tab)}</strong>{subtitle && <span>{subtitle}</span>}</div>{tab.pinned && <Pin size={18} aria-label="Закреплено" />}{active && <Check size={18} aria-label="Текущая вкладка" />}{searching && <ArrowRight size={20} aria-hidden="true" />}</div>
       </button>
       <button className="tab-desk-close" onClick={() => onCloseTab(space.id, tab.id)} aria-label={`Закрыть ${tabTitle(tab)}`}><X size={18} /></button>

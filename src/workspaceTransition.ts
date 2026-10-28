@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import { bridge } from './bridge'
-import { useFluidReducedMotion } from './motion'
+import { calmEase, motionDuration, useFluidReducedMotion } from './motion'
+import { isTabCover } from './tabCover'
 
 export type WorkspaceRoute = { type: 'home' } | { type: 'spaces' } | { type: 'space'; spaceId: string } | { type: 'browse'; spaceId: string }
 type Box = { x: number; y: number; width: number; height: number }
@@ -8,7 +9,7 @@ type ScrollPosition = { path: string; top: number; left: number }
 type Journey = { dashboard: WorkspaceRoute; focus: string | null; source: Box }
 type Transition = { layer: HTMLElement; from: WorkspaceRoute; to: WorkspaceRoute; outgoing: HTMLElement; animations: Animation[]; cleanup: Array<() => void>; reverse: boolean; started: boolean; source: Box; sourceTitle: HTMLElement | null; finish: () => void }
 
-export const workspaceTiming = { duration: 320, easing: 'cubic-bezier(.22,.68,.24,1)', fill: 'both' } as const
+export const workspaceTiming = { duration: motionDuration.layout * 1000, easing: `cubic-bezier(${calmEase.join(', ')})`, fill: 'both' } as const
 const sameRoute = (a: WorkspaceRoute, b: WorkspaceRoute) => a.type === b.type && ('spaceId' in a ? 'spaceId' in b && a.spaceId === b.spaceId : true)
 const routeKey = (route: WorkspaceRoute) => route.type + ('spaceId' in route ? `:${route.spaceId}` : '')
 
@@ -116,7 +117,7 @@ function snapshot(root: HTMLElement, covers: Record<string, string>, cleanup: Ar
 function fillNativePreviews(scene: HTMLElement, covers: Record<string, string>) {
   scene.querySelectorAll<HTMLElement>('[data-workspace-tab-id]').forEach(viewport => {
     const cover = covers[viewport.dataset.workspaceTabId!]
-    if (!cover || !/^data:image\/png;base64,/i.test(cover)) return
+    if (!isTabCover(cover)) return
     let image = viewport.querySelector<HTMLImageElement>('.native-cover')
     if (!image) { image = document.createElement('img'); image.className = 'native-cover'; image.alt = ''; viewport.append(image) }
     if (image.getAttribute('src') !== cover) image.src = cover

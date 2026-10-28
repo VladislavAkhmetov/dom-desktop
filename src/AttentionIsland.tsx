@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useSpring, useTransform, useReducedMotion } from 'motion/react'
+import { calmTween, motionDuration } from './motion'
 import { ArrowRight, Bell, CalendarDays, Check, ChevronDown, Clock3, Mail, Music2, Pause, Sparkles, Timer, Video, X } from 'lucide-react'
-import type { AppState, Resource } from './types'
+import type { AppState, AppUpdate, Resource } from './types'
 import { attentionLine, selectAttentionSignal, type AttentionSignal } from './attentionModel'
+import { snoozeReminder } from './dayModel'
 import { isRealReminder, realEvents } from './dayModel'
 import { selectGreeting } from './greetingModel'
 import { zenTimer } from './focus/zenTimer'
@@ -12,8 +14,8 @@ import { sound } from './sound'
 import { bridge } from './bridge'
 import './attention.css'
 
-let currentUpdateReady: { version: string } | null = null
-const updateListeners = new Set<(update: { version: string } | null) => void>()
+let currentUpdateReady: AppUpdate | null = null
+const updateListeners = new Set<(update: AppUpdate | null) => void>()
 
 if (typeof window !== 'undefined') {
   bridge.onUpdateReady?.((data) => {
@@ -23,9 +25,9 @@ if (typeof window !== 'undefined') {
 }
 
 export function useUpdateReady() {
-  const [update, setUpdate] = useState<{ version: string } | null>(currentUpdateReady)
+  const [update, setUpdate] = useState<AppUpdate | null>(currentUpdateReady)
   useEffect(() => {
-    const listener = (data: { version: string } | null) => setUpdate(data)
+    const listener = (data: AppUpdate | null) => setUpdate(data)
     updateListeners.add(listener)
     return () => { updateListeners.delete(listener) }
   }, [])
@@ -59,7 +61,7 @@ export function MemoryReliefSignal({ freedMB }: { freedMB: number }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
+      transition={calmTween(motionDuration.state)}
       className="island-memory-relief"
     >
       <span className="island-relief-dot" aria-hidden="true" />
@@ -69,9 +71,23 @@ export function MemoryReliefSignal({ freedMB }: { freedMB: number }) {
 }
 
 type Signal = AttentionSignal
+
+// Signals that already rang this session (shared by the dashboard and browser islands, so a reminder rings once).
+const rungSignals = new Set<string>()
+const ringStarted = new Map<string, number>()
+const RING_MS = 2400
+/** A reminder rings when it has just become due (≤ 2 min ago, the clock ticks every 30 s) — not when an old one is restored. */
+export function shouldRing(signal: Signal | null, state: AppState, now: Date) {
+  if (!signal || rungSignals.has(signal.id)) return false
+  if (signal.type === 'event') return true
+  if (signal.type !== 'task' || signal.id.endsWith(':soon')) return false
+  const due = state.reminders.find(item => item.id === signal.targetId)?.dueAt
+  return Boolean(due) && now.getTime() - Date.parse(due!) <= 120_000
+}
+
 const categories: Record<Signal['type'], string> = { task: 'Напоминание', mail: 'Письмо', event: 'Встреча', focus: 'Фокус', music: 'Музыка', activity: 'Помощник', update: 'Обновление' }
 
-export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus, compact = false, browser = false, layoutLocked = false, onDay, onAssistant, onUndo, memoryRelief, update: propUpdate }: { state: AppState; now: Date; onChange: (update: (state: AppState) => AppState) => unknown; onOpen: (resource: Resource) => void; onSpace: (id: string) => void; onFocus: () => void; compact?: boolean; browser?: boolean; layoutLocked?: boolean; onDay?: () => void; onAssistant?: () => void; onUndo?: (taskId: string, noticeId: string) => void; memoryRelief?: { freedMB: number; id: string } | null; update?: { version: string } | null }) {
+export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus, compact = false, browser = false, layoutLocked = false, onDay, onAssistant, onUndo, memoryRelief, update: propUpdate }: { state: AppState; now: Date; onChange: (update: (state: AppState) => AppState) => unknown; onOpen: (resource: Resource) => void; onSpace: (id: string) => void; onFocus: () => void; compact?: boolean; browser?: boolean; layoutLocked?: boolean; onDay?: () => void; onAssistant?: () => void; onUndo?: (taskId: string, noticeId: string) => void; memoryRelief?: { freedMB: number; id: string } | null; update?: AppUpdate | null }) {
   const globalUpdate = useUpdateReady()
   const activeUpdate = propUpdate !== undefined ? propUpdate : globalUpdate
   const [focus, setFocus] = useState(zenTimer.getState())
@@ -190,6 +206,26 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
     return () => { observer.disconnect(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
   }, [browser, expanded])
   const signal = expanded ? openedSignal : liveSignal
+  const [ringingId, setRingingId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!liveSignal) return
+    if (!rungSignals.has(liveSignal.id)) {
+      const ring = shouldRing(liveSignal, state, now)
+      rungSignals.add(liveSignal.id)
+      if (ring) {
+        if (liveSignal.type === 'event') sound.playEventSoon(); else sound.playReminderChime()
+        ringStarted.set(liveSignal.id, Date.now())
+      }
+    }
+    // Derived from the start time, so a re-run (StrictMode, signal flicker) keeps or ends the sway correctly.
+    const left = (ringStarted.get(liveSignal.id) || 0) + RING_MS - Date.now()
+    if (left <= 0) return
+    setRingingId(liveSignal.id)
+    const timer = window.setTimeout(() => setRingingId(null), left)
+    return () => window.clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveSignal?.id])
+  const ringing = ringingId !== null && ringingId === liveSignal?.id
   const mail = signal?.type === 'mail' ? state.mailMessages?.find(item => item.id === signal.targetId) : undefined
   const event = signal?.type === 'event' ? state.events?.find(item => item.id === signal.targetId) : undefined
   const eventSpace = event?.spaceId ? state.spaces.find(space => space.id === event.spaceId && !space.archivedAt) : undefined
@@ -223,13 +259,14 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
   function completeTask() {
     if (signal?.type !== 'task') return
     const current = signal
+    sound.playTaskDone()
     void change(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === current.targetId ? { ...item, done: true } : item), dismissedNotices: [...(previous.dismissedNotices || []), current.id].slice(-500) }), () => { if (onUndo) onUndo(current.targetId, current.id); else setUndo({ taskId: current.targetId, noticeId: current.id }); close() })
   }
   function snooze() {
     if (signal?.type !== 'task') return
     const id = signal.targetId
-    const dueAt = new Date(Date.now() + 15 * 60000).toISOString()
-    void change(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === id ? { ...item, dueAt, notifiedAt: undefined, trigger: undefined } : item) }))
+    sound.playReminderLater()
+    void change(previous => ({ ...previous, reminders: previous.reminders.map(item => item.id === id ? snoozeReminder(item, 15) : item) }))
   }
   const details = expanded && <section ref={panel} className={'island-details' + (browser ? ' browser-island-details' : '')} style={browser ? { position: 'fixed', ...position, transform: 'none' } : undefined} id={detailsId} role="dialog" aria-modal="false" aria-label="Сейчас">
         <div className="island-detail-heading"><span>{signal ? categories[signal.type] : browser ? 'Сейчас' : 'Уведомления'}</span><button aria-label="Свернуть уведомление" onClick={close}><X size={16} /></button></div>
@@ -257,7 +294,12 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
           ) : signal.type === 'music' ? (
             <button onClick={() => { audioManager.pause(); close() }}><Pause size={16} />Пауза</button>
           ) : signal.type === 'update' ? (
-            <button disabled={saving} onClick={dismiss}>Понятно</button>
+            signal.manual ? (
+              <>
+                <button className="island-primary" onClick={() => { void bridge.openReleasePage?.(); dismiss() }}>Скачать<ArrowRight size={15} /></button>
+                <button disabled={saving} onClick={dismiss}>Позже</button>
+              </>
+            ) : <button disabled={saving} onClick={dismiss}>Понятно</button>
           ) : (
             <>
               {signal.url && (
@@ -371,7 +413,8 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
           'island-trigger' +
           (browser ? ' browser-day-pulse' : '') +
           (showGreeting ? ' is-hidden-for-greeting' : '') +
-          (isManifesting ? ' is-manifesting' : '')
+          (isManifesting ? ' is-manifesting' : '') +
+          (ringing && !expanded && state.liveHints !== false ? ' is-ringing' : '')
         }
         aria-label={memoryRelief ? `Кабинет на паузе · Освобождено ${memoryRelief.freedMB} МБ ОЗУ` : browser ? line ? 'Центр внимания: ' + line : 'Открыть центр внимания' : signal ? 'Сейчас: ' + signal.title : 'Уведомления'}
         aria-expanded={expanded}
@@ -385,7 +428,7 @@ export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus
           <MemoryReliefSignal freedMB={memoryRelief.freedMB} />
         ) : browser ? (
           <>
-            <span className="browser-island-dot" aria-hidden="true" />
+            <span className="browser-island-icon" aria-hidden="true">{icon}{hasSignal && <span className="browser-island-dot" />}</span>
             <span className="browser-island-line" aria-live="polite">{line || (wide ? 'Нет срочного' : '')}</span>
           </>
         ) : (

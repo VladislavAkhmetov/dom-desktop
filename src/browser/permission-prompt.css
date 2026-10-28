@@ -4,30 +4,18 @@
   left: 0;
   width: 360px;
   max-width: calc(100vw - 32px);
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-popover);
   padding: 16px 18px;
   z-index: 1001;
   display: flex;
   flex-direction: column;
   gap: 12px;
   text-align: left;
-  animation: permBubbleFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
-  box-sizing: border-box;
-}
-
-@keyframes permBubbleFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+  --enter-y: -8px; --enter-scale: .97; animation: calm-in var(--motion-enter) var(--ease-calm) both;
+  box-sizing: border-box; background: var(--surface-popover); backdrop-filter: blur(var(--blur-popover)); -webkit-backdrop-filter: blur(var(--blur-popover));}
 
 .chrome-permission-bubble::before {
   content: '';
@@ -37,8 +25,8 @@
   width: 11px;
   height: 11px;
   background: #ffffff;
-  border-left: 1px solid rgba(0, 0, 0, 0.12);
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  border-left: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line-strong);
   transform: rotate(45deg);
 }
 
@@ -83,13 +71,13 @@
   border: none !important;
   background: transparent !important;
   color: #5f6368 !important;
-  border-radius: 50% !important;
+  border-radius: var(--radius-full) !important;
   cursor: pointer !important;
   padding: 0 !important;
   flex-shrink: 0 !important;
   flex-grow: 0 !important;
   box-sizing: border-box !important;
-  transition: background 0.15s, color 0.15s !important;
+  transition: background var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm) !important;
 }
 
 .chrome-permission-bubble button.perm-close-btn:hover,
@@ -115,16 +103,16 @@
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: #f1f3f4;
   flex-shrink: 0;
 }
 
 .perm-icon-geo {
-  color: #1a73e8;
+  color: var(--accent);
 }
 .perm-icon-wrapper:has(.perm-icon-geo) {
-  background: #e8f0fe;
+  background: var(--accent-soft);
 }
 
 .perm-icon-bell {
@@ -155,7 +143,7 @@
 
 .perm-description {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: #3c4043;
   font-weight: 400;
@@ -182,9 +170,9 @@
   min-height: 34px !important;
   max-height: 34px !important;
   padding: 0 16px !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-sm) !important;
   font-family: inherit !important;
-  font-size: 13px !important;
+  font-size: var(--fs-meta) !important;
   font-weight: 500 !important;
   line-height: 34px !important;
   white-space: nowrap !important;
@@ -193,54 +181,54 @@
   box-sizing: border-box !important;
   flex: 0 0 auto !important;
   text-align: center !important;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s !important;
+  transition: background var(--motion-hover) var(--ease-calm), border-color var(--motion-hover) var(--ease-calm), box-shadow var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm) !important;
   outline: none !important;
 }
 
 .chrome-permission-bubble button.perm-btn:focus-visible,
 .browser-omnibox .chrome-permission-bubble button.perm-btn:focus-visible {
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #1a73e8 !important;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--accent) !important;
 }
 
 .chrome-permission-bubble button.perm-btn-block,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-block {
   background: #ffffff !important;
-  border: 1px solid #dadce0 !important;
-  color: #1a73e8 !important;
+  border: 1px solid var(--line-strong) !important;
+  color: var(--accent) !important;
   box-shadow: none !important;
 }
 
 .chrome-permission-bubble button.perm-btn-block:hover,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-block:hover {
   background: #f8f9fa !important;
-  border-color: #dadce0 !important;
-  color: #174ea6 !important;
+  border-color: var(--line-strong) !important;
+  color: var(--accent-hover) !important;
 }
 
 .chrome-permission-bubble button.perm-btn-block:active,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-block:active {
   background: #f1f3f4 !important;
-  border-color: #dadce0 !important;
+  border-color: var(--line-strong) !important;
 }
 
 .chrome-permission-bubble button.perm-btn-allow,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-allow {
-  background: #1a73e8 !important;
-  border: 1px solid #1a73e8 !important;
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
   color: #ffffff !important;
   font-weight: 500 !important;
-  box-shadow: 0 1px 2px rgba(26, 115, 232, 0.25) !important;
+  box-shadow: 0 1px 2px rgba(44, 82, 64, 0.25) !important;
 }
 
 .chrome-permission-bubble button.perm-btn-allow:hover,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-allow:hover {
-  background: #1557b0 !important;
-  border-color: #1557b0 !important;
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
   color: #ffffff !important;
 }
 
 .chrome-permission-bubble button.perm-btn-allow:active,
 .browser-omnibox .chrome-permission-bubble button.perm-btn-allow:active {
-  background: #174ea6 !important;
-  border-color: #174ea6 !important;
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
 }

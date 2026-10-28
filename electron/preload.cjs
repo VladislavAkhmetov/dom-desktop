@@ -31,8 +31,11 @@ contextBridge.exposeInMainWorld('dom', {
     onAI: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('ai:event', listener); return () => ipcRenderer.removeListener('ai:event', listener) }
   },
   vault: {
-    listCredentials: origin => ipcRenderer.invoke('vault:credentials:list', origin),
+    listCredentials: site => ipcRenderer.invoke('vault:credentials:list', site),
+    revealPassword: id => ipcRenderer.invoke('vault:credentials:reveal', id),
     saveCredential: cred => ipcRenderer.invoke('vault:credentials:save', cred),
+    saveOffer: (token, username, password) => ipcRenderer.invoke('vault:credentials:save-offer', token, username, password),
+    exportCredentials: () => ipcRenderer.invoke('vault:credentials:export'),
     removeCredential: id => ipcRenderer.invoke('vault:credentials:remove', id),
     importCredentials: csv => ipcRenderer.invoke('vault:credentials:import', csv)
   },
@@ -55,7 +58,7 @@ contextBridge.exposeInMainWorld('dom', {
     getReaderContent: tabId => ipcRenderer.invoke('browser:reader:content', tabId),
     translateText: (text, targetLang) => ipcRenderer.invoke('browser:translate:text', text, targetLang),
     translateTab: tabId => ipcRenderer.invoke('browser:translate:tab', tabId),
-    autofill: (tabId, cred) => ipcRenderer.invoke('browser:autofill', tabId, cred)
+    autofill: (tabId, credentialId) => ipcRenderer.invoke('browser:autofill', tabId, credentialId)
   },
   bitwardenStatus: () => ipcRenderer.invoke('bitwarden:status'),
   pickResource: kind => ipcRenderer.invoke('resource:pick', kind),
@@ -89,6 +92,7 @@ contextBridge.exposeInMainWorld('dom', {
     ipcRenderer.on('toast:show', listener)
     return () => ipcRenderer.removeListener('toast:show', listener)
   },
+  openReleasePage: () => ipcRenderer.invoke('app:open-release'),
   onUpdateReady: callback => {
     const listener = (_event, data) => callback(data)
     ipcRenderer.on('app:update-ready', listener)

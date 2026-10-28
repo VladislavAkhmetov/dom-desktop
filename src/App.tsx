@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
+import { calmTween, motionDuration } from './motion'
+import { useScreenEntrance } from './useScreenEntrance'
 import {
-  AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Compass, History, Pencil,
-  ExternalLink, FileText, Folder, Globe2, Link2,
+  AppWindow, Archive, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, History, Pencil,
+  ExternalLink, FileText, Folder, FolderPlus, Globe2, Link2,
   Bookmark, LayoutGrid, Pin, Plus, Search, Settings2, Sparkles, SquarePlus, Trash2, X
 } from 'lucide-react'
 import { bridge, isDesktop } from './bridge'
@@ -21,6 +23,9 @@ import { cachedUfaWeather, fetchUfaWeather, type UfaWeather } from './weather'
 import { AmbientDate, AmbientWeather, WeatherDetails } from './AmbientPreviews'
 import { Workstage } from './browser/Workstage'
 import { BottomDock } from './BottomDock'
+import { SpaceSwitcher } from './SpaceSwitcher'
+import { dayLabel, ensureDayDraft, isDayDraft, isPastDay, pastDays, promoteDayDraft, todayDraft } from './dayDraft'
+import { SpaceThreshold } from './SpaceThreshold'
 import { FluidGroup } from './FluidMotion'
 import { useWorkspaceTransition, type WorkspaceRoute } from './workspaceTransition'
 import { AssistantPanel } from './CloudAssistant'
@@ -63,6 +68,8 @@ import { sound } from './sound'
 import { DashboardSettings } from './DashboardSettings'
 import { dashboardWidgets } from './dashboard'
 import { CalmTooltip } from './CalmTooltip'
+import { isTabCover } from './tabCover'
+import { previewTabCovers } from './previewFixture'
 import { isCabinetPreview } from './cabinetMode'
 import { cabinetFromTabs, copyMaterial, formatSpaceDisplayName, hasCabinetWork, nameFromMaterials, newCabinet, suggestInitialName } from './cabinetModel'
 import { SpacePanel } from './browser/SpacePanel'
@@ -75,6 +82,7 @@ import { useSpacesTabDrag } from './useSpacesTabDrag'
 import './cabinet.css'
 import { CalmWindSvgFilter } from './CalmWindSvgFilter'
 import { productIcon } from './productIcon'
+import { ProfileGlyph } from './ProfileGlyph'
 
 export { CalmWindSvgFilter, productIcon }
 
@@ -161,7 +169,26 @@ function App() {
   const resourceInFlight = useRef(new Map<string, Promise<OpenResult>>())
   const [undoAction, setUndoAction] = useState<{ label: string; restore: () => void; open?: () => void } | null>(null)
   const { state, commit } = usePersistentState(setToast)
+  // Day draft «Сегодня» (docs/day-draft.md): created on load, retired at the 04:00 boundary — checked on
+  // window focus and every 5 minutes. ensureDayDraft returns the same state when nothing changes (no write).
+  useEffect(() => {
+    if (!isCabinetPreview || !state) return
+    const check = () => { void commit(previous => ensureDayDraft(previous)) }
+    check()
+    const timer = window.setInterval(check, 5 * 60000)
+    window.addEventListener('focus', check)
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', check) }
+  }, [Boolean(state)])
   const news = useNews(state, commit)
+  // Browser dev preview only: drawn stand-ins for fixture tabs. Electron sends real covers via 'cover' events.
+  const previewCoversSeeded = useRef(false)
+  useEffect(() => {
+    if (previewCoversSeeded.current || !state) return
+    const seeded = previewTabCovers(state)
+    if (!Object.keys(seeded).length) return
+    previewCoversSeeded.current = true
+    setTabCovers(previous => ({ ...seeded, ...previous }))
+  }, [state])
   const [newSpaceName, setNewSpaceName] = useState('')
   const [newSpaceTone, setNewSpaceTone] = useState<SpaceTone>('sage')
   const [linkName, setLinkName] = useState('')
@@ -195,6 +222,7 @@ function App() {
   }, [])
 
   const isWorkstageOpen = route.type === 'browse'
+  useScreenEntrance(contentViewport, `${route.type}:${'spaceId' in route ? route.spaceId : ''}`, !isWorkstageOpen)
   useLayoutEffect(() => {
     const viewport = contentViewport.current
     if (!viewport || isWorkstageOpen) return
@@ -262,14 +290,25 @@ function App() {
 
   useEffect(() => {
     if (!bridge.browser) return
-    const observer = new MutationObserver(() => bridge.browser!.block(Boolean(document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-browser-drag-layer], [data-workspace-transition]'))).catch(() => undefined))
+    // Any DOM change may open or close an overlay, but the native pages only need to know when the
+    // answer flips: one check per animation frame, one IPC call per actual change.
+    let frame = 0
+    let blocked: boolean | null = null
+    const check = () => {
+      frame = 0
+      const next = Boolean(document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-browser-drag-layer], [data-workspace-transition]'))
+      if (next === blocked) return
+      blocked = next
+      bridge.browser!.block(next).catch(() => undefined)
+    }
+    const observer = new MutationObserver(() => { if (!frame) frame = requestAnimationFrame(check) })
     observer.observe(document.body, { childList: true, subtree: true })
-    return () => observer.disconnect()
+    return () => { observer.disconnect(); if (frame) cancelAnimationFrame(frame) }
   }, [])
 
   useEffect(() => {
     return bridge.browser?.onEvent(event => {
-      if (event.type === 'cover' && /^data:image\/png;base64,/i.test(event.image)) {
+      if (event.type === 'cover' && isTabCover(event.image)) {
         setTabCovers(previous => Object.fromEntries([...Object.entries(previous).filter(([id]) => id !== event.tabId), [event.tabId, event.image]].slice(-40)))
       }
       else if (event.type === 'update') commit(previous => {
@@ -319,7 +358,7 @@ function App() {
           origin: event.origin,
           hostname: event.hostname,
           username: event.username,
-          password: event.password
+          token: event.token
         })
       }
       else if (event.type === 'adblock-stats') {
@@ -349,15 +388,11 @@ function App() {
     setPasswordPrompt(null)
   }, [activeTabId])
 
+  // `password` is empty unless the user typed a different one; the captured password never reaches the interface.
   const handlePasswordPromptSave = async (username: string, password: string) => {
-    if (!passwordPrompt || !bridge.vault?.saveCredential) return
+    if (!passwordPrompt || !bridge.vault?.saveOffer) return
     try {
-      await bridge.vault.saveCredential({
-        origin: passwordPrompt.origin,
-        username,
-        password,
-        title: passwordPrompt.hostname
-      })
+      await bridge.vault.saveOffer(passwordPrompt.token, username, password || undefined)
       setToast(`Пароль для ${passwordPrompt.hostname} сохранён`)
     } catch {
       setToast('Не удалось сохранить пароль')
@@ -560,6 +595,12 @@ function App() {
     commit(previous => ({ ...previous, spaces: previous.spaces.map(item => item.id === space.id ? { ...item, pinned: !item.pinned } : item) }))
   }
 
+  // «Сделать пространством»: the day draft keeps its tabs and becomes a regular space named after its content.
+  function promoteDraft(space: Space) {
+    void commit(previous => promoteDayDraft(previous, space.id))
+    setToast('Теперь это пространство. «Сегодня» снова чистый')
+  }
+
   function renameCabinet(space: Space) {
     setSpaceActionId(space.id); setNewSpaceName(space.name); setModal('renameSpace')
   }
@@ -697,7 +738,7 @@ function App() {
   }
 
   function spaceActions(space: Space): MenuAction[] {
-    const spaces = state?.spaces.filter(item => !item.archivedAt && item.kind !== 'web') || []
+    const spaces = state?.spaces.filter(item => !item.archivedAt && item.kind !== 'web' && item.kind !== 'day') || []
     const index = spaces.findIndex(item => item.id === space.id)
     return [
       { label: space.pinned ? 'Открепить из меню' : 'Закрепить в меню', icon: <Pin size={16} />, onSelect: () => toggleSpacePin(space) },
@@ -705,7 +746,7 @@ function App() {
       ...(index > 0 ? [{ label: 'Передвинуть раньше', icon: <ChevronLeft size={16} />, onSelect: () => reorderSpace(space.id, spaces[index - 1].id) }] : []),
       ...(index >= 0 && index < spaces.length - 1 ? [{ label: 'Передвинуть дальше', icon: <ChevronRight size={16} />, onSelect: () => reorderSpace(space.id, spaces[index + 1].id, true) }] : []),
       { label: 'В архив', icon: <Archive size={16} />, onSelect: () => archiveSpace(space) },
-      { label: 'Удалить пространство', icon: <Trash2 size={16} />, onSelect: () => { setSpaceActionId(space.id); setModal('deleteSpace') } }
+      { label: 'Удалить пространство', icon: <Trash2 size={16} />, tone: 'danger', onSelect: () => { setSpaceActionId(space.id); setModal('deleteSpace') } }
     ]
   }
 
@@ -810,6 +851,11 @@ function App() {
     const name = newSpaceName.trim()
     if (!name) { setToast('Дайте пространству имя.'); return }
     const renameTarget = isCabinetPreview ? state?.spaces.find(space => space.id === spaceActionId) || currentSpace : currentSpace
+    if (modal === 'renameSpace' && renameTarget && isDayDraft(renameTarget)) {
+      commit(previous => promoteDayDraft(previous, renameTarget.id, new Date(), name))
+      setModal(null)
+      return
+    }
     if (modal === 'renameSpace' && renameTarget) {
       commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id === renameTarget.id ? { ...space, name, ...(isCabinetPreview ? { nameOrigin: 'manual' as const } : {}) } : space) }))
       setModal(null)
@@ -968,6 +1014,16 @@ function App() {
       setModal(null)
       setToast('Ссылка добавлена.')
     } catch { setToast('Некорректный адрес сайта') }
+  }
+
+  // Opens a page as a tab of the given space (e.g. a bookmark from «Избранное» into «Сегодня»).
+  function openLinkInSpace(spaceId: string, url: string, title: string) {
+    const tab: BrowserTab = { id: crypto.randomUUID(), title, url }
+    commit(previous => ({ ...previous, activeSpaceId: spaceId, spaces: previous.spaces.map(item => item.id !== spaceId ? item : updateContextSession(item, session => {
+      const existing = session.tabs.find(value => value.url === url)
+      return { ...session, tabs: existing ? session.tabs : [...session.tabs, tab], activeTabId: existing?.id || tab.id }
+    })) }))
+    setRoute({ type: 'browse', spaceId })
   }
 
   async function openResource(resource: Resource, contextId?: string): Promise<OpenResult> {
@@ -1135,10 +1191,11 @@ function App() {
   function openWeb() {
     if (!state) return
     if (isCabinetPreview) {
-      const last = state.spaces.find(space => space.id === state.activeSpaceId && !space.archivedAt && space.kind !== 'web')
-        || state.spaces.find(space => !space.archivedAt && space.kind !== 'web')
-      if (last) openWorkstage(last.id)
-      else void createEmptyCabinet()
+      // «Браузер» without a space opens today's draft — no one is pushed into a space to browse.
+      // The draft exists from the first load (ensureDayDraft effect); right after a day change it is created here.
+      const draft = todayDraft(state)
+      if (draft) openWorkstage(draft.id)
+      else void commit(previous => ensureDayDraft(previous))
       return
     }
     const webId = webSpaceId(state)
@@ -1492,8 +1549,17 @@ function App() {
   }, [stopSpacesHoldScroll])
 
   const activeTopSpaceId = currentSpace?.id || targetWorkstageSpace?.id
-  const availableTopSpaces = state ? state.spaces.filter(space => !space.archivedAt && space.kind !== 'web') : []
-  const visibleTopSpaces = availableTopSpaces
+  const availableTopSpaces = state ? state.spaces.filter(space => !space.archivedAt && space.kind !== 'web' && space.kind !== 'day') : []
+  const today = state && isCabinetPreview ? todayDraft(state) : undefined
+  const previousDays = state && isCabinetPreview ? pastDays(state) : []
+  // «Избранное» lives outside spaces: bookmarks of the hidden browsing space (kind 'web').
+  const favoritesSpace = state?.spaces.find(space => space.kind === 'web' && !space.archivedAt)
+  // Where a tab or material can go: today's draft first, then the spaces (never a past day).
+  const moveTargets = (exceptId: string) => [...(today && today.id !== exceptId ? [today] : []), ...availableTopSpaces.filter(space => space.id !== exceptId)]
+  // Header shows only pinned spaces (max 3) plus the open one; everything else lives in SpaceSwitcher.
+  const openTopSpaceId = (isWorkstageOpen ? targetWorkstageSpace?.id : currentSpace?.id) || null
+  const pinnedTopSpaces = availableTopSpaces.filter(space => space.pinned).slice(0, 3)
+  const visibleTopSpaces = availableTopSpaces.filter(space => pinnedTopSpaces.includes(space) || space.id === openTopSpaceId)
 
   useLayoutEffect(() => {
     const el = spacesViewportRef.current
@@ -1595,7 +1661,7 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 0.35, 0] }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.6, ease: [0.2, 0, 0, 1] }}
+              transition={calmTween(motionDuration.layout * 2)}
             />
           )}
         </AnimatePresence>
@@ -1713,7 +1779,7 @@ function App() {
                     title={`Профиль: ${userProfile.name}`}
                   >
                     <span className={`profile-avatar-pill tone-${userProfile.avatarTone || 'sage'}`}>
-                      {userProfile.avatarEmoji || (userProfile.name.trim().charAt(0).toUpperCase() || 'П')}
+                      <ProfileGlyph profile={userProfile} size={15} />
                     </span>
                   </button>
                 )
@@ -1724,6 +1790,8 @@ function App() {
             <nav className="chrome-spaces" aria-label="Пространства">
               <div className="chrome-spaces-home">
                 <button className={`chrome-space ${!isWorkstageOpen && !currentSpace && !showSpaces ? 'selected' : ''}`} onClick={returnHome}>Мой день</button>
+                {/* Always here, even empty: a stable place for free browsing (tabs outside any space). */}
+                {today && <button className={`chrome-space chrome-space-today ${currentSpace?.id === today.id ? 'selected' : ''}`} data-space-id={today.id} onClick={() => openSpace(today.id)} title="Вкладки без пространства. Каждое утро — с чистого листа, вчерашние уходят в «Прошлые дни»">Сегодня</button>}
               </div>
               <div className="chrome-spaces-scroll-container">
                 <div
@@ -1800,6 +1868,10 @@ function App() {
                         </button>
                       )
                     })}
+                    {/* One click to a new space, right after the tabs (search and the full list stay in «Пространства»). */}
+                    <button type="button" className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Новое пространство">
+                      <Plus size={18} aria-hidden="true" />
+                    </button>
                   </FluidGroup>
                 </div>
                 {spacesTabDrag.dragPointer && spacesTabDrag.dragLayout.current && spacesTabDrag.draggedSpace && typeof document !== 'undefined' && document.body && createPortal(
@@ -1837,9 +1909,14 @@ function App() {
                 </div>
               </div>
               <div className="chrome-spaces-actions">
-                <button className={`chrome-space ${showSpaces ? 'selected' : ''}`} onClick={() => setRoute({ type: 'spaces' })}>Все пространства</button>
-                <button className="chrome-new-space" onClick={createStream} aria-label="Создать пространство" title="Создать пространство"><Plus size={17} /></button>
-                <button className="chrome-space-search" onClick={() => setModal('search')} aria-label="Поиск по пространствам" title="Поиск по пространствам · Ctrl K"><Search size={16} /></button>
+                <SpaceSwitcher
+                  spaces={availableTopSpaces}
+                  currentId={openTopSpaceId}
+                  onOpen={openSpace}
+                  onShowAll={() => setRoute({ type: 'spaces' })}
+                  onCreate={createStream}
+                  pastDays={previousDays}
+                />
               </div>
             </nav>
           </div>}
@@ -1886,6 +1963,7 @@ function App() {
             />
           ) : (
             <Workstage
+              history={state.history}
               space={targetWorkstageSpace!}
               tabs={tabs}
               activeTabId={activeTabId}
@@ -1904,7 +1982,7 @@ function App() {
                 onOpen={openResource} onEdit={() => editContext(targetWorkstageSpace!.id)} onPin={() => toggleSpacePin(targetWorkstageSpace!)}
                 onAddLink={() => startLink(targetWorkstageSpace!.id)} onAddDocument={() => addDocumentReference(targetWorkstageSpace!.id)}
                 onAddWindow={() => openWindowPicker(targetWorkstageSpace!.id)}
-                onRemove={removeResource} onCopy={copyToCabinet} destinations={availableTopSpaces.filter(space => space.id !== targetWorkstageSpace!.id)}
+                onRemove={removeResource} onCopy={copyToCabinet} destinations={moveTargets(targetWorkstageSpace!.id)}
                 suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, targetWorkstageSpace!.id)} onDismissRecentFile={dismissRecentDocument}
               /> : browserDayOpen ? <BrowserDayPanel
                 state={state} model={browserDay} now={time} focus={browserFocus} pinned={browserDayPinned}
@@ -1951,60 +2029,43 @@ function App() {
 
           return (
             <main className={`collection-stage space-detail tone-context-${currentSpace.tone}${isCabinetPreview ? ' cabinet-detail' : ''}`} aria-label={currentSpace.name}>
-              <div className="collection-header">
-                <div>
-                  <button className="back-button" onClick={() => setRoute({ type: 'spaces' })}><ChevronLeft size={18} /> Пространства</button>
+              <div className="collection-header space-head">
+                <div className="space-head-main">
                   <div className="space-title-row" {...spaceInteractions(currentSpace)}>
+                    {!isDayDraft(currentSpace) && <button className="space-back" onClick={() => setRoute({ type: 'spaces' })} aria-label="Все пространства" title="Все пространства"><ChevronLeft size={20} /></button>}
                     <h1 title={currentSpace.name}>{currentSpace.name}</h1>
-                    <button className="calm-icon" aria-label="Переименовать пространство" onClick={() => { if (isCabinetPreview) renameCabinet(currentSpace); else { setNewSpaceName(currentSpace.name); setModal('renameSpace') } }}><Pencil size={17} /></button>
+                    {!isDayDraft(currentSpace) && <button className="calm-icon" aria-label="Переименовать пространство" onClick={() => { if (isCabinetPreview) renameCabinet(currentSpace); else { setNewSpaceName(currentSpace.name); setModal('renameSpace') } }}><Pencil size={17} /></button>}
                   </div>
-                  {statusText && <p className="space-detail-meta">{statusText}</p>}
+                  {!isCabinetPreview && statusText && <p className="space-detail-meta">{statusText}</p>}
                 </div>
                 <div className="space-add-actions">
-                  {(!isCabinetPreview || cabinetTabsCount > 0) && (
+                  {!isCabinetPreview && (
                     <button className="space-open-tabs" data-workspace-navigation onClick={() => openWorkstage(currentSpace.id)}>
                       <Globe2 size={18} /> Открыть вкладки
                     </button>
                   )}
-                  <ActionMenu label="Добавить в пространство" triggerContent={<><Plus size={18} />Добавить<ChevronDown size={14} /></>} actions={[
+                  {!isDayDraft(currentSpace) && <ActionMenu label="Добавить в пространство" triggerContent={<><Plus size={18} />Добавить<ChevronDown size={14} /></>} actions={[
                     { label: 'Сайт', icon: <Link2 size={17} />, onSelect: () => startLink(currentSpace.id) },
                     { label: 'Документ', icon: <FileText size={17} />, onSelect: () => addDocumentReference(currentSpace.id) },
                     { label: 'Открытое окно', icon: <AppWindow size={17} />, onSelect: () => openWindowPicker(currentSpace.id) },
                     { label: 'Приложение', icon: <AppWindow size={17} />, onSelect: () => addPicked('app', currentSpace.id) }
-                  ]} />
-                  <ActionMenu label="Действия с пространством" actions={[
+                  ]} />}
+                  <ActionMenu label="Действия с пространством" actions={isDayDraft(currentSpace) ? [
+                    { label: 'Сделать пространством', icon: <FolderPlus size={17} />, onSelect: () => promoteDraft(currentSpace) },
+                    ...(isPastDay(currentSpace) ? [{ label: 'Удалить этот день', icon: <Trash2 size={17} />, tone: 'danger' as const, onSelect: () => { setSpaceActionId(currentSpace.id); setModal('deleteSpace') } }] : [])
+                  ] : [
+                    { label: 'Что изменилось', icon: <History size={17} />, onSelect: () => setModal('changes') },
                     ...(isCabinetPreview ? [
                       { label: 'Настроить продолжение пространства', icon: <Pencil size={17} />, onSelect: () => editContext(currentSpace.id) },
                       ...spaceActions(currentSpace)
                     ] : []),
-                    { label: 'Что изменилось', icon: <History size={17} />, onSelect: () => setModal('changes') },
                     ...(!isCabinetPreview ? [{ label: 'В архив', icon: <Archive size={17} />, onSelect: () => archiveSpace(currentSpace) }] : [])
                   ]} />
                 </div>
               </div>
               {!isCabinetPreview && <nav className="space-contexts" aria-label="Текущее дело для открываемых документов"><span>Дело</span>{normalizeSpace(currentSpace).workContexts!.map(context => <button className="soft-button" key={context.id} aria-pressed={context.id === currentContext(currentSpace).id} title={`Открываемые документы добавятся в «${contextTitle(currentSpace, context)}»`} onClick={() => commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id === currentSpace.id ? activateContext(space, context.id) : space) }))}><span>{contextTitle(currentSpace, context)}{context.completedAt ? ' · завершено' : ''}</span></button>)}<button className="calm-text-button" onClick={() => editContext(currentSpace.id, undefined, true)}><Plus size={15} />Новое дело</button><button className="calm-icon" title="Настроить продолжение текущего дела" aria-label="Настроить продолжение текущего дела" onClick={() => editContext(currentSpace.id)}><Pencil size={15} /></button></nav>}
               {visibleSpaceCheckpoint && (
-                isCabinetPreview ? (
-                  <div className="cabinet-continuation-banner" role="region" aria-label="Точка возвращения к задаче">
-                    <div className="cabinet-continuation-body">
-                      <span className="cabinet-continuation-icon" aria-hidden="true"><Compass size={17} /></span>
-                      <div className="cabinet-continuation-copy">
-                        <strong className="cabinet-continuation-step">{visibleSpaceCheckpoint.nextStep || 'Продолжить работу'}</strong>
-                        {visibleSpaceCheckpoint.note && <span className="cabinet-continuation-note"> · {visibleSpaceCheckpoint.note}</span>}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="cabinet-continuation-edit"
-                      onClick={() => editContext(currentSpace.id)}
-                      title="Настроить следующий шаг"
-                      aria-label="Настроить следующий шаг"
-                    >
-                      <Pencil size={14} />
-                      <span>Настроить</span>
-                    </button>
-                  </div>
-                ) : (
+                isCabinetPreview ? null : (
                   <section className="space-continuation card">
                     <div className="continuation-copy"><time className="continuation-kicker" dateTime={visibleSpaceCheckpoint.savedAt}>{new Date(visibleSpaceCheckpoint.savedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time><h2>{visibleSpaceCheckpoint.nextStep || 'Продолжить дело'}</h2>{visibleSpaceCheckpoint.note && <p>{visibleSpaceCheckpoint.note}</p>}</div>
                     <button className="primary-button" onClick={() => resumeContext(currentSpace.id, currentContext(currentSpace).id)}>Продолжить <ArrowRight size={18} /></button>
@@ -2012,7 +2073,30 @@ function App() {
                   </section>
                 )
               )}
-              {isCabinetPreview ? <CabinetContents key={currentSpace.id} space={currentSpace} destinations={availableTopSpaces.filter(space => space.id !== currentSpace.id)} covers={tabCovers} drag={cabinetDrag}
+              {isCabinetPreview && (
+                <SpaceThreshold
+                  nextStep={isDayDraft(currentSpace) ? undefined : visibleSpaceCheckpoint?.nextStep}
+                  note={visibleSpaceCheckpoint?.note}
+                  lastAt={hasCabinetWork(currentSpace) || currentSpace.resources.length ? visibleSpaceCheckpoint?.savedAt || currentSpace.lastActiveAt : undefined}
+                  tabs={(currentSpace.activeSession?.tabs || []).filter(tab => Boolean(tab.url))}
+                  files={currentSpace.resources.filter(resource => resource.kind === 'file' && !resource.completedAt)}
+                  onOpenTabs={() => openWorkstage(currentSpace.id)}
+                  onOpenFile={resource => { void openResource(resource) }}
+                  onSaveStep={isDayDraft(currentSpace) ? undefined : step => { void commit(previous => saveCheckpoint(previous, currentSpace.id, { contextId: currentContext(currentSpace).id, nextStep: step })) }}
+                  dayNote={isDayDraft(currentSpace) ? (isPastDay(currentSpace) ? 'Прошлый день' : dayLabel(currentSpace.day!)) : undefined}
+                  dayHint={isDayDraft(currentSpace) ? (isPastDay(currentSpace) ? 'Хранится 14 дней' : 'Вкладки без пространства · утром — с чистого листа') : undefined}
+                  primaryLabel={isDayDraft(currentSpace) && !isPastDay(currentSpace) ? 'Открыть браузер' : 'Открыть вкладки'}
+                  onPromote={isDayDraft(currentSpace) ? () => promoteDraft(currentSpace) : undefined}
+                />
+              )}
+              {isCabinetPreview ? <CabinetContents key={currentSpace.id} space={currentSpace} destinations={moveTargets(currentSpace.id)}
+                {...(isDayDraft(currentSpace) && !isPastDay(currentSpace) ? {
+                  favorites: favoritesSpace?.resources.filter(resource => resource.kind === 'link' && !resource.completedAt && /^https?:\/\//i.test(resource.target)) || [],
+                  favoriteGroups: favoritesSpace?.bookmarkGroups || [],
+                  pastDays: previousDays,
+                  onOpenFavorite: (resource: Resource) => openLinkInSpace(currentSpace.id, resource.target, resource.name),
+                  onOpenDay: (id: string) => openSpace(id)
+                } : {})} covers={tabCovers} drag={cabinetDrag}
                 pointerTabTarget={cabinetTabDrop} onPointerStart={pointerCabinet.start}
                 onSelectTab={id => selectExistingTab(currentSpace.id, id)} onCloseTab={id => handleCloseTab(id, currentSpace.id)} onSaveTab={tab => requestSaveTab(tab, currentSpace.id)}
                 onMoveTab={(id, destination) => moveTab(currentSpace.id, id, destination)} onReorderTab={(id, target, after) => reorderTab(currentSpace.id, currentContext(currentSpace).id, id, target, after)}
@@ -2082,7 +2166,7 @@ function App() {
       </Dialog>}
       {modal === 'deleteSpace' && <Dialog title="Удалить пространство?" onClose={() => setModal(null)}>
         <p className="context-edit-copy">«{state.spaces.find(space => space.id === spaceActionId)?.name}» и его сохранённые вкладки будут убраны из Дома. Файлы на диске, страницы и облачные документы сохранятся. Удаление можно отменить сразу после действия.</p>
-        <div className="calm-dialog-actions"><button className="soft-button" onClick={() => setModal(null)}>Оставить</button><button className="calm-primary" onClick={() => deleteCabinet(spaceActionId)}>Удалить пространство</button></div>
+        <div className="calm-dialog-actions"><button className="soft-button" onClick={() => setModal(null)}>Оставить</button><button className="calm-primary is-danger" onClick={() => deleteCabinet(spaceActionId)}>Удалить пространство</button></div>
       </Dialog>}
       {modal === 'context' && contextEditor && <Dialog title={isCabinetPreview ? 'Продолжение пространства' : contextEditor.isNew ? 'Новое дело' : 'Настроить продолжение'} onClose={() => setModal(null)}>
         <p className="context-edit-copy">{isCabinetPreview ? 'Вкладки сохраняются автоматически. Следующий шаг и короткая заметка помогут вернуться к работе.' : '«Продолжить» откроет выбранные документы и вкладки этого дела.'}</p>

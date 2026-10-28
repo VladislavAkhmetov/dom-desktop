@@ -63,6 +63,12 @@ export function CalmTooltip() {
       restoreTitle(activeElement.current)
       activeElement.current = trigger
 
+      // Rows whose label is already visible (and which may show their own peek) opt out.
+      if (trigger.hasAttribute('data-tooltip-off')) {
+        hide()
+        return
+      }
+
       const titleAttr = trigger.getAttribute('title')
       const tooltipAttr = trigger.getAttribute('data-tooltip')
       const ariaLabel = trigger.getAttribute('aria-label')

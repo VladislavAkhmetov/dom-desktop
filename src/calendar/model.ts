@@ -22,8 +22,11 @@ export function slotTime(day: Date, slot: number) {
   return result
 }
 
-export function rescheduleCalendarTask(task: Reminder, target: Date, timed = false): Reminder {
+export function rescheduleCalendarTask(task: Reminder, target: Date, timed = false, now = new Date()): Reminder {
   const due = new Date(target)
   if (!timed && task.dueAt) { const previous = new Date(task.dueAt); due.setHours(previous.getHours(), previous.getMinutes(), 0, 0) }
-  return { ...task, plannedDate: localDate(target), kind: 'task', dueAt: timed || task.dueAt ? due.toISOString() : null, notifiedAt: undefined }
+  const dueAt = timed || task.dueAt ? due.toISOString() : null
+  // Dropped onto a time that already passed: it stays visible but does not ring at once (see dayModel.quietIfPast).
+  const passed = dueAt !== null && Date.parse(dueAt) <= now.getTime()
+  return { ...task, plannedDate: localDate(target), kind: 'task', dueAt, notifiedAt: passed ? now.toISOString() : undefined }
 }

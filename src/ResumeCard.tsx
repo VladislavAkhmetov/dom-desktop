@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { AppWindow, ArrowRight, ArrowUpRight, Check, FileText, Folder, Layers, Pencil, Plus } from 'lucide-react'
+import { enterOffset, fluidInstant, fluidSpring } from './motion'
+import { ArrowRight, ArrowUpRight, Check, Folder, Pencil, Plus } from 'lucide-react'
 import { ActionMenu } from './ActionMenu'
 import { FluidButton } from './FluidMotion'
 import type { Resource } from './types'
@@ -10,6 +11,8 @@ import './resume.css'
 import { isCabinetPreview } from './cabinetMode'
 import { formatSpaceDisplayName } from './cabinetModel'
 import type { BrowserTab } from './types'
+import { ContinuationFooter } from './ContinuationFooter'
+import { NextStepLine } from './NextStepLine'
 
 function tabSubtitle(tabs: BrowserTab[], documents: Resource[], contextTitle: string, spaceDisplayName: string) {
   const parts: string[] = []
@@ -65,14 +68,9 @@ export function ParkedCoversStack({ spaceId, covers }: { spaceId: string; covers
             src={cover.dataUrl}
             alt=""
             style={{ zIndex: 10 - i }}
-            initial={reduced ? { opacity: 0 } : { opacity: 0.8, y: -40, rotate: 0 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: yOffset - enterOffset.y * 2, rotate }}
             animate={{ opacity: 1 - i * 0.18, y: yOffset, rotate }}
-            transition={{
-              type: 'spring',
-              stiffness: 380,
-              damping: 30,
-              mass: 0.8,
-            }}
+            transition={reduced ? fluidInstant : fluidSpring.slow}
             className="resume-cover-stack-img"
           />
         )
@@ -92,6 +90,8 @@ interface Props {
   onResume: (retry?: boolean) => void
   onSpace: () => void
   onEdit: () => void
+  /** Saves the next step typed in place on the card (cabinet mode). */
+  onSaveStep?: (step: string) => void
   onComplete: () => void
   onDocument: (resource: Resource) => void
   onTabs: () => void
@@ -115,7 +115,7 @@ function activityLabel(at: string | undefined, now: Date) {
   return `${day}, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-export function ResumeCard({ continuation, now, hidden, style, pending, result, onResume, onSpace, onEdit, onComplete, onDocument, onTabs, covers, children, onPointerDown, dataWidgetId, className, rowSpan, colSpan, size, onNewSpace }: Props) {
+export function ResumeCard({ continuation, now, hidden, style, pending, result, onResume, onSpace, onEdit, onSaveStep, onComplete, onDocument, onTabs, covers, children, onPointerDown, dataWidgetId, className, rowSpan, colSpan, size, onNewSpace }: Props) {
   const reduced = useReducedMotion()
   const isCompactRow = rowSpan !== undefined && rowSpan <= 2
   const isSmall = (rowSpan !== undefined && rowSpan <= 4) || (colSpan !== undefined && colSpan <= 5) || size === 'S'
@@ -131,7 +131,7 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
         layout="position"
         initial={reduced ? undefined : { y: 2 }}
         animate={reduced ? undefined : { y: 0 }}
-        transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
+        transition={reduced ? fluidInstant : fluidSpring.slow}
         className={`calm-card resume-card context-resume resume-card-empty ${isCompactRow ? 'is-compact-row' : ''} ${isSmall ? 'is-small-card' : ''} ${className || ''}`}
         data-widget="resume"
         data-widget-id={dataWidgetId}
@@ -200,7 +200,10 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
   const checkpoint = context.checkpoint
   const failures = result?.failures.filter(failure => documents.some(document => document.id === failure.id)) || []
   const spaceDisplayName = formatSpaceDisplayName(space)
+  const isBlank = !checkpoint?.nextStep && !checkpoint?.note && documents.length === 0 && tabs.length === 0
   const subtitle = tabSubtitle(tabs, documents, context.title, spaceDisplayName)
+  const showStep = Boolean(checkpoint?.nextStep && (isCabinetPreview || checkpoint.nextStep !== spaceDisplayName))
+  const accent = isBlank ? 'Чистый лист' : showStep ? checkpoint!.nextStep : subtitle
   const visibleCovers = tabs
     .map(tab => ({ id: tab.id, dataUrl: covers?.[tab.id] || '' }))
     .filter(item => Boolean(item.dataUrl))
@@ -210,7 +213,7 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
     layout="position"
     initial={reduced ? undefined : { y: 2 }}
     animate={reduced ? undefined : { y: 0 }}
-    transition={{ type: 'spring', stiffness: 350, damping: 28, mass: 0.8 }}
+    transition={reduced ? fluidInstant : fluidSpring.slow}
     className={`calm-card resume-card context-resume ${isCompactRow ? 'is-compact-row' : ''} ${isSmall ? 'is-small-card' : ''} ${className || ''}`}
     data-widget="resume"
     data-widget-id={dataWidgetId}
@@ -250,11 +253,19 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
       <>
         <div className="resume-card-heading">
           <div className="resume-heading-context">
-            <button className="resume-space-link" onClick={onSpace} title={`Открыть пространство «${spaceDisplayName}»`}>
-              <Folder size={18} aria-hidden="true" />
-              <h2 className="resume-space-title">{spaceDisplayName}</h2>
-              <ArrowUpRight size={14} aria-hidden="true" />
-            </button>
+            {isCabinetPreview ? (
+              // The space name is the accent below; the heading only says what the card is.
+              <span className="resume-space-link is-label">
+                <Folder size={18} aria-hidden="true" />
+                <h2 className="resume-space-title">{space.kind === 'day' ? 'Без пространства' : 'Пространство'}</h2>
+              </span>
+            ) : (
+              <button className="resume-space-link" onClick={onSpace} title={`Открыть пространство «${spaceDisplayName}»`}>
+                <Folder size={18} aria-hidden="true" />
+                <h2 className="resume-space-title">{spaceDisplayName}</h2>
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </button>
+            )}
           </div>
           <div className="resume-heading-actions">
             <ActionMenu label="Действия с продолжением" actions={[{ label: 'Настроить продолжение', icon: <Pencil size={16} />, onSelect: onEdit }, { label: isCabinetPreview ? 'Убрать пространство в архив' : 'Дело завершено', icon: <Check size={16} />, onSelect: onComplete }]} />
@@ -263,61 +274,30 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
         <div className="resume-body-content">
           <div className="resume-main">
             <div className="resume-subtitle-row">
-              <span className="resume-subtitle">{subtitle}</span>
+              {isCabinetPreview
+                ? <button type="button" className="resume-subtitle card-accent resume-space-name" onClick={onSpace} title={`Открыть пространство «${spaceDisplayName}»`}>{spaceDisplayName}</button>
+                : <span className="resume-subtitle card-accent">{accent}</span>}
               {activityLabel(at, now) && (
                 <time className="resume-time" dateTime={at}>
-                  Последнее открытие · {activityLabel(at, now)}
+                  Открывали · {activityLabel(at, now)}
                 </time>
               )}
             </div>
-            {checkpoint?.nextStep && (isCabinetPreview || checkpoint.nextStep !== spaceDisplayName) && (
-              <p className="resume-next-step">{checkpoint.nextStep}</p>
-            )}
+            {isCabinetPreview && space.kind !== 'day' && <NextStepLine step={checkpoint?.nextStep} onSave={onSaveStep} className="resume-next" />}
             {checkpoint?.note && <p className="resume-note">{checkpoint.note}</p>}
-            {!checkpoint?.nextStep && !checkpoint?.note && documents.length === 0 && tabs.length === 0 && (
-              <p className="resume-next-step">Пространство готово к работе</p>
+            {isBlank && (
+              <p className="resume-next-step">Откройте вкладки или добавьте файлы — всё сохранится здесь</p>
             )}
-            {documents.length > 0 && (
-              <div className="resume-contents" aria-label="Состав продолжения">
-                {documents.slice(0, 2).map(document => (
-                  <button className="resume-material" key={document.id} disabled={pending} onClick={() => onDocument(document)} title={`${document.name} · ${document.kind === 'window' ? 'окно программы' : 'программа по умолчанию'}`}>
-                    {document.kind === 'window' ? <AppWindow size={16} aria-hidden="true" /> : <FileText size={16} aria-hidden="true" />}
-                    <span>{!isCabinetPreview && document.name === title ? 'Документ' : document.name}</span>
-                  </button>
-                ))}
-                {documents.length > 2 && (
-                  <details className="resume-more-documents">
-                    <summary>Ещё документов: {documents.length - 2}</summary>
-                    {documents.slice(2).map(document => (
-                      <button className="resume-material" key={document.id} disabled={pending} onClick={() => onDocument(document)}>
-                        {document.kind === 'window' ? <AppWindow size={16} /> : <FileText size={16} />}
-                        <span>{document.name}</span>
-                      </button>
-                    ))}
-                  </details>
-                )}
-              </div>
-            )}
-            <div className="resume-footer-row">
-              {tabs.length > 0 ? (
-                <button
-                  type="button"
-                  className="resume-tabs-pill resume-material resume-tab-group"
-                  disabled={pending}
-                  onClick={onTabs}
-                  title={tabs.map(tab => tab.title || tab.url).join('\n')}
-                >
-                  <Layers size={16} aria-hidden="true" />
-                  <span>{tabs.length} {tabs.length === 1 ? 'вкладка' : (tabs.length >= 2 && tabs.length <= 4) ? 'вкладки' : 'вкладок'}</span>
-                </button>
-              ) : <div />}
-              <div className="resume-actions">
-                <FluidButton className="resume-primary" disabled={pending} onClick={() => onResume()}>
-                  {pending ? 'Открываем…' : 'Продолжить'}
-                  <ArrowRight size={18} />
-                </FluidButton>
-              </div>
-            </div>
+            <ContinuationFooter
+              primaryLabel="Продолжить"
+              onPrimary={() => onResume()}
+              pending={pending}
+              tabs={tabs}
+              onTabs={onTabs}
+              documents={documents}
+              onDocument={onDocument}
+              documentLabel={document => (!isCabinetPreview && document.name === title ? 'Документ' : document.name)}
+            />
             {failures.length > 0 && (
               <div className="resume-errors" role="status">
                 <details>

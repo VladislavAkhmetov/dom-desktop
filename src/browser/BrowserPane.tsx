@@ -3,16 +3,21 @@ import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookmarkPlus, Check, Globe2,
   FileText, Plus, RotateCw, X
 } from 'lucide-react'
-import type { BrowserTab, Resource, Space } from '../types'
+import type { BrowserTab, Resource, Space, HistoryItem } from '../types'
 import { isDesktop } from '../bridge'
 import { recentMaterials, resourceAppLabel } from '../resourcePresentation'
 
 export interface BrowserPaneProps {
   tab?: BrowserTab
   space: Space
+  /** For the new tab field's suggestions. */
+  spaces?: Space[]
+  history?: HistoryItem[]
   isSplit?: boolean
   isPaired?: boolean
   coverImage?: string
+  /** Cabinet mode: the bookmarks space («Избранное», kind 'web') shown on the new tab, outside any space. */
+  favorites?: Space
   onCloseSplit?: () => void
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
   onSaveTab: (tab: BrowserTab) => void

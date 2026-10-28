@@ -21,11 +21,12 @@ it('навигация на день и последний получасово�
 })
 it('перенос на дату сохраняет время напоминания и снимает старую отметку уведомления', () => {
   const task = { id: 'r', title: 'Проверить макет', createdAt: new Date(2026, 8, 30).toISOString(), dueAt: new Date(2026, 8, 30, 18, 30).toISOString(), done: false, notifiedAt: '2026-09-30' }
-  const moved = rescheduleCalendarTask(task, new Date(2026, 9, 2))
+  // «now» before the target: a move into the future clears the old notice (a passed time would stay quiet, see reminder-mechanics)
+  const moved = rescheduleCalendarTask(task, new Date(2026, 9, 2), false, new Date(2026, 8, 30, 12))
   expect(moved.plannedDate).toBe('2026-10-02')
   expect([new Date(moved.dueAt!).getHours(), new Date(moved.dueAt!).getMinutes()]).toEqual([18, 30])
   expect(localDate(new Date(moved.dueAt!))).toBe('2026-10-02')
   expect(moved.notifiedAt).toBeUndefined()
-  const timed = rescheduleCalendarTask(task, slotTime(new Date(2026, 9, 3), 21), true)
+  const timed = rescheduleCalendarTask(task, slotTime(new Date(2026, 9, 3), 21), true, new Date(2026, 8, 30, 12))
   expect([new Date(timed.dueAt!).getHours(), new Date(timed.dueAt!).getMinutes()]).toEqual([10, 30])
 })

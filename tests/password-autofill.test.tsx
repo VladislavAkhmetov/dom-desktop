@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PasswordSavePrompt } from '../src/browser/PasswordSavePrompt'
-import type { PasswordSavePromptInfo, SavedCredential } from '../src/types'
+import type { CredentialSummary, PasswordSavePromptInfo } from '../src/types'
 import { BrowserChrome } from '../src/browser/BrowserChrome'
 import { bridge } from '../src/bridge'
 
@@ -17,7 +17,7 @@ describe('PasswordSavePrompt (Calm Tech)', () => {
     origin: 'https://higgsfield.ai',
     hostname: 'higgsfield.ai',
     username: 'creator@higgsfield.ai',
-    password: 'SuperSecret123!'
+    token: 'offer-token'
   }
 
   beforeEach(() => {
@@ -29,7 +29,7 @@ describe('PasswordSavePrompt (Calm Tech)', () => {
     await act(async () => root.unmount())
   })
 
-  it('отображает хост, предзаполненный логин и маскированный пароль', async () => {
+  it('отображает хост и логин, а перехваченный пароль в интерфейс не попадает', async () => {
     const onSave = vi.fn()
     const onDismiss = vi.fn()
     await act(async () => {
@@ -43,8 +43,10 @@ describe('PasswordSavePrompt (Calm Tech)', () => {
     const passInput = document.querySelector<HTMLInputElement>('#password-prompt-pass')!
 
     expect(userInput.value).toBe('creator@higgsfield.ai')
-    expect(passInput.value).toBe('SuperSecret123!')
+    expect(passInput.value).toBe('')
+    expect(passInput.placeholder).toBe('Как ввели на странице')
     expect(passInput.type).toBe('password')
+    expect(document.body.innerHTML).not.toContain('SuperSecret123!')
   })
 
   it('переключает видимость пароля по клику на глаз', async () => {
@@ -87,7 +89,8 @@ describe('PasswordSavePrompt (Calm Tech)', () => {
       form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     })
 
-    expect(onSave).toHaveBeenCalledWith('edited@higgsfield.ai', 'SuperSecret123!')
+    // Empty password = keep the one captured on the page (held by the main process under the token).
+    expect(onSave).toHaveBeenCalledWith('edited@higgsfield.ai', '')
   })
 
   it('закрывает баббл по Escape или кнопке Не сейчас', async () => {
@@ -123,15 +126,14 @@ describe('Интеграция автозаполнения в BrowserChrome', (
   })
 
   it('отображает кнопку ключа и вызывает autofill при выборе сохранённого пароля', async () => {
-    const cred: SavedCredential = {
+    const cred: CredentialSummary = {
       id: 'cred-1',
       origin: 'https://higgsfield.ai',
       username: 'art@design.io',
-      password: 'password999',
       updatedAt: new Date().toISOString()
     }
 
-    vi.spyOn(bridge.vault!, 'listCredentials').mockResolvedValue([cred])
+    const listSpy = vi.spyOn(bridge.vault!, 'listCredentials').mockResolvedValue([cred])
     const autofillSpy = vi.fn().mockResolvedValue(true)
     bridge.browser.autofill = autofillSpy
 
@@ -201,10 +203,8 @@ describe('Интеграция автозаполнения в BrowserChrome', (
       item?.click()
     })
 
-    expect(autofillSpy).toHaveBeenCalledWith('tab-1', {
-      username: 'art@design.io',
-      password: 'password999',
-      origin: 'https://higgsfield.ai'
-    })
+    // Asks for the exact page's site and autofills by id: the password is resolved in the main process.
+    expect(listSpy).toHaveBeenCalledWith('https://higgsfield.ai/login')
+    expect(autofillSpy).toHaveBeenCalledWith('tab-1', 'cred-1')
   })
 })

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { bridge } from './bridge'
 import type { AppState, CalendarEvent, CalendarSubscription } from './types'
 import { normalizeCalendarUrl } from './calendar/ical'
-import { calendarRange, parseCalendar } from './calendar/parse'
+import { calendarRange } from './calendar/range'
 
 type CommitState = (updater: (previous: AppState) => AppState) => unknown
 
@@ -18,6 +18,8 @@ export function useCalendarSync(state: AppState | null, commit: CommitState, set
     if (!subs.length) return
     setIsRefreshingCalendar(true)
     try {
+      // ical.js is loaded only when there is a calendar to sync.
+      const { parseCalendar } = await import('./calendar/parse')
       const allEvents: CalendarEvent[] = []
       const results = new Map<string, { error?: string; lastFetchedAt?: string }>()
       for (const sub of subs) {

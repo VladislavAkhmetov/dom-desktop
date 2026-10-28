@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Renderer-only preview (equivalent to `npm run dev:web`), no Electron.
+exec npx vite --host 0.0.0.0 --port "$PORT" --strictPort

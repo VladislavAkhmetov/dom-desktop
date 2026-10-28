@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Copy, Download, ExternalLink, Eye, EyeOff, KeyRound, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { bridge } from './bridge'
-import type { BitwardenExtensionStatus, SavedCredential } from './types'
+import type { BitwardenExtensionStatus, CredentialSummary } from './types'
 import { useI18n } from './i18n'
 
 function bitwardenLine(status: BitwardenExtensionStatus | null) {
@@ -13,13 +13,14 @@ function bitwardenLine(status: BitwardenExtensionStatus | null) {
 
 export function PasswordSettings() {
   const { t } = useI18n()
-  const [credentials, setCredentials] = useState<SavedCredential[]>([])
+  const [credentials, setCredentials] = useState<CredentialSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [origin, setOrigin] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [title, setTitle] = useState('')
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({})
+  // Passwords are fetched one at a time on an explicit «show» or «copy»; the list never carries them.
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, string>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importCsv, setImportCsv] = useState('')
@@ -77,9 +78,20 @@ export function PasswordSettings() {
     } catch {}
   }
 
-  async function handleCopy(id: string, text: string) {
+  async function toggleVisible(id: string) {
+    if (visiblePasswords[id] !== undefined) {
+      setVisiblePasswords(({ [id]: _hidden, ...rest }) => rest)
+      return
+    }
     try {
-      await navigator.clipboard.writeText(text)
+      const password = await bridge.vault!.revealPassword(id)
+      setVisiblePasswords(prev => ({ ...prev, [id]: password }))
+    } catch {}
+  }
+
+  async function handleCopy(id: string) {
+    try {
+      await navigator.clipboard.writeText(await bridge.vault!.revealPassword(id))
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 2000)
     } catch {}
@@ -101,20 +113,10 @@ export function PasswordSettings() {
     }
   }
 
-  function handleExportCsv() {
-    if (!credentials.length) return
-    const header = 'name,url,username,password\n'
-    const rows = credentials.map(c => {
-      const escape = (s: string) => `"${(s || '').replace(/"/g, '""')}"`
-      return `${escape(c.title || c.origin)},${escape(c.origin)},${escape(c.username)},${escape(c.password)}`
-    }).join('\n')
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dombro-passwords-bitwarden-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+  // The CSV is written by the main process through a save dialog; passwords do not pass through the interface.
+  async function handleExportCsv() {
+    if (!credentials.length || !bridge.vault) return
+    try { await bridge.vault.exportCredentials() } catch {}
   }
 
   function openBitwarden() {
@@ -136,7 +138,7 @@ export function PasswordSettings() {
             </div>
             <div>
               <h4 style={{ margin: 0, fontSize: 16 }}>Менеджер паролей: Bitwarden</h4>
-              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
                 Пароль остаётся в Bitwarden. dombro поле пароля не читает и не сохраняет.
               </p>
             </div>
@@ -153,7 +155,7 @@ export function PasswordSettings() {
           </div>
         </div>
 
-        <p style={{ margin: '14px 0 0', fontSize: 13, lineHeight: 1.45 }}>{bitwardenLine(bitwarden)}</p>
+        <p style={{ margin: '14px 0 0', fontSize: 'var(--fs-meta)', lineHeight: 1.45 }}>{bitwardenLine(bitwarden)}</p>
       </div>
 
       <div className="settings-card settings-collection-card">
@@ -172,10 +174,10 @@ export function PasswordSettings() {
 
         {importOpen && (
           <div style={{ padding: '12px', background: 'rgba(255,255,255,0.7)', borderRadius: 14, marginBottom: 14, border: '1px solid rgba(100,143,125,0.25)' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            <span style={{ fontSize: 'var(--fs-meta)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
               Импорт паролей из CSV
             </span>
-            <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
+            <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
               Вставьте содержимое экспорта паролей (формат Chrome: <code>name,url,username,password</code>).
             </p>
             <textarea
@@ -183,9 +185,9 @@ export function PasswordSettings() {
               value={importCsv}
               onChange={e => setImportCsv(e.target.value)}
               placeholder="url,username,password..."
-              style={{ width: '100%', font: 'inherit', fontSize: 12, padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxSizing: 'border-box' }}
+              style={{ width: '100%', font: 'inherit', fontSize: 'var(--fs-meta)', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxSizing: 'border-box' }}
             />
-            {importStatus && <p style={{ fontSize: 12, color: '#386348', margin: '6px 0' }}>{importStatus}</p>}
+            {importStatus && <p style={{ fontSize: 'var(--fs-meta)', color: '#386348', margin: '6px 0' }}>{importStatus}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button className="soft-button" type="button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
               <button className="calm-primary" type="button" onClick={handleImport} disabled={!importCsv.trim()}>{t('settings.passwords.import_btn')}</button>
@@ -200,7 +202,7 @@ export function PasswordSettings() {
             <p className="settings-empty">{t('settings.passwords.empty')}</p>
           ) : (
             credentials.map(item => {
-              const show = Boolean(visiblePasswords[item.id])
+              const show = visiblePasswords[item.id] !== undefined
               const isCopied = copiedId === item.id
               return (
                 <div
@@ -219,15 +221,15 @@ export function PasswordSettings() {
                     <strong style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.title || item.origin}
                     </strong>
-                    <small style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.username} · {show ? item.password : '••••••••'}
+                    <small style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.username} · {show ? visiblePasswords[item.id] : '••••••••'}
                     </small>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 'none' }}>
                     <button
                       className="calm-icon"
                       type="button"
-                      onClick={() => setVisiblePasswords(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                      onClick={() => { void toggleVisible(item.id) }}
                       title={show ? 'Скрыть пароль' : 'Показать пароль'}
                       aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
                     >
@@ -236,7 +238,7 @@ export function PasswordSettings() {
                     <button
                       className="calm-icon"
                       type="button"
-                      onClick={() => handleCopy(item.id, item.password)}
+                      onClick={() => { void handleCopy(item.id) }}
                       title={isCopied ? 'Скопировано!' : 'Скопировать пароль'}
                       aria-label={isCopied ? 'Скопировано' : 'Скопировать пароль'}
                     >
@@ -310,7 +312,7 @@ export function PasswordSettings() {
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(100,143,125,0.15)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <ShieldCheck size={20} color="#486955" style={{ flex: 'none', marginTop: 2 }} />
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 }}>
+          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.45 }}>
             Пароли в этом списке шифруются средствами ОС. Со страницы они сюда не попадают. Автозаполнение с сайта в этой сборке не работает.
           </p>
         </div>

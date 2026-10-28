@@ -1,6 +1,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const { ElectronBlocker, fullLists } = require('@ghostery/adblocker-electron')
+// Loaded lazily in initialize(): the Ghostery package pulls in Electron at require time, and the
+// settings model (site lists, cookie toggle, dark sites) is useful without it — e.g. in unit tests.
+const loadBlocker = () => require('@ghostery/adblocker-electron').ElectronBlocker
 
 class AdblockManager {
   constructor({ userDataPath, getTabByWebContentsId, onBlocked }) {
@@ -58,6 +60,7 @@ class AdblockManager {
 
     this.initPromise = (async () => {
       const t0 = Date.now()
+      const ElectronBlocker = loadBlocker()
       try {
         if (fs.existsSync(this.cacheFile)) {
           const buffer = await fs.promises.readFile(this.cacheFile)

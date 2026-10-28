@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '../src/types'
 import { newCabinet, upgradeCabinets } from '../src/cabinetModel'
 import App from '../src/App'
+import { createSpaceFromSwitcher, openSwitcher, switcherNames } from './helpers/spaceSwitcher'
 
 vi.mock('../src/cabinetMode', () => ({ isCabinetPreview: true }))
 const native = vi.hoisted(() => ({ openResource: vi.fn() }))
@@ -112,53 +113,38 @@ describe('полоса вкладок рабочих пространств (Chr
     expect(names).toContain('Второе пространство')
   })
 
-  it('при создании новых пространств добавляет их правее, сохраняя все предыдущие', async () => {
+  it('создаёт пространства через переключатель: новое открывается в полосе, прежние остаются в списке', async () => {
     await mount()
 
-    // Create 3rd space via "+" button
-    const plusButton = labelled('Создать пространство')
-    expect(plusButton).not.toBeNull()
-    await click(plusButton)
-
-    let spaceButtons = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space'))
-    let names = spaceButtons.map(b => b.textContent?.trim())
-    expect(names).toContain('Первое пространство')
-    expect(names).toContain('Второе пространство')
+    await createSpaceFromSwitcher()
+    let names = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space')).map(b => b.textContent?.trim())
     expect(names.some(name => name?.includes('Новое пространство'))).toBe(true)
 
-    // Create 4th space
-    await click(plusButton)
-
-    spaceButtons = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space'))
-    names = spaceButtons.map(b => b.textContent?.trim())
+    await createSpaceFromSwitcher()
+    await openSwitcher()
+    names = switcherNames()
     expect(names).toContain('Первое пространство')
     expect(names).toContain('Второе пространство')
     expect(names.filter(name => name?.includes('Новое пространство')).length).toBe(2)
   })
 
-  it('структура chrome-spaces содержит viewport, трек с вкладками и блок действий Все пространства / Создать / Поиск', async () => {
+  it('структура chrome-spaces: viewport с треком вкладок и переключатель «Пространства» с поиском, «Все» и «Новое»', async () => {
     await mount()
 
     const nav = document.querySelector('nav.chrome-spaces')
     expect(nav).not.toBeNull()
-
     const viewport = nav?.querySelector('.chrome-spaces-viewport')
-    expect(viewport).not.toBeNull()
+    expect(viewport?.querySelector('.chrome-spaces-track')).not.toBeNull()
 
-    const track = viewport?.querySelector('.chrome-spaces-track')
-    expect(track).not.toBeNull()
+    const trigger = nav?.querySelector<HTMLButtonElement>('.chrome-spaces-actions .space-switcher-trigger')
+    expect(trigger?.textContent?.trim()).toBe('Пространства')
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
 
-    const actions = nav?.querySelector('.chrome-spaces-actions')
-    expect(actions).not.toBeNull()
-
-    const allSpacesBtn = actions?.querySelector('.chrome-space')
-    expect(allSpacesBtn?.textContent?.trim()).toBe('Все пространства')
-
-    const newSpaceBtn = actions?.querySelector('.chrome-new-space')
-    expect(newSpaceBtn).not.toBeNull()
-
-    const searchBtn = actions?.querySelector('.chrome-space-search')
-    expect(searchBtn).not.toBeNull()
+    await openSwitcher()
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true')
+    expect(document.querySelector('.space-switcher-search')).not.toBeNull()
+    const actions = [...document.querySelectorAll('.space-switcher-footer button')].map(item => item.textContent?.trim())
+    expect(actions).toEqual(['Все', 'Новое'])
   })
 
   it('при клике по стрелкам влево/вправо прокручивает viewport', async () => {
@@ -197,22 +183,20 @@ describe('полоса вкладок рабочих пространств (Chr
     expect(scrollBySpy).toHaveBeenCalledWith(expect.objectContaining({ left: 200 }))
   })
 
-  it('не ограничивает количество вкладок до 4 и сохраняет все пространства при большом их числе (например 6+ пространств)', async () => {
+  it('при 6+ пространствах полоса остаётся короткой (закреплённые и открытое), а переключатель хранит все', async () => {
     await mount()
-    const plusButton = labelled('Создать пространство')
-    expect(plusButton).not.toBeNull()
-    for (let i = 0; i < 4; i++) {
-      await click(plusButton)
-    }
+    for (let i = 0; i < 4; i++) await createSpaceFromSwitcher()
+
     const homeBtn = document.querySelector('.chrome-spaces-home .chrome-space')
     expect(homeBtn?.textContent?.trim()).toBe('Мой день')
+    // At most three pinned spaces plus the open one — no endless tab strip.
+    expect(document.querySelectorAll('.chrome-spaces-track .chrome-space').length).toBeLessThanOrEqual(4)
 
-    const spaceButtons = Array.from(document.querySelectorAll('.chrome-spaces-track .chrome-space'))
-    const names = spaceButtons.map(b => b.textContent?.trim())
+    await openSwitcher()
+    const names = switcherNames()
     expect(names).toContain('Первое пространство')
     expect(names).toContain('Второе пространство')
-    // 2 initial spaces + 4 newly created = 6 spaces in track (plus 'Мой день' pinned on left)
-    expect(spaceButtons.length).toBe(6)
+    expect(names).toHaveLength(6)
   })
 
   it('содержит градиентные полупрозрачные зоны по краям скролла и защищенный блок действий', async () => {

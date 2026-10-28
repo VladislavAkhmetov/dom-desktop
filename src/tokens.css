@@ -1,0 +1,104 @@
+/* ══ Style table (docs/design-tokens.md) ══════════════════════════════════════
+ * The single source for colour roles, surfaces, lines, radii, elevation and control sizes.
+ * Loaded first (main.tsx); motion tokens live next door in motion.css.
+ * Rule of nesting: inner radius = outer radius − padding (popover 20 − 8 = menu item 12).
+ */
+:root {
+  /* ── ink ── all ≥ 4.5:1 on --surface-card */
+  --ink-1: #1b2620;                       /* primary text, icons in active state */
+  --ink-2: #435349;                       /* secondary text, resting icons */
+  --ink-3: #5a6a61;                       /* meta, placeholders, hints */
+  --ink-disabled: rgba(27, 38, 32, .38);
+  --ink-inverse: #f4f7f2;                 /* on --accent and --surface-inverse */
+
+  /* ── accent & tones ── */
+  --accent: #2c5240;
+  --accent-hover: #234536;
+  --accent-ink: var(--ink-inverse);
+  --accent-soft: rgba(44, 82, 64, .09);    /* quiet primary (e.g. «Открыть вкладки»), selected rows */
+  --accent-soft-hover: rgba(44, 82, 64, .14);
+  --accent-quiet: #dcebe0;                /* quiet primary surface (card actions) */
+  --accent-quiet-hover: #cfe4d5;
+  --accent-quiet-ink: #1f4535;
+  --danger: #9a3b31;
+  --danger-soft: rgba(154, 59, 49, .09);
+
+  /* ── interaction states (overlays on any surface) ── */
+  --state-hover: rgba(40, 70, 52, .06);
+  --state-pressed: rgba(40, 70, 52, .10);
+  --state-selected: var(--accent-soft);
+  --state-disabled: rgba(40, 70, 52, .05);
+
+  /* ── surfaces, from wallpaper up ── */
+  --surface-glass: rgba(247, 252, 249, .55);         /* controls sitting on the wallpaper; with --blur-glass */
+  --surface-glass-hover: rgba(255, 255, 255, .85);
+  --surface-card: rgba(248, 249, 245, .94);          /* cards, header bar */
+  --surface-control: rgba(255, 255, 255, .72);       /* chips, secondary buttons, fields on a card */
+  --surface-control-hover: rgba(255, 255, 255, .94);
+  --surface-field: rgba(255, 255, 255, .9);          /* text inputs, address bar */
+  --surface-popover: rgba(250, 252, 248, .97);       /* menus, dropdowns, popovers, bubbles */
+  --surface-sheet: rgba(251, 252, 249, .98);         /* dialogs, island details */
+  --surface-inverse: #24382c;                        /* toasts, tooltips, undo */
+
+  /* ── lines ── */
+  --line-soft: rgba(40, 70, 52, .08);     /* dividers, card and popover edges */
+  --line-strong: rgba(40, 70, 52, .16);   /* fields and outlined controls */
+  --line-glass: rgba(255, 255, 255, .72); /* light edge of glass on the wallpaper */
+  --focus-ring: rgba(44, 82, 64, .6);     /* outline: 2px solid var(--focus-ring); outline-offset: 2px */
+
+  /* ── radii: scale ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+  --radius-full: 999px;
+  /* ── radii: roles ── */
+  --radius-inline: var(--radius-xs);      /* progress bars, marks inside text */
+  --radius-mark: var(--radius-sm);        /* file badges, site marks, tooltips, small tiles */
+  --radius-control: var(--radius-md);     /* buttons, fields, chips, rows, menu items */
+  --radius-tile: var(--radius-lg);        /* nested panels, thumbnails */
+  --radius-popover: var(--radius-xl);     /* menus, dropdowns, popovers */
+  --radius-card: var(--radius-2xl);       /* cards */
+  --radius-sheet: var(--radius-3xl);      /* dialogs, large panels */
+  --radius-pill: var(--radius-full);      /* dock capsule, counters, avatars, dots, toasts */
+
+  /* ── elevation ── */
+  --shadow-control: 0 1px 2px rgba(24, 40, 30, .06);
+  --shadow-card: 0 1px 2px rgba(24, 40, 30, .04), 0 10px 30px rgba(24, 40, 30, .07);
+  --shadow-raised: 0 1px 2px rgba(24, 40, 30, .05), 0 18px 44px rgba(24, 40, 30, .11);
+  --shadow-popover: 0 2px 6px rgba(24, 40, 30, .06), 0 18px 48px rgba(24, 40, 30, .16);
+  --shadow-sheet: 0 4px 12px rgba(24, 40, 30, .06), 0 32px 90px -20px rgba(20, 45, 33, .34);
+  --blur-glass: 16px;
+  --blur-popover: 20px;
+
+  /* ── type floor (AGENTS.md: no readable text below 14px) ── */
+  --fs-meta: 14px;                        /* smallest readable text: meta, captions, badges with words, shortcuts */
+  --fs-glyph: 13px;                       /* letters inside icon-like marks only: file badges, site/app marks, avatar */
+
+  /* ── sizes ── */
+  --control-h-sm: 32px;
+  --control-h: 44px;
+  --icon-btn: 36px;
+  --icon-tile: 32px;
+  --menu-item-h: 40px;
+  --popover-pad: 8px;
+  --card-pad: 24px;
+  --card-gap: 16px;
+
+  /* ── legacy names (kept as aliases; prefer the roles above) ── */
+  --ink: var(--ink-1);
+  --muted: var(--ink-3);
+  --hairline: var(--line-soft);
+  --line: var(--line-soft);
+  --glass-line: var(--line-soft);
+  --card-border: var(--line-soft);
+  --card-surface: var(--surface-card);
+  --card-shadow: var(--shadow-card);
+  --card-radius: var(--radius-card);
+  --control-radius: var(--radius-control);
+  --glass: var(--surface-popover);
+  --glass-shadow: var(--shadow-popover);
+}

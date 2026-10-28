@@ -56,7 +56,7 @@ export function NewsWidget({ state, onOpen, onChange, onAssistant, onRefresh, re
   </button>
 
   return <>
-    <div className="news-card-heading">
+    <div className="news-card-heading"><span className="card-icon-tile" aria-hidden="true"><Newspaper size={18} /></span>
       <div className="news-tabs calm-tabs" role="tablist" aria-label="Темы новостей">{tabs.map((tab, index) => <button id={`${id}-tab-${index}`} key={tab.value} className={active === tab.value ? 'selected' : ''} role="tab" aria-selected={active === tab.value} aria-controls={`${id}-panel`} tabIndex={active === tab.value ? 0 : -1} onClick={() => choose(tab.value)} onKeyDown={event => keyboard(event, index)}>{tab.label}</button>)}</div>
       <button className="calm-icon news-settings-button" title="Темы и источники" aria-label="Настроить темы и источники" onClick={() => setSettings(true)}><Settings2 size={19} /></button>
     </div>

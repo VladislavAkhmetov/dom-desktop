@@ -97,8 +97,13 @@ describe('SpacesOverview - карточки пространств и меню �
     expect(menuBtn2).toBeTruthy()
     expect(menuBtn2?.getAttribute('aria-label')).toBe('Действия с пространством «Моя мастерская»')
 
-    // Проверяем наличие стрелки на карточке
-    expect(cards[0].querySelector('.overview-arrow')).toBeTruthy()
+    // Карточка без отдельной стрелки: название и то, что вернёт в пространство (шаг или вкладки)
+    expect(cards[0].querySelector('.overview-arrow')).toBeNull()
+    expect(cards[0].querySelector('.overview-space-name')?.textContent).toBe('Поток: 24 сент.')
+    expect(cards[0].querySelector('.overview-space-lead')?.textContent?.trim()).toBeTruthy()
+    // Карусель заменена сеткой: без стрелок прокрутки и собственного скроллбара
+    expect(container.querySelector('.spaces-grid')).toBeTruthy()
+    expect(container.querySelector('[role="scrollbar"]')).toBeNull()
   })
 
   it('клик по телу карточки открывает пространство, а клик по меню три точки не триггерит onOpen', async () => {

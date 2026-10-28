@@ -2,6 +2,16 @@ const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
 
+function siteHost(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return ''
+  try { return new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`).hostname.replace(/^www\./, '') } catch { return '' }
+}
+
+function summary({ password: _password, ...rest }) {
+  return rest
+}
+
 class Vault {
   constructor(directory, encryption) {
     this.file = path.join(directory, 'secrets.encrypted.json')
@@ -27,11 +37,36 @@ class Vault {
     this.data = next
   }
 
-  getCredentials(originFilter) {
-    const list = this.get('credentials:list') || []
-    if (!originFilter) return list
-    const norm = originFilter.trim().toLowerCase()
-    return list.filter(item => item.origin.toLowerCase().includes(norm) || (item.title && item.title.toLowerCase().includes(norm)))
+  // Full records, passwords included — main process only. Never return this over IPC.
+  getCredentials() {
+    return this.get('credentials:list') || []
+  }
+
+  // What the interface may see: no passwords. With a page address/host, only that exact site
+  // (www. ignored) — `a.com` never lists credentials saved for `data.com`.
+  summaries(site) {
+    const host = site ? siteHost(site) : ''
+    if (site && !host) return []
+    return this.getCredentials().filter(item => !host || siteHost(item.origin) === host).map(summary)
+  }
+
+  // One password for an explicit user action (show / copy in settings).
+  revealPassword(id) {
+    const item = this.getCredentials().find(entry => entry.id === id)
+    if (!item) throw new Error('Пароль не найден')
+    return item.password
+  }
+
+  // Autofill target check lives here, next to the secret: the record must belong to the page's site.
+  credentialFor(id, pageUrl) {
+    const item = this.getCredentials().find(entry => entry.id === id)
+    const host = siteHost(pageUrl)
+    return item && host && siteHost(item.origin) === host ? item : null
+  }
+
+  exportCsv() {
+    const escape = value => `"${String(value || '').replace(/"/g, '""')}"`
+    return 'name,url,username,password\n' + this.getCredentials().map(item => [item.title || item.origin, item.origin, item.username, item.password].map(escape).join(',')).join('\n')
   }
 
   saveCredential(cred) {
@@ -54,7 +89,7 @@ class Vault {
       list.push(entry)
     }
     this.set('credentials:list', list)
-    return entry
+    return summary(entry)
   }
 
   removeCredential(id) {
@@ -98,4 +133,4 @@ class Vault {
   }
 }
 
-module.exports = { Vault }
+module.exports = { Vault, siteHost }

@@ -10,30 +10,13 @@ const { bitwardenExtensionStatus } = require('./bitwarden-extension.cjs')
 const { Vault } = require('./vault.cjs')
 const { Gmail } = require('./gmail.cjs')
 const { AI } = require('./ai.cjs')
-const { fetchLimited } = require('./network.cjs')
+const { fetchLimited, fetchPublic } = require('./network.cjs')
 const { pathToFileURL } = require('node:url')
 const osWindows = require('./os-windows.cjs')
+const { ApprovedPaths } = require('./approved-paths.cjs')
 const { autoUpdater } = require('electron-updater')
-
-function initCalmAutoUpdater(mainWindow) {
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true // Обновится само, когда юзер закроет dombro вечером
-
-  autoUpdater.on('update-downloaded', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('app:update-ready', {
-        version: info.version,
-      })
-    }
-  })
-
-  // Проверяем тихо через 10 секунд после запуска
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {
-      // Игнорируем отсутствие сети без ошибок в UI (Calm Tech)
-    })
-  }, 10000)
-}
+const { initUpdates } = require('./updates.cjs')
+let updates
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173'
 const isDev = process.argv.includes('--dev')
@@ -68,6 +51,11 @@ let checkingReminders = false
 let browser
 let captureWindow
 let vault, gmail, ai
+let approved
+const NOT_APPROVED = 'Этот файл добавлен не через окно выбора. Добавьте его заново: «Документ» или «Программа».'
+// Window handles from os-windows.cjs look like 0x1a2b3c; anything else never reaches koffi.
+const hwnd = value => typeof value === 'string' && /^0x[0-9a-f]{1,16}$/i.test(value) ? value : null
+const hwndList = value => Array.isArray(value) ? value.slice(0, 500).map(hwnd).filter(Boolean) : []
 function trustedURL(value) {
   try {
     const url = new URL(value)
@@ -89,7 +77,10 @@ async function changeState(update) {
   const previous = await storage.get(); const state = await storage.apply(diffState(previous, update(previous))); broadcastState(state); return state
 }
 
-function broadcastState(state) { mainWindow?.webContents.send('state:changed', state); captureWindow?.webContents.send('state:changed', state) }
+// `except`: the window that made the change already has the result as the IPC reply.
+function broadcastState(state, except) {
+  for (const window of [mainWindow, captureWindow]) if (window && !window.isDestroyed() && window.webContents !== except) window.webContents.send('state:changed', state)
+}
 
 async function createIntegrations() {
   vault = new Vault(app.getPath('userData'), safeStorage)
@@ -111,11 +102,12 @@ trustedHandle('google:configured', () => gmail.configured())
 trustedHandle('gmail:connect', () => gmail.connect())
 trustedHandle('gmail:sync', (_event, id) => gmail.sync(id))
 trustedHandle('gmail:disconnect', (_event, id) => gmail.disconnect(id))
-trustedHandle('feed:fetch', (_event, url) => fetchLimited(String(url)))
+trustedHandle('feed:fetch', (_event, url) => fetchPublic(String(url)))
 trustedHandle('material:read', async (_event, id) => {
   const item = (await storage.get()).spaces.flatMap(space => space.resources).find(item => item.id === id)
   if (!item || item.kind === 'app') throw new Error('Материал недоступен')
-  if (item.kind === 'link') return { id, title: item.name, url: item.target, text: await fetchLimited(item.target) }
+  if (item.kind === 'link') return { id, title: item.name, url: item.target, text: await fetchPublic(item.target) }
+  if (!approved.has(item.target)) throw new Error(NOT_APPROVED)
   if (!/\.(txt|md|csv|json|html?|xml|log|js|ts|tsx|jsx|css|py)$/i.test(item.target)) throw new Error('Для этого формата доступно только название. Чтение PDF, Office и Adobe пока не подключено.')
   const details = await fs.promises.stat(item.target)
   if (!details.isFile() || details.size > 2_000_000) throw new Error('Текстовый файл должен быть до 2 МБ')
@@ -127,7 +119,7 @@ trustedHandle('calendar:add', async (_event, name, url) => {
   const id = require('node:crypto').randomUUID(); vault.set(`calendar:${id}`, target.toString())
   await changeState(previous => ({ ...previous, calendarSubscriptions: [...(previous.calendarSubscriptions || []), { id, name: String(name).slice(0, 100), secretId: `calendar:${id}`, url: '' }] }))
 })
-trustedHandle('calendar:source', async (_event, id) => { const sub = (await storage.get()).calendarSubscriptions?.find(item => item.id === id); if (!sub) throw new Error('Календарь отключён'); const url = sub.secretId ? vault.get(sub.secretId) : sub.url; if (!url) throw new Error('Адрес календаря недоступен'); return fetchLimited(url) })
+trustedHandle('calendar:source', async (_event, id) => { const sub = (await storage.get()).calendarSubscriptions?.find(item => item.id === id); if (!sub) throw new Error('Календарь отключён'); const url = sub.secretId ? vault.get(sub.secretId) : sub.url; if (!url) throw new Error('Адрес календаря недоступен'); return fetchPublic(url) })
 trustedHandle('calendar:remove', async (_event, id) => { vault.set(`calendar:${id}`, undefined); await changeState(previous => ({ ...previous, calendarSubscriptions: previous.calendarSubscriptions?.filter(item => item.id !== id), events: previous.events?.filter(item => item.sourceId !== id) })) })
 trustedHandle('ai:configure', (_event, value, key) => ai.configure(value, key))
 trustedHandle('ai:run', (event, request) => ai.run(request, value => { if (!event.sender.isDestroyed()) event.sender.send('ai:event', value) }))
@@ -138,8 +130,22 @@ trustedHandle('ai:transcribe', async (_event, buffer, mimeType) => {
   if (uint8.byteLength > 15_000_000) throw new Error('Аудиозапись слишком большая')
   return ai.transcribe(uint8, typeof mimeType === 'string' ? mimeType : 'audio/webm')
 })
-trustedHandle('vault:credentials:list', (_event, origin) => vault.getCredentials(origin))
+// Passwords stay in the main process: the interface gets summaries, reveals one password on an explicit
+// action, and autofill/export happen here (docs/security.md → «Пароли»).
+trustedHandle('vault:credentials:list', (_event, site) => vault.summaries(typeof site === 'string' ? site : ''))
+trustedHandle('vault:credentials:reveal', (_event, id) => vault.revealPassword(String(id)))
 trustedHandle('vault:credentials:save', (_event, cred) => vault.saveCredential(cred))
+trustedHandle('vault:credentials:save-offer', (_event, token, username, password) => {
+  const offer = browser?.takePasswordOffer(token)
+  if (!offer) throw new Error('Предложение устарело. Войдите на сайт ещё раз.')
+  return vault.saveCredential({ origin: offer.origin, title: offer.hostname, username: typeof username === 'string' && username.trim() ? username : offer.username, password: typeof password === 'string' && password ? password : offer.password })
+})
+trustedHandle('vault:credentials:export', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, { title: 'Экспорт паролей в CSV', defaultPath: `dombro-passwords-bitwarden-${new Date().toISOString().slice(0, 10)}.csv`, filters: [{ name: 'CSV', extensions: ['csv'] }] })
+  if (result.canceled || !result.filePath) return false
+  await fs.promises.writeFile(result.filePath, vault.exportCsv(), { encoding: 'utf8', mode: 0o600 })
+  return true
+})
 trustedHandle('vault:credentials:remove', (_event, id) => vault.removeCredential(id))
 trustedHandle('vault:credentials:import', (_event, csv) => vault.importCredentialsCsv(csv))
 
@@ -480,7 +486,9 @@ async function checkReminders() {
     if (events.length) changes.push({ op: 'set', path: ['notifiedNotices'], value: [...(state.notifiedNotices || []), ...events.map(item => `event:${item.id}:${item.startAt}`)].slice(-1000) })
     const next = await storage.apply(changes)
     broadcastState(next)
-    if (Notification.isSupported()) {
+    // In the app the attention island rings (chime + bell); the system notification is for when dombro is not in front.
+    const inApp = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && mainWindow.isFocused())
+    if (Notification.isSupported() && !inApp) {
       const all = [...due.map(item => item.title), ...events.map(item => `Скоро: ${item.title}`)]
       const bodies = all.length > 3 ? [`Напоминаний: ${all.length}. Откройте dombro, чтобы посмотреть.`] : all
       for (const body of bodies) { const notification = new Notification({ title: 'dombro напоминает', body, silent: true }); notification.on('click', showWindow); notification.show() }
@@ -491,10 +499,10 @@ async function checkReminders() {
 
 trustedHandle('state:get', () => storage.get())
 trustedHandle('state:save', () => { throw new Error('Используйте операции изменения данных') })
-trustedHandle('state:apply', async (_event, changes) => {
+trustedHandle('state:apply', async (event, changes) => {
   if (!Array.isArray(changes) || changes.length > 40000) throw new Error('Некорректные операции изменения')
   const state = await storage.apply(changes)
-  broadcastState(state)
+  broadcastState(state, event.sender)
   return state
 })
 trustedHandle('state:search', (_event, query) => storage.search(String(query).slice(0, 500)))
@@ -506,16 +514,18 @@ trustedHandle('resource:pick', async (_event, kind) => {
     properties: process.platform === 'darwin' && kind === 'app' ? ['openFile', 'openDirectory'] : ['openFile'],
     filters: kind === 'app' ? [{ name: 'Приложения и ярлыки', extensions: process.platform === 'darwin' ? ['app'] : ['exe', 'lnk'] }] : undefined
   })
-  return result.canceled ? null : result.filePaths[0]
+  if (result.canceled || !result.filePaths[0]) return null
+  approved.approve(result.filePaths[0])
+  return result.filePaths[0]
 })
 trustedHandle('resource:open', async (_event, resource) => {
   if (!resource || !['app', 'file', 'link', 'window'].includes(resource.kind)) return { ok: false, error: 'Некорректный ресурс' }
   if (resource.kind === 'window') {
-    if (resource.windowHwnd && osWindows.isWindowAlive(resource.windowHwnd)) {
+    if (hwnd(resource.windowHwnd) && osWindows.isWindowAlive(resource.windowHwnd)) {
       osWindows.focusWindow(resource.windowHwnd)
       return { ok: true }
     }
-    if (resource.target && fs.existsSync(resource.target)) {
+    if (resource.target && approved.has(resource.target) && fs.existsSync(resource.target)) {
       const error = await shell.openPath(resource.target)
       return error ? { ok: false, error } : { ok: true }
     }
@@ -532,6 +542,8 @@ trustedHandle('resource:open', async (_event, resource) => {
   if (typeof resource.target !== 'string' || !path.isAbsolute(resource.target) || !fs.existsSync(resource.target)) {
     return { ok: false, error: 'Файл не найден. Проверьте его расположение.' }
   }
+  // Launching goes through shell.openPath, which also runs programs: only paths approved by the main process.
+  if (!approved.has(resource.target)) return { ok: false, error: NOT_APPROVED }
   const error = await shell.openPath(resource.target)
   return error ? { ok: false, error } : { ok: true }
 })
@@ -575,18 +587,24 @@ async function getRecentFiles() {
         if (results.length >= 8) break
       } catch { /* skip unreadable */ }
     }
+    approved?.approve(results.map(item => item.target))
     return results
   } catch {
     return []
   }
 }
 trustedHandle('resource:recentFiles', () => getRecentFiles())
-trustedHandle('windows:list-open', () => osWindows.getOpenWindows(process.pid))
+trustedHandle('windows:list-open', () => {
+  const windows = osWindows.getOpenWindows(process.pid)
+  approved.approve(windows.map(item => item.exePath).filter(Boolean))
+  return windows
+})
 trustedHandle('windows:minimize', (_event, toPark, activeKeep) => {
-  osWindows.minimizeWindows(toPark, activeKeep)
+  osWindows.minimizeWindows(hwndList(toPark), hwndList(activeKeep))
   return true
 })
-trustedHandle('windows:restore', (_event, hwndList, focusDomWindow) => {
+trustedHandle('windows:restore', (_event, handles, focusDomWindow) => {
+  const list = hwndList(handles)
   let domHwnd = null
   if (focusDomWindow && mainWindow && !mainWindow.isDestroyed()) {
     try {
@@ -595,10 +613,10 @@ trustedHandle('windows:restore', (_event, hwndList, focusDomWindow) => {
       // fallback
     }
   }
-  osWindows.restoreWindows(hwndList, domHwnd)
+  osWindows.restoreWindows(list, domHwnd)
   return true
 })
-trustedHandle('windows:focus', (_event, hwnd) => osWindows.focusWindow(hwnd))
+trustedHandle('windows:focus', (_event, handle) => hwnd(handle) ? osWindows.focusWindow(handle) : false)
 trustedHandle('settings:getAutostart', () => app.getLoginItemSettings().openAtLogin)
 trustedHandle('settings:setAutostart', (_event, value) => {
   app.setLoginItemSettings({ openAtLogin: Boolean(value) })
@@ -610,7 +628,7 @@ trustedHandle('calendar:fetch', async (_event, url) => {
   if (targetUrl.startsWith('webcal://')) targetUrl = 'https://' + targetUrl.slice(9)
   const parsed = new URL(targetUrl)
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Поддерживаются только протоколы HTTP, HTTPS и Webcal')
-  return fetchLimited(targetUrl)
+  return fetchPublic(targetUrl)
 })
 trustedHandle('window:show', () => { showWindow(); return true })
 trustedHandle('window:toggleFullScreen', () => {
@@ -635,6 +653,7 @@ trustedHandle('window:setTitleBarOverlay', (_event, options) => {
   }
 })
 trustedHandle('capture:close', () => captureWindow?.hide())
+trustedHandle('app:open-release', async () => { const url = updates?.releasePage(); if (!url) return false; await shell.openExternal(url); return true })
 trustedHandle('browser:show', (_event, value) => browser.show(value))
 trustedHandle('browser:hide', (_event, id) => browser.hide(id))
 trustedHandle('browser:move', (_event, id, spaceId) => browser.move(id, spaceId))
@@ -668,10 +687,12 @@ trustedHandle('browser:translate:text', async (_event, text, targetLang) => {
   return translateText(text, targetLang)
 })
 trustedHandle('browser:translate:tab', async (_event, tabId) => browser.translateTab(tabId))
+// Opt-in (state.searchSuggestions). Never sends what looks like an address, path, e-mail or token.
+const privateQuery = value => /[\/\\:@]/.test(value) || /^\S+\.\S+$/.test(value) || /^\S{24,}$/.test(value)
 trustedHandle('browser:suggest', async (_event, query) => {
   if (!query || typeof query !== 'string') return []
   const q = query.trim().slice(0, 100)
-  if (!q) return []
+  if (!q || privateQuery(q) || (await storage.get()).searchSuggestions !== true) return []
   try {
     const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}`, {
       headers: { 'User-Agent': 'Mozilla/5.0' }
@@ -685,8 +706,15 @@ trustedHandle('browser:suggest', async (_event, query) => {
 })
 ipcMain.on('page:signal', (event, value) => browser?.pageSignal(event.sender, value))
 ipcMain.on('page:password-submit', (event, data) => browser?.pagePasswordSubmit(event.sender, data))
-trustedHandle('browser:autofill', async (_event, tabId, cred) => browser?.autofill(tabId, cred))
+trustedHandle('browser:autofill', async (_event, tabId, id) => browser?.autofill(tabId, url => vault.credentialFor(String(id), url)))
 trustedHandle('bitwarden:status', () => bitwardenExtensionStatus())
+
+// Defence in depth for every webContents, including ones added later: no <webview>, no new windows
+// unless a specific handler (main window, tabs) replaces this default right after creation.
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', event => event.preventDefault())
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+})
 
 const gotTheLock = app.requestSingleInstanceLock()
 
@@ -719,11 +747,13 @@ if (!gotTheLock) {
     ]))
     storage = createStorage(app.getPath('userData'))
     await storage.ready
+    approved = new ApprovedPaths(app.getPath('userData'))
+    approved.adopt(await storage.get())
     await createIntegrations()
     createWindow()
     createTray()
     if (!isSmoke) {
-      initCalmAutoUpdater(mainWindow)
+      updates = initUpdates({ window: mainWindow, autoUpdater, fetchText: fetchLimited, currentVersion: app.getVersion() })
     }
     setInterval(() => gmail.sync().catch(() => undefined), 120000)
     setInterval(() => ai.background().catch(() => undefined), 60000)
@@ -747,6 +777,7 @@ if (!gotTheLock) {
             mainWindow?.webContents.send('toast:show', `«${top.name}» уже в «${space.name}»`)
             return
           }
+          approved.approve(top.target)
           const resource = {
             id: crypto.randomUUID(),
             name: top.name,

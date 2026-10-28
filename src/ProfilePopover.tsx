@@ -2,7 +2,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, FolderInput, Palette, Settings2, User } from 'lucide-react'
 import type { UserProfile } from './types'
-import { getUserProfile, PROFILE_EMOJIS, PROFILE_TONES } from './userProfile'
+import { getUserProfile, PROFILE_TONES } from './userProfile'
+import { PROFILE_ICONS, ProfileGlyph } from './ProfileGlyph'
 import './profile.css'
 
 export interface ProfilePopoverProps {
@@ -81,7 +82,6 @@ export function ProfilePopover({
     }
   }, [onClose, anchorElement])
 
-  const avatarDisplay = current.avatarEmoji || current.name.charAt(0).toUpperCase() || 'П'
 
   const saveName = () => {
     const trimmed = nameDraft.trim()
@@ -103,7 +103,7 @@ export function ProfilePopover({
     >
       <div className="profile-card-header">
         <div className={`profile-avatar-large tone-${current.avatarTone || 'sage'}`}>
-          {avatarDisplay}
+          <ProfileGlyph profile={current} size={20} />
         </div>
         <div className="profile-info">
           {isEditingName ? (
@@ -182,15 +182,16 @@ export function ProfilePopover({
       <div className="profile-customization">
         <div className="profile-section-title">Значок</div>
         <div className="profile-emojis-bar">
-          {PROFILE_EMOJIS.map(emoji => (
+          {PROFILE_ICONS.map(({ id, Icon, label }) => (
             <button
-              key={emoji}
+              key={id}
               type="button"
-              className={`profile-emoji-btn ${current.avatarEmoji === emoji ? 'active' : ''}`}
-              onClick={() => onChangeProfile({ avatarEmoji: emoji })}
-              aria-label={`Эмодзи ${emoji}`}
+              className={`profile-emoji-btn ${current.avatarEmoji === id ? 'active' : ''}`}
+              onClick={() => onChangeProfile({ avatarEmoji: id })}
+              aria-label={`Значок: ${label}`}
+              aria-pressed={current.avatarEmoji === id}
             >
-              {emoji}
+              <Icon size={16} aria-hidden="true" />
             </button>
           ))}
           <button

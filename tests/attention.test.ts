@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { emptyState } from '../shared/state'
-import { attentionLine, selectAttention, selectAttentionSignal } from '../src/attentionModel'
+import { ATTENTION_MAIL, attentionLine, selectAttention, selectAttentionSignal } from '../src/attentionModel'
 import { mailIsImportant } from '../src/mailModel'
 const now = new Date('2026-09-27T12:00:00Z')
 const focus = { status: 'running', remainingSeconds: 1250 }
@@ -28,13 +28,13 @@ it('снятое правило отправителя перестаёт счи
   expect(mailIsImportant(state, message)).toBe(false)
   expect(mailIsImportant(state, { ...message, gmailImportant: true })).toBe(true)
 })
-it('в браузинге фокус и музыка не вытесняют важное письмо', () => {
+it('почта пока не источник сигналов островка: важное письмо не появляется, строка письма сохраняет формат', () => {
+  expect(ATTENTION_MAIL).toBe(false)
   const state = emptyState()
   expect(selectAttentionSignal(state, now, focus, { music: 'Lofi Girl' })).toBeNull()
   state.mailMessages = [{ id: 'mail', accountId: 'a', gmailId: 'm', threadId: 't', from: 'Анна <anna@example.com>', subject: 'Согласован макет', snippet: 'Можно отправлять', receivedAt: now.toISOString(), unread: true, important: true, gmailImportant: true, url: 'https://mail.google.com/' }]
-  const signal = selectAttentionSignal(state, now, focus, { music: 'Lofi Girl' })
-  expect(signal?.type).toBe('mail')
-  expect(attentionLine(signal, state.mailMessages[0].from)).toBe('Анна · Согласован макет')
+  expect(selectAttentionSignal(state, now, focus, { music: 'Lofi Girl' })).toBeNull()
+  expect(attentionLine({ id: 'mail:mail', type: 'mail', title: 'Согласован макет', label: 'Важное письмо', targetId: 'mail' }, state.mailMessages[0].from)).toBe('Анна · Согласован макет')
   expect(selectAttentionSignal(state, now, focus, { ambient: true })?.type).toBe('focus')
 })
 it('сигнал ИИ появляется по завершении, учитывает скрытие и срок актуальности', () => {
@@ -110,4 +110,14 @@ it('напоминание Сейчас имеет приоритет над п�
   const signal = selectAttention(state, now, idle)
   expect(signal?.targetId).toBe('t-now')
   expect(signal?.label).toBe('Сейчас')
+})
+
+it('portable-версия предлагает скачать новую сборку, установщик — перезапуск при выходе', () => {
+  const idleFocus = { status: 'idle', remainingSeconds: 0 }
+  const manual = selectAttentionSignal(emptyState(), now, idleFocus as any, { update: { version: '0.0.2', manual: true } })
+  expect(manual).toMatchObject({ type: 'update', manual: true, title: 'Вышла версия 0.0.2' })
+  expect(attentionLine(manual)).toBe('Вышла версия 0.0.2 · Скачать')
+  const installed = selectAttentionSignal(emptyState(), now, idleFocus as any, { update: { version: '0.0.2' } })
+  expect(installed?.manual).toBeUndefined()
+  expect(attentionLine(installed)).toBe('Доступно обновление dombro · Перезапустить при выходе')
 })

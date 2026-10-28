@@ -35,6 +35,17 @@ export function postponeReminder(item: Reminder, choice: 'hour' | 'tomorrow', no
   return { ...item, kind: 'task', plannedDate: localDate(due), dueAt: choice === 'hour' || item.dueAt ? due.toISOString() : null, notifiedAt: undefined, done: false }
 }
 
+/** A time that has already passed must not ring the moment a task is moved there: keep the time, count it as shown. */
+export function quietIfPast(item: Reminder, now = new Date()): Reminder {
+  return item.dueAt && !item.done && Date.parse(item.dueAt) <= now.getTime() ? { ...item, notifiedAt: now.toISOString() } : item
+}
+
+/** «Напомнить через N минут»: the planned day follows the new time (23:50 + 15 min is tomorrow). */
+export function snoozeReminder(item: Reminder, minutes: number, now = new Date()): Reminder {
+  const due = new Date(now.getTime() + minutes * 60000)
+  return { ...item, dueAt: due.toISOString(), plannedDate: item.plannedDate ? localDate(due) : item.plannedDate, notifiedAt: undefined, trigger: undefined, done: false }
+}
+
 export function rescheduleTaskToToday(item: Reminder, now = new Date()): Reminder {
   let dueAt: string | null = null
   if (item.dueAt) {
@@ -43,12 +54,12 @@ export function rescheduleTaskToToday(item: Reminder, now = new Date()): Reminde
     next.setHours(previous.getHours(), previous.getMinutes(), 0, 0)
     dueAt = next.toISOString()
   }
-  return {
+  return quietIfPast({
     ...item,
     kind: 'task',
     plannedDate: localDate(now),
     dueAt,
     notifiedAt: undefined,
     done: false
-  }
+  }, now)
 }
