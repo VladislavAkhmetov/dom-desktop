@@ -222,8 +222,6 @@
 .setting-row a.soft-button { text-decoration: none; }
 .settings-home-row { margin-top: 4px; }
 @media (max-height: 800px) and (min-width: 761px) {
-  .dashboard-home .dashboard-grid > .resume-card { gap: 10px; padding: 20px 23px; }
-  .resume-space-link { min-height: 28px; }
   .dashboard-home .resume-recent { padding-top: 8px; }
 }
 .dashboard-home .quick-widget { display: flex; flex-direction: column; min-height: 0; }
@@ -311,11 +309,7 @@
   .hub-content .empty-space h2 { font-size: 20px; }
 }
 
-.dashboard-home .dashboard-grid.standard-grid > .resume-card { padding: 10px 23px; gap: 4px; }
 .dashboard-home .dashboard-grid.standard-grid .resume-title { font-size: 26px; }
-@media (max-height: 800px) and (min-width: 901px) {
-  .dashboard-home .dashboard-grid.standard-grid > .resume-card { padding-top: 8px; padding-bottom: 8px; gap: 3px; }
-}
 @media (max-width: 760px) {
   .app-shell:not(.browsing) .page-wrap { grid-template-rows: 136px 110px minmax(0,1fr) 152px; }
   .app-shell:not(.browsing) .hub-bottom { height: 152px; }

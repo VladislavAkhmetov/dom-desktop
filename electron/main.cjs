@@ -654,6 +654,15 @@ trustedHandle('window:setTitleBarOverlay', (_event, options) => {
 })
 trustedHandle('capture:close', () => captureWindow?.hide())
 trustedHandle('app:open-release', async () => { const url = updates?.releasePage(); if (!url) return false; await shell.openExternal(url); return true })
+trustedHandle('app:install-update', () => {
+  try {
+    autoUpdater.quitAndInstall(false, true)
+    return true
+  } catch (err) {
+    console.error('Failed to quit and install update:', err)
+    return false
+  }
+})
 trustedHandle('browser:show', (_event, value) => browser.show(value))
 trustedHandle('browser:hide', (_event, id) => browser.hide(id))
 trustedHandle('browser:move', (_event, id, spaceId) => browser.move(id, spaceId))

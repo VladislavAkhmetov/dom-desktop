@@ -1712,6 +1712,78 @@ describe('WeatherWidget, MapWidget and Dashboard Presets UI', () => {
     expect(custom).toBeDefined()
     expect(custom?.completedToday).toBe(false)
   })
+
+  it('отображает кнопку «Войти» для задачи с meetingUrl в карточке плана и открывает ссылку', async () => {
+    const { Home } = await import('../src/Home')
+    const onOpen = vi.fn()
+    const homeState: AppState = {
+      version: 2,
+      revision: 1,
+      userProfile: { name: 'Тест', avatarTone: 'sage' },
+      spaces: [{ id: 's1', name: 'Основное', resources: [] }],
+      reminders: [
+        {
+          id: 'task-meet',
+          title: 'Созвон по проекту',
+          createdAt: new Date('2026-10-16T10:00:00Z').toISOString(),
+          dueAt: new Date('2026-10-16T14:00:00Z').toISOString(),
+          plannedDate: '2026-10-16',
+          done: false,
+          kind: 'task',
+          meetingUrl: 'https://meet.google.com/xyz-uvwx-rst'
+        }
+      ],
+      dashboardCustomization: {
+        widgets: [{ id: 'w1', type: 'day', size: 'M', colSpan: 6, rowSpan: 6 }]
+      }
+    }
+
+    await act(async () => {
+      root.render(
+        <Home
+          viewportWidth={1440}
+          viewportHeight={900}
+          onSearchHandled={vi.fn()}
+          state={homeState}
+          now={new Date('2026-10-16T12:00:00Z')}
+          onChange={vi.fn()}
+          onCapture={vi.fn()}
+          onFocus={vi.fn()}
+          onPlan={vi.fn()}
+          onCreateAt={vi.fn()}
+          onSpace={vi.fn()}
+          onOpen={onOpen}
+          onAddLink={vi.fn()}
+          onAssistant={vi.fn()}
+          onSaveThought={vi.fn()}
+          onImport={vi.fn()}
+          onNewTab={vi.fn()}
+          onSettings={vi.fn()}
+          onCalendarRange={vi.fn()}
+          onResume={vi.fn()}
+          onOpenContext={vi.fn()}
+          onEditContext={vi.fn()}
+          onCompleteContext={vi.fn()}
+          onOpenDocument={vi.fn()}
+        />
+      )
+    })
+
+    const meetingBtn = document.querySelector('.plan-meeting-btn') as HTMLButtonElement
+    expect(meetingBtn).not.toBeNull()
+    expect(meetingBtn.textContent).toContain('Войти')
+
+    await act(async () => {
+      meetingBtn.click()
+    })
+
+    expect(onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'link',
+        target: 'https://meet.google.com/xyz-uvwx-rst'
+      })
+    )
+  })
 })
 
 

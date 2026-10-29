@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('dom', {
     return () => ipcRenderer.removeListener('toast:show', listener)
   },
   openReleasePage: () => ipcRenderer.invoke('app:open-release'),
+  installUpdate: () => ipcRenderer.invoke('app:install-update'),
   onUpdateReady: callback => {
     const listener = (_event, data) => callback(data)
     ipcRenderer.on('app:update-ready', listener)

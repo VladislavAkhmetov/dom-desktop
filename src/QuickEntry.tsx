@@ -5,7 +5,7 @@ import { useVoiceCapture } from './voice'
 import { bridge } from './bridge'
 
 interface Props {
-  onSave: (title: string, dueAt: string | null, plannedDate?: string | null, kind?: 'note' | 'task') => unknown
+  onSave: (title: string, dueAt: string | null, plannedDate?: string | null, kind?: 'note' | 'task', meetingUrl?: string) => unknown
   onAssistant: (draft?: string) => void
   mode?: 'note' | 'ai'
   onModeChange?: (mode: 'note' | 'ai') => void
@@ -76,7 +76,12 @@ export function QuickEntry({ onSave, onAssistant, mode: controlledMode, onModeCh
       if (mode === 'ai') { onAssistant(question); return }
       setSaving(true)
       setError('')
-      try { const result = await onSave(parsed.title, parsed.dueAt, parsed.plannedDate, parsed.kind); if (result !== false) { setNote(''); sessionStorage.removeItem('dom-quick-draft'); setSaved(true); startedAt.current = new Date(); input.current?.focus() } else setError('Не удалось сохранить. Попробуйте ещё раз.') }
+      try {
+        const result = parsed.meetingUrl !== undefined
+          ? await onSave(parsed.title, parsed.dueAt, parsed.plannedDate, parsed.kind, parsed.meetingUrl)
+          : await onSave(parsed.title, parsed.dueAt, parsed.plannedDate, parsed.kind)
+        if (result !== false) { setNote(''); sessionStorage.removeItem('dom-quick-draft'); setSaved(true); startedAt.current = new Date(); input.current?.focus() } else setError('Не удалось сохранить. Попробуйте ещё раз.')
+      }
       catch { setError('Не удалось сохранить. Попробуйте ещё раз.') }
       finally { setSaving(false) }
     }}>

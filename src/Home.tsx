@@ -3,6 +3,7 @@ import { saveCheckpoint } from './checkpoints'
 import { ArrowRight, ArrowUpRight, BookmarkPlus, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, FileText, Lightbulb, Pencil, Sun, Plus, PlusCircle, SlidersHorizontal, Timer, Video, X } from 'lucide-react'
 import type { AppState, AIContext, CalendarEvent, Reminder, Resource, WidgetConfig, WidgetType } from './types'
 import { formatDue, fromLocalInput, toLocalInput } from './reminders'
+import { extractMeetingUrl } from './calendar/ical'
 import { isRealReminder, postponeReminder, realEvents, remindersForDay, rescheduleTaskToToday } from './dayModel'
 import './home.css'
 import { Dialog } from './Dialog'
@@ -313,6 +314,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
   const [page, setPage] = useState(0)
   const [reminderId, setReminderId] = useState('')
   const [reminderTitle, setReminderTitle] = useState('')
+  const [reminderMeetingUrl, setReminderMeetingUrl] = useState('')
   const [reminderWhen, setReminderWhen] = useState('')
   useEffect(() => { const reminder = state.reminders.find(item => item.id === initialReminderId); if (reminder) editReminder(reminder); if (initialReminderId) onSearchHandled() }, [initialReminderId])
 
@@ -343,6 +345,7 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
   function editReminder(item: Reminder) {
     setReminderId(item.id)
     setReminderTitle(item.title)
+    setReminderMeetingUrl(item.meetingUrl || '')
     setReminderWhen(toLocalInput(item.dueAt))
     setReminderDay(item.plannedDate || '')
     setReminderDeadline(item.deadline || '')
@@ -441,32 +444,38 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
                     </div>
                   </div>
                   <div className="calm-plan-list">
-                    {schedule.slice(0, 3).map(item => (
-                      <div key={item.id} className={`calm-plan-item task-row ${state.liveHints !== false && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 15 * 60000 ? 'live-hint' : ''}`}>
-                        {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
-                        <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
-                        {item.event?.meetingUrl ? (
-                          <button
-                            className="plan-meeting-btn"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onOpen({ id: item.id, name: item.title, kind: 'link', target: item.event!.meetingUrl!, createdAt: new Date().toISOString() })
-                            }}
-                            title={item.event.meetingUrl}
-                          >
-                            <Video size={13} />
-                            <span>Войти</span>
-                            <ArrowUpRight size={13} />
-                          </button>
-                        ) : item.reminder ? <ActionMenu label={`Действия: ${item.title}`} actions={[
-                          { label: focus.status === 'idle' ? 'Сосредоточиться' : 'К сессии фокуса', icon: <Timer size={16} />, onSelect: () => onFocus(item.id) },
-                          { label: 'Завтра', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
-                          { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
-                          { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
-                          , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null, dueAt: null, notifiedAt: undefined }, 'Убрано из сегодняшнего') }
-                        ]} /> : null}
-                      </div>
-                    ))}
+                    {schedule.slice(0, 3).map(item => {
+                      const meetingUrl = item.event?.meetingUrl || item.reminder?.meetingUrl
+                      return (
+                        <div key={item.id} className={`calm-plan-item task-row ${state.liveHints !== false && item.reminder?.dueAt && Date.parse(item.reminder.dueAt) > now.getTime() && Date.parse(item.reminder.dueAt) - now.getTime() <= 15 * 60000 ? 'live-hint' : ''}`}>
+                          {item.reminder ? <button className="task-check" aria-label={`Завершить: ${item.title}`} title="Отметить сделанным" onClick={() => changeTask(item.reminder!, { done: true }, 'Дело завершено')}><Check size={14} /></button> : <span className="task-event-icon"><CalendarDays size={18} /></span>}
+                          <button className="plan-item-title" onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span>{item.title}</span><time className="calm-time" dateTime={item.time || undefined}>{item.event?.allDay ? 'Весь день' : item.time ? new Date(item.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'Без времени'}{item.event ? ' · Событие' : ''}</time></button>
+                          <div className="plan-item-actions">
+                            {meetingUrl ? (
+                              <button
+                                className="plan-meeting-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onOpen({ id: item.id, name: item.title, kind: 'link', target: meetingUrl, createdAt: new Date().toISOString() })
+                                }}
+                                title={meetingUrl}
+                              >
+                                <Video size={13} />
+                                <span>Войти</span>
+                                <ArrowUpRight size={13} />
+                              </button>
+                            ) : null}
+                            {item.reminder ? <ActionMenu label={`Действия: ${item.title}`} actions={[
+                              { label: focus.status === 'idle' ? 'Сосредоточиться' : 'К сессии фокуса', icon: <Timer size={16} />, onSelect: () => onFocus(item.id) },
+                              { label: 'Завтра', icon: <CalendarDays size={16} />, onSelect: () => postponeTask(item.reminder!, 'tomorrow') },
+                              { label: 'Через час', icon: <Clock3 size={16} />, onSelect: () => postponeTask(item.reminder!, 'hour') },
+                              { label: 'Изменить', icon: <Pencil size={16} />, onSelect: () => editReminder(item.reminder!) }
+                              , { label: 'Убрать из сегодняшнего', icon: <FileText size={16} />, onSelect: () => changeTask(item.reminder!, { plannedDate: null, dueAt: null, notifiedAt: undefined }, 'Убрано из сегодняшнего') }
+                            ]} /> : null}
+                          </div>
+                        </div>
+                      )
+                    })}
                     {!schedule.length && (
                       <div className="calm-plan-empty-wrap">
                         {day === 0 && earlier.length > 0 ? (
@@ -845,11 +854,53 @@ export function Home({ viewportWidth, viewportHeight: _viewportHeight, calendarR
 
     {dialog === 'today' && <Dialog title={selectedDay.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} onClose={() => setDialog(null)}><div className="calm-digest-list">{schedule.map(item => <button key={item.id} onClick={() => item.reminder ? editReminder(item.reminder) : showEvent(item.event!)}><span><strong>{item.title}</strong><small>{item.time ? formatDue(item.time) : 'Без времени'}</small></span><ArrowRight size={16} /></button>)}</div></Dialog>}
     {dialog === 'reminder' && selectedReminder && <Dialog title="Дело и напоминание" onClose={() => setDialog(null)}>
-      <div className="calm-form"><label>Название<input value={reminderTitle} onChange={event => setReminderTitle(event.target.value)} /></label><label>День выполнения<input type="date" value={reminderDay} onChange={event => setReminderDay(event.target.value)} /></label><label>Срок<input type="date" value={reminderDeadline} onChange={event => setReminderDeadline(event.target.value)} /></label><label>Напомнить<input type="datetime-local" value={reminderWhen} onChange={event => setReminderWhen(event.target.value)} /></label></div>
+      <div className="calm-form">
+        <label>Название<input value={reminderTitle} onChange={event => setReminderTitle(event.target.value)} /></label>
+        <label>Ссылка на созвон (Google Meet, Zoom, Яндекс.Телемост)<input value={reminderMeetingUrl} placeholder="https://meet.google.com/..." onChange={event => setReminderMeetingUrl(event.target.value)} /></label>
+        <label>День выполнения<input type="date" value={reminderDay} onChange={event => setReminderDay(event.target.value)} /></label>
+        <label>Срок<input type="date" value={reminderDeadline} onChange={event => setReminderDeadline(event.target.value)} /></label>
+        <label>Напомнить<input type="datetime-local" value={reminderWhen} onChange={event => setReminderWhen(event.target.value)} /></label>
+      </div>
+      {(reminderMeetingUrl.trim() || selectedReminder.meetingUrl) && (
+        <button
+          className="calm-primary"
+          style={{ width: '100%', marginBottom: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          onClick={() => onOpen({ id: selectedReminder.id, name: selectedReminder.title, kind: 'link', target: (reminderMeetingUrl.trim() || selectedReminder.meetingUrl)!, createdAt: now.toISOString() })}
+        >
+          <Video size={16} /> Войти во встречу
+        </button>
+      )}
       <div className="calm-postpone"><button onClick={() => updateReminder(item => postponeReminder(item, 'hour'))}>Через час</button><button onClick={() => updateReminder(item => postponeReminder(item, 'tomorrow'))}>Завтра</button><button onClick={() => updateReminder(item => ({ ...item, dueAt: null, notifiedAt: undefined, trigger: undefined }))}>Без напоминания</button></div>
       <details className="calm-details"><summary>При событии или возвращении</summary><div className="calm-form"><label>Когда вернусь в пространство<select value="" onChange={event => { if (event.target.value) updateReminder(item => ({ ...item, dueAt: null, notifiedAt: undefined, trigger: { kind: 'return', spaceId: event.target.value, armedAt: new Date().toISOString() } })) }}><option value="">Выбрать пространство</option>{state.spaces.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select></label><label>После встречи<select value="" onChange={event => { const meeting = state.events?.find(item => item.id === event.target.value); if (meeting) updateReminder(item => ({ ...item, dueAt: meeting.endAt, notifiedAt: undefined, trigger: { kind: 'event', eventId: meeting.id, offsetMinutes: 0 } })) }}><option value="">Выбрать событие</option>{events.filter(item => !item.allDay).map(event => <option key={event.id} value={event.id}>{event.title} · {formatDue(event.startAt)}</option>)}</select></label></div></details>
       {selectedReminder.sourceUrl && <button className="calm-text-button" onClick={() => onOpen({ id: selectedReminder.id, name: selectedReminder.title, kind: 'link', target: selectedReminder.sourceUrl!, createdAt: now.toISOString() })}>Открыть источник</button>}
-      <div className="calm-dialog-actions"><button className="calm-text-button" onClick={() => { changeTask(selectedReminder, { done: true }, 'Дело завершено'); setDialog(null) }}><Check size={18} />Сделано</button><button className="calm-primary" disabled={!reminderTitle.trim()} onClick={() => updateReminder(item => ({ ...item, trigger: undefined, title: reminderTitle.trim(), plannedDate: reminderDay || null, deadline: reminderDeadline || null, kind: reminderDay || reminderWhen || reminderDeadline ? 'task' : 'note', dueAt: fromLocalInput(reminderWhen), notifiedAt: item.dueAt === fromLocalInput(reminderWhen) ? item.notifiedAt : undefined }))}>Сохранить</button></div>
+      <div className="calm-dialog-actions">
+        <button className="calm-text-button" onClick={() => { changeTask(selectedReminder, { done: true }, 'Дело завершено'); setDialog(null) }}><Check size={18} />Сделано</button>
+        <button
+          className="calm-primary"
+          disabled={!reminderTitle.trim()}
+          onClick={() => {
+            const detectedMeeting = reminderMeetingUrl.trim() || extractMeetingUrl(reminderTitle)
+            const cleanTitle = reminderMeetingUrl.trim()
+              ? reminderTitle.trim()
+              : (extractMeetingUrl(reminderTitle)
+                ? reminderTitle.replace(extractMeetingUrl(reminderTitle)!, '').trim().replace(/^[,.:;\s]+|[,.:;\s]+$/g, '') || reminderTitle.trim()
+                : reminderTitle.trim())
+            updateReminder(item => ({
+              ...item,
+              trigger: undefined,
+              title: cleanTitle || 'Созвон',
+              meetingUrl: detectedMeeting || undefined,
+              plannedDate: reminderDay || null,
+              deadline: reminderDeadline || null,
+              kind: reminderDay || reminderWhen || reminderDeadline || detectedMeeting ? 'task' : 'note',
+              dueAt: fromLocalInput(reminderWhen),
+              notifiedAt: item.dueAt === fromLocalInput(reminderWhen) ? item.notifiedAt : undefined
+            }))
+          }}
+        >
+          Сохранить
+        </button>
+      </div>
     </Dialog>}
 
     {dialog === 'digest' && <Dialog title="Сохранённое" onClose={() => setDialog(null)}><div className="calm-tabs digest-tabs">{(['notes', 'reading', 'events'] as const).map(tab => <button key={tab} className={digestTab === tab ? 'selected' : ''} onClick={() => { setDigestTab(tab); setPage(0) }}>{tab === 'notes' ? 'Мысли и дела' : tab === 'reading' ? 'Почитать' : 'События'}</button>)}</div><div className="calm-digest-list">

@@ -68,8 +68,10 @@ export interface TranslationsSchema {
     not_found: string
     groups: {
       app: string
-      connections: string
+      browser?: string
       security: string
+      system?: string
+      connections?: string
     }
     sections: {
       profile: string
@@ -78,21 +80,27 @@ export interface TranslationsSchema {
       general: string
       general_desc: string
       general_keywords: string
+      browser?: string
+      browser_desc?: string
+      browser_keywords?: string
       passwords: string
       passwords_desc: string
-      passwords_keywords: string
-      calendars: string
-      calendars_desc: string
-      calendars_keywords: string
-      mail: string
-      mail_desc: string
-      mail_keywords: string
-      news: string
-      news_desc: string
-      news_keywords: string
-      privacy: string
-      privacy_desc: string
-      privacy_keywords: string
+      passwords_keywords?: string
+      about?: string
+      about_desc?: string
+      about_keywords?: string
+      calendars?: string
+      calendars_desc?: string
+      calendars_keywords?: string
+      mail?: string
+      mail_desc?: string
+      mail_keywords?: string
+      news?: string
+      news_desc?: string
+      news_keywords?: string
+      privacy?: string
+      privacy_desc?: string
+      privacy_keywords?: string
     }
     general: {
       language_title: string

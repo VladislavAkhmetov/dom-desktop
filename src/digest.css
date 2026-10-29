@@ -1,5 +1,5 @@
 /* The preview is a finite set of headlines; reading and configuration open on demand. */
-.dashboard-home .dashboard-grid > .news-card { display: flex; flex-direction: column; padding: 16px 24px 12px; overflow: hidden; container-type: inline-size; gap: 8px; }
+.dashboard-home .dashboard-grid > .news-card { display: flex; flex-direction: column; padding: var(--card-pad); overflow: hidden; container-type: inline-size; gap: 8px; }
 .news-card-heading { display: flex; align-items: center; gap: 14px; flex: none; min-width: 0; }
 .news-tabs.calm-tabs { display: flex; align-items: center; gap: 20px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .news-tabs.calm-tabs button { flex: none; }
@@ -125,7 +125,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .news-refreshing { animation: none; } .news-tile-media img, .horizontal-rail-thumb { transition: none; } }
 @media (max-height: 800px) and (min-width: 761px) {
-  .dashboard-home .dashboard-grid > .news-card { padding-top: 12px; gap: 4px; }
   .news-tile-button { gap: 6px; }
   .horizontal-rail-viewport { padding-top: 3px; padding-bottom: 3px; }
 }

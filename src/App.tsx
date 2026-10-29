@@ -13,7 +13,8 @@ import { Home } from './Home'
 import { Capture } from './Capture'
 import { planTime } from './dayModel'
 import { isDemo } from './demo'
-import { formatDue, toLocalInput } from './reminders'
+import { formatDue, parseCapture, toLocalInput } from './reminders'
+import { extractMeetingUrl } from './calendar/ical'
 import type { BrowserSession, BrowserTab, OpenResult, OpenWindowItem, PasswordSavePromptInfo, ReaderArticle, RecentFile, Reminder, ResearchSource, Resource, ResourceKind, Space, SpaceTone } from './types'
 import { localDate, normalizeSpace } from '../shared/state'
 import { activateContext, contextDocuments, contextSession, contextTitle, createContext, currentContext, documentPathKey, recordDocumentOpen, updateContextSession } from './workContexts'
@@ -43,6 +44,7 @@ import { TabOverview } from './browser/TabOverview'
 import { createSpaceAndMoveTab, ensureWebSpace, moveBrowserTab, orderedTabs, removeBrowserTab, reorderBrowserTabs, restoreBrowserTab, selectBrowserTab, tabEntries, webSpaceId } from './browser/tabModel'
 import { Settings, type SettingsSectionId } from './Settings'
 import { ProfilePopover } from './ProfilePopover'
+import { UpdateNoticeButton } from './UpdateNoticeButton'
 import { getUserProfile, updateUserProfile } from './userProfile'
 import { I18nProvider, translate } from './i18n'
 import type { PermissionRequestInfo } from './browser/PermissionPrompt'
@@ -63,7 +65,7 @@ import { Dialog } from './Dialog'
 import { ActionMenu, type MenuAction } from './ActionMenu'
 import { SpacePreview, spaceContents } from './SpacePreview'
 import { SpacesOverview } from './SpacesOverview'
-import { DEFAULT_WALLPAPER, resolveWallpaperUrl } from './WallpaperPicker'
+import { DEFAULT_WALLPAPER, FALLBACK_IMAGE_WALLPAPER, isVideoWallpaper, resolveWallpaperUrl } from './WallpaperPicker'
 import { sound } from './sound'
 import { DashboardSettings } from './DashboardSettings'
 import { dashboardWidgets } from './dashboard'
@@ -88,11 +90,14 @@ export { CalmWindSvgFilter, productIcon }
 
 const emptySession = (): BrowserSession => ({ tabs: [], activeTabId: '', splitTabId: null })
 
-function addressToUrl(input: string): string {
+function addressToUrl(input: string, engine = 'google'): string {
   const value = input.trim()
   if (/^https?:\/\//i.test(value)) return new URL(value).toString()
   if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value)) return new URL(`http://${value}`).toString()
   if (/^[^\s]+\.[^\s]+$/.test(value)) return new URL(`https://${value}`).toString()
+  if (engine === 'duckduckgo') return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`
+  if (engine === 'yandex') return `https://yandex.ru/search/?text=${encodeURIComponent(value)}`
+  if (engine === 'ecosia') return `https://www.ecosia.org/search?q=${encodeURIComponent(value)}`
   return `https://www.google.com/search?q=${encodeURIComponent(value)}`
 }
 
@@ -198,7 +203,7 @@ function App() {
   const [captureTimed, setCaptureTimed] = useState(false)
   const [autostart, setAutostart] = useState(false)
   const [weather, setWeather] = useState<UfaWeather | null>(cachedUfaWeather)
-  const { newCalendarName, setNewCalendarName, newCalendarUrl, setNewCalendarUrl, isRefreshingCalendar, syncCalendars, addCalendar, removeCalendar } = useCalendarSync(state, commit, setToast)
+  const { syncCalendars } = useCalendarSync(state, commit, setToast)
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [dismissedRecentTargets, setDismissedRecentTargets] = useState<Set<string>>(new Set())
 
@@ -839,12 +844,30 @@ function App() {
     setModal('capture')
   }
 
-  async function saveCapture(title: string, dueAt: string | null, plannedDate: string | null = null, kind: 'note' | 'task' = plannedDate || dueAt ? 'task' : 'note') {
-    const reminder: Reminder = { id: crypto.randomUUID(), title, createdAt: new Date().toISOString(), dueAt, plannedDate, kind, done: false, spaceId: isWorkstageOpen ? targetWorkstageSpace?.id : undefined }
+  async function saveCapture(title: string, dueAt: string | null, plannedDate: string | null = null, kind: 'note' | 'task' = plannedDate || dueAt ? 'task' : 'note', meetingUrl?: string) {
+    const parsed = dueAt === null ? parseCapture(title, time) : null
+    const finalMeetingUrl = meetingUrl || parsed?.meetingUrl || extractMeetingUrl(title)
+    const baseTitle = parsed ? parsed.title : title
+    const cleanTitle = (finalMeetingUrl ? baseTitle.replace(finalMeetingUrl, '').trim().replace(/^[,.:;\s]+|[,.:;\s]+$/g, '') : baseTitle).trim() || baseTitle.trim() || 'Созвон'
+    const finalDueAt = dueAt ?? parsed?.dueAt ?? null
+    const finalPlannedDate = plannedDate ?? parsed?.plannedDate ?? (finalDueAt ? localDate(new Date(finalDueAt)) : null)
+    const finalKind = finalPlannedDate || finalDueAt || finalMeetingUrl ? 'task' : kind
+
+    const reminder: Reminder = {
+      id: crypto.randomUUID(),
+      title: cleanTitle,
+      createdAt: new Date().toISOString(),
+      dueAt: finalDueAt,
+      plannedDate: finalPlannedDate,
+      kind: finalKind,
+      done: false,
+      spaceId: isWorkstageOpen ? targetWorkstageSpace?.id : undefined,
+      meetingUrl: finalMeetingUrl
+    }
     const saved = await commit(previous => ({ ...previous, reminders: [reminder, ...previous.reminders] }))
     if (saved !== true) return false
     setModal(null)
-    setToast(dueAt ? `Напоминание: ${formatDue(dueAt).toLowerCase()}` : 'Сохранено')
+    setToast(finalMeetingUrl ? 'Созвон сохранён' : finalDueAt ? `Напоминание: ${formatDue(finalDueAt).toLowerCase()}` : 'Сохранено')
     return true
   }
   function createSpace() {
@@ -1161,7 +1184,7 @@ function App() {
   function openAddress(address: string, title?: string, requestedSpaceId?: string, newPage = true, tabId?: string) {
     if (!state || !address.trim()) return
     let url: string
-    try { url = addressToUrl(address) }
+    try { url = addressToUrl(address, state?.searchEngine) }
     catch { setToast('Не удалось распознать адрес.'); return }
     const webId = webSpaceId(state)
     const destinationId = requestedSpaceId || state.spaces.find(space => space.kind === 'web')?.id || webId
@@ -1556,10 +1579,9 @@ function App() {
   const favoritesSpace = state?.spaces.find(space => space.kind === 'web' && !space.archivedAt)
   // Where a tab or material can go: today's draft first, then the spaces (never a past day).
   const moveTargets = (exceptId: string) => [...(today && today.id !== exceptId ? [today] : []), ...availableTopSpaces.filter(space => space.id !== exceptId)]
-  // Header shows only pinned spaces (max 3) plus the open one; everything else lives in SpaceSwitcher.
+  // Header shows spaces track; everything also lives in SpaceSwitcher.
   const openTopSpaceId = (isWorkstageOpen ? targetWorkstageSpace?.id : currentSpace?.id) || null
-  const pinnedTopSpaces = availableTopSpaces.filter(space => space.pinned).slice(0, 3)
-  const visibleTopSpaces = availableTopSpaces.filter(space => pinnedTopSpaces.includes(space) || space.id === openTopSpaceId)
+  const visibleTopSpaces = availableTopSpaces
 
   useLayoutEffect(() => {
     const el = spacesViewportRef.current
@@ -1644,13 +1666,30 @@ function App() {
   const browserDay = browserDayModel(state, time, browserFocus)
   const currentLocale = state?.locale || 'ru'
   const t = (key: any, params?: any) => translate(currentLocale, key, params)
+  const currentWallpaper = state?.backgroundImage || DEFAULT_WALLPAPER
+  const isVideoBg = isVideoWallpaper(currentWallpaper)
+  const resolvedWallpaper = resolveWallpaperUrl(currentWallpaper)
+  const resolvedFallbackImage = resolveWallpaperUrl(FALLBACK_IMAGE_WALLPAPER)
   return (
     <I18nProvider locale={state?.locale} onLocaleChange={newLocale => commit(prev => ({ ...prev, locale: newLocale }))}>
       <div
         ref={shellRef}
         className={`app-shell ${bridge.platform === "darwin" ? "platform-mac" : ""} ${isWorkstageOpen ? 'browsing' : ''} ${isDesktop ? 'desktop' : ''}`}
-        style={{ '--app-bg': `url("${resolveWallpaperUrl(state?.backgroundImage || DEFAULT_WALLPAPER)}")` } as React.CSSProperties}
+        style={{ '--app-bg': `url("${isVideoBg ? resolvedFallbackImage : resolvedWallpaper}")` } as React.CSSProperties}
       >
+        {isVideoBg && (
+          <div className="app-shell-video-container" aria-hidden="true">
+            <video
+              className="app-shell-video"
+              src={resolvedWallpaper}
+              poster={resolvedFallbackImage}
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          </div>
+        )}
         <CalmWindSvgFilter />
         <AnimatePresence>
           {reliefWave && (
@@ -1768,6 +1807,7 @@ function App() {
               )}
               <button className="chrome-button" onClick={() => setModal('search')} title={`${t('nav.search_dom')} · Ctrl K`} aria-label={t('nav.search_dom')}><Search size={19} /></button>
               <button className="chrome-button" onClick={() => openSettings()} aria-label={t('nav.settings')}><Settings2 size={19} /></button>
+              <UpdateNoticeButton />
               {(() => {
                 const userProfile = getUserProfile(state)
                 return (
@@ -2255,7 +2295,7 @@ function App() {
           onClear={() => commit(prev => ({ ...prev, history: clearHistory() }))}
         />
       )}
-      {modal === 'settings' && <Settings state={state} onChange={commit} onClose={() => { setModal(null); setSettingsSection(undefined) }} onDashboard={() => openDashboardSettings('widgets')} autostart={autostart} onAutostart={changeAutostart} onBackup={async () => { try { await bridge.backup(); setToast('Резервная копия сохранена.') } catch { setToast('Не удалось создать резервную копию.') } }} calendarName={newCalendarName} calendarUrl={newCalendarUrl} onCalendarName={setNewCalendarName} onCalendarUrl={setNewCalendarUrl} onAddCalendar={addCalendar} onRemoveCalendar={removeCalendar} onCalendarRefresh={() => syncCalendars()} calendarRefreshing={isRefreshingCalendar} onNewsRefresh={news.refresh} newsRefreshing={news.refreshing} initialSection={settingsSection} onImport={() => setModal('import')} />}
+      {modal === 'settings' && <Settings state={state} onChange={commit} onClose={() => { setModal(null); setSettingsSection(undefined) }} onDashboard={() => openDashboardSettings('widgets')} autostart={autostart} onAutostart={changeAutostart} onBackup={async () => { try { await bridge.backup(); setToast('Резервная копия сохранена.') } catch { setToast('Не удалось создать резервную копию.') } }} initialSection={settingsSection} onImport={() => setModal('import')} />}
       {modal && !['context', 'splitSpace', 'documentReference', 'deleteSpace', 'capture', 'import', 'search', 'changes', 'archive', 'dashboard', 'focus', 'settings', 'history'].includes(modal) && <Dialog className={`app-dialog ${modal === 'weather' ? 'weather-dialog' : ['newSpace', 'newStream', 'renameSpace'].includes(modal) ? 'space-create-dialog' : ''}`} title={modal === 'renameSpace' ? 'Новое название' : modal === 'newLink' ? 'Новая ссылка' : modal === 'weather' ? 'Погода' : modal === 'newStream' ? 'Новый поток' : 'Новое пространство'} onClose={() => setModal(null)}>
         {(modal === 'newSpace' || modal === 'newStream' || modal === 'renameSpace') && <>
           {modal !== 'renameSpace' && <div className={`space-create-preview tone-${newSpaceTone}`}><SpacePreview space={{ resources: [] }} /><span><strong>{newSpaceName.trim() || 'Новое пространство'}</strong></span></div>}

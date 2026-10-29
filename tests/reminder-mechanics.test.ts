@@ -5,6 +5,7 @@ import { postponeReminder, quietIfPast, remindersForDay, rescheduleTaskToToday, 
 import { rescheduleCalendarTask } from '../src/calendar/model'
 import { selectAttention } from '../src/attentionModel'
 import { shouldRing } from '../src/AttentionIsland'
+import { parseCapture } from '../src/reminders'
 
 const at = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m)
 const task = (patch: Partial<Reminder> = {}): Reminder => ({ id: 'r', title: 'Позвонить в типографию', createdAt: at(20, 8).toISOString(), dueAt: null, done: false, kind: 'task', ...patch })
@@ -68,5 +69,51 @@ describe('Напоминания и откладывание', () => {
     expect(shouldRing(freshSignal as never, state([fresh, old]), now)).toBe(true)
     expect(shouldRing(oldSignal as never, state([fresh, old]), now)).toBe(false)
     expect(shouldRing(soonSignal as never, state([fresh, old]), now)).toBe(false)
+  })
+
+  it('автоматически распознаёт ссылки на созвоны и время при вводе фразы', () => {
+    const fixedNow = at(27, 10, 0)
+    // 1. Google Meet со временем
+    const parsedMeet = parseCapture('Созвон в 14:00 https://meet.google.com/abc-defg-hij', fixedNow)
+    expect(parsedMeet.title).toBe('Созвон')
+    expect(parsedMeet.meetingUrl).toBe('https://meet.google.com/abc-defg-hij')
+    expect(parsedMeet.kind).toBe('task')
+    expect(new Date(parsedMeet.dueAt!).getHours()).toBe(14)
+    expect(new Date(parsedMeet.dueAt!).getMinutes()).toBe(0)
+    expect(parsedMeet.plannedDate).toBe('2026-10-27')
+
+    // 2. В кавычках с пунктуацией
+    const parsedQuotes = parseCapture('«Созвон по проекту в 15:30 https://meet.google.com/xyz-uvwx-rst»', fixedNow)
+    expect(parsedQuotes.title).toBe('Созвон по проекту')
+    expect(parsedQuotes.meetingUrl).toBe('https://meet.google.com/xyz-uvwx-rst')
+
+    // 3. Zoom
+    const parsedZoom = parseCapture('Встреча с клиентом https://us02web.zoom.us/j/1234567890?pwd=secret', fixedNow)
+    expect(parsedZoom.title).toBe('Встреча с клиентом')
+    expect(parsedZoom.meetingUrl).toBe('https://us02web.zoom.us/j/1234567890?pwd=secret')
+    expect(parsedZoom.kind).toBe('task')
+
+    // 4. Яндекс.Телемост
+    const parsedTelemost = parseCapture('Синхрон команды https://telemost.yandex.ru/j/98765432101234', fixedNow)
+    expect(parsedTelemost.title).toBe('Синхрон команды')
+    expect(parsedTelemost.meetingUrl).toBe('https://telemost.yandex.ru/j/98765432101234')
+
+    // 5. Только ссылка без темы
+    const parsedBare = parseCapture('https://meet.google.com/foo-bar-baz', fixedNow)
+    expect(parsedBare.title).toBe('Созвон')
+    expect(parsedBare.meetingUrl).toBe('https://meet.google.com/foo-bar-baz')
+  })
+
+  it('передаёт meetingUrl задачи в сигнал островка внимания', () => {
+    const now = at(27, 14, 55)
+    const meetingTask = task({
+      id: 'task-meet',
+      title: 'Созвон по дизайну',
+      dueAt: at(27, 15, 5).toISOString(),
+      meetingUrl: 'https://meet.google.com/abc-defg-hij'
+    })
+    const signal = selectAttention(state([meetingTask]), now, idle)
+    expect(signal?.type).toBe('task')
+    expect(signal?.url).toBe('https://meet.google.com/abc-defg-hij')
   })
 })

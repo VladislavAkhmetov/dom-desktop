@@ -14,25 +14,8 @@ import { sound } from './sound'
 import { bridge } from './bridge'
 import './attention.css'
 
-let currentUpdateReady: AppUpdate | null = null
-const updateListeners = new Set<(update: AppUpdate | null) => void>()
-
-if (typeof window !== 'undefined') {
-  bridge.onUpdateReady?.((data) => {
-    currentUpdateReady = data
-    updateListeners.forEach(fn => fn(data))
-  })
-}
-
-export function useUpdateReady() {
-  const [update, setUpdate] = useState<AppUpdate | null>(currentUpdateReady)
-  useEffect(() => {
-    const listener = (data: AppUpdate | null) => setUpdate(data)
-    updateListeners.add(listener)
-    return () => { updateListeners.delete(listener) }
-  }, [])
-  return update
-}
+import { useUpdateReady } from './useUpdateReady'
+export { useUpdateReady }
 
 export function MemoryReliefSignal({ freedMB }: { freedMB: number }) {
   const reduced = useReducedMotion()
@@ -88,8 +71,7 @@ export function shouldRing(signal: Signal | null, state: AppState, now: Date) {
 const categories: Record<Signal['type'], string> = { task: 'Напоминание', mail: 'Письмо', event: 'Встреча', focus: 'Фокус', music: 'Музыка', activity: 'Помощник', update: 'Обновление' }
 
 export function AttentionIsland({ state, now, onChange, onOpen, onSpace, onFocus, compact = false, browser = false, layoutLocked = false, onDay, onAssistant, onUndo, memoryRelief, update: propUpdate }: { state: AppState; now: Date; onChange: (update: (state: AppState) => AppState) => unknown; onOpen: (resource: Resource) => void; onSpace: (id: string) => void; onFocus: () => void; compact?: boolean; browser?: boolean; layoutLocked?: boolean; onDay?: () => void; onAssistant?: () => void; onUndo?: (taskId: string, noticeId: string) => void; memoryRelief?: { freedMB: number; id: string } | null; update?: AppUpdate | null }) {
-  const globalUpdate = useUpdateReady()
-  const activeUpdate = propUpdate !== undefined ? propUpdate : globalUpdate
+  const activeUpdate = propUpdate !== undefined ? propUpdate : null
   const [focus, setFocus] = useState(zenTimer.getState())
   const [playing, setPlaying] = useState(audioManager.getIsPlaying())
   const [expanded, setExpanded] = useState(false)

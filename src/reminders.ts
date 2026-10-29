@@ -1,6 +1,7 @@
 import { localDate } from '../shared/state'
+import { extractMeetingUrl } from './calendar/ical'
 
-export interface ParsedCapture { title: string; dueAt: string | null; plannedDate: string | null; kind: 'note' | 'task' }
+export interface ParsedCapture { title: string; dueAt: string | null; plannedDate: string | null; kind: 'note' | 'task'; meetingUrl?: string }
 
 export function parseCapture(raw: string, now = new Date()): ParsedCapture {
   let text = raw.trim()
@@ -9,11 +10,19 @@ export function parseCapture(raw: string, now = new Date()): ParsedCapture {
   let dueAt: Date | null = null
   let plannedDate: string | null = null
 
+  const meetingUrl = extractMeetingUrl(text)
+  if (meetingUrl) {
+    text = text.replace(meetingUrl, ' ')
+  }
+
   const relative = text.match(/(?<![\p{L}\p{N}])через\s+(\d+)\s+(минут[уы]?|минуту|час(?:а|ов)?)(?![\p{L}\p{N}])/iu)
   if (relative) {
     const amount = Number(relative[1])
     const minutes = relative[2].toLowerCase().startsWith('час') ? amount * 60 : amount
-    if (!(amount > 0 && minutes <= 525600)) return { title: raw.trim(), dueAt: null, plannedDate: null, kind: 'note' }
+    if (!(amount > 0 && minutes <= 525600)) {
+      const clean = text.replace(/^[,.:;«"'\s]+|[,.:;»"'\s]+$/g, '').replace(/\s{2,}/g, ' ')
+      return { title: clean || (meetingUrl ? 'Созвон' : raw.trim()), dueAt: null, plannedDate: null, kind: meetingUrl ? 'task' : 'note', meetingUrl }
+    }
     dueAt = new Date(now.getTime() + minutes * 60_000)
     plannedDate = localDate(dueAt)
     text = text.replace(relative[0], '')
@@ -34,7 +43,10 @@ export function parseCapture(raw: string, now = new Date()): ParsedCapture {
         const month = Number(dateMatch[2]) - 1
         const year = dateMatch[3] ? Number(dateMatch[3]) : now.getFullYear()
         date.setFullYear(year, month, day)
-        if (date.getDate() !== day || date.getMonth() !== month) return { title: raw.trim(), dueAt: null, plannedDate: null, kind: 'note' }
+        if (date.getDate() !== day || date.getMonth() !== month) {
+          const clean = text.replace(/^[,.:;«"'\s]+|[,.:;»"'\s]+$/g, '').replace(/\s{2,}/g, ' ')
+          return { title: clean || (meetingUrl ? 'Созвон' : raw.trim()), dueAt: null, plannedDate: null, kind: meetingUrl ? 'task' : 'note', meetingUrl }
+        }
         if (!dateMatch[3] && localDate(date)! < localDate(now)!) date.setFullYear(year + 1)
         text = text.replace(dateMatch[0], '')
       }
@@ -48,8 +60,10 @@ export function parseCapture(raw: string, now = new Date()): ParsedCapture {
     }
   }
 
-  text = text.replace(/^[,.:;\s]+|[,.:;\s]+$/g, '').replace(/\s{2,}/g, ' ')
-  return { title: text || raw.trim(), dueAt: dueAt?.toISOString() ?? null, plannedDate, kind: plannedDate ? 'task' : 'note' }
+  text = text.replace(/^[,.:;«"'\s]+|[,.:;»"'\s]+$/g, '').replace(/\s{2,}/g, ' ')
+  const finalTitle = text || (meetingUrl ? 'Созвон' : raw.trim())
+  const finalKind = (plannedDate || meetingUrl) ? 'task' : 'note'
+  return { title: finalTitle, dueAt: dueAt?.toISOString() ?? null, plannedDate, kind: finalKind, meetingUrl }
 }
 
 export function toLocalInput(iso: string | null): string {

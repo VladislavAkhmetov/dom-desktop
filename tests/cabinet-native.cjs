@@ -216,10 +216,12 @@ async function run() {
     return s.spaces.length > 1
   }, 'создание нового кабинета в базе данных')
   assert.equal(await renderer(() => Boolean(document.querySelector('.app-shell.browsing'))), false, 'Создание кабинета из дашборда не должно выбивать в браузер')
+  await waitFor(() => renderer(() => document.querySelectorAll('.chrome-spaces-track .chrome-space').length > 1), 'новый кабинет отрисован в панели')
+  await waitFor(() => renderer(() => document.querySelector('.chrome-space.selected')?.textContent?.trim().includes('Новое пространство')), 'новый кабинет выбран в React')
 
   // 10. Verify clicking a space in dashboard stays inside dashboard
   await renderer(() => {
-    const spaceBtn = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Работа' || b.getAttribute('aria-label')?.includes('Работа'))
+    const spaceBtn = [...document.querySelectorAll('.chrome-spaces-track .chrome-space')].find(b => b.textContent?.trim() === 'Работа') || [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Работа')
     if (spaceBtn) spaceBtn.click()
   })
   await waitFor(async () => {

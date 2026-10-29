@@ -16,7 +16,7 @@
 /* ── Shell ─────────────────────────────────────────── */
 .dashboard-home .calm-card {
   border-radius: var(--card-radius);
-  padding: var(--card-pad);
+  padding: var(--card-pad) !important;
   background: var(--card-surface);
   border: 1px solid var(--line-soft);
   box-shadow: var(--card-shadow);
@@ -27,6 +27,7 @@
 /* ── Header ────────────────────────────────────────── */
 .dashboard-home .calm-card-heading,
 .dashboard-home .resume-card-heading,
+.dashboard-home .reading-shelf-header,
 .dashboard-home .scratchpad-header,
 .dashboard-home .habits-header,
 .dashboard-home .map-widget-header,
@@ -338,6 +339,9 @@
   color: var(--ink-2) !important;
   max-width: 440px;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dashboard-home .resume-card .resume-footer-row {
   justify-content: flex-start;
@@ -399,11 +403,18 @@
 .dashboard-home .reading-shelf-title,
 .dashboard-home .scratchpad-title,
 .dashboard-home .habits-title-wrap,
-.dashboard-home .map-title-badge { gap: 10px; }
+.dashboard-home .map-title-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: auto;
+  padding: 0 !important;
+}
 
 /* One header rhythm for every card */
 .dashboard-home .calm-card-heading,
 .dashboard-home .resume-card-heading,
+.dashboard-home .reading-shelf-header,
 .dashboard-home .scratchpad-header,
 .dashboard-home .habits-header,
 .dashboard-home .map-widget-header,
@@ -775,6 +786,12 @@
 .dashboard-home .plan-card .plan-item-title time { font: var(--t-meta) !important; color: var(--ink-3) !important; }
 
 /* Join meeting: the one colored action in a row */
+.dashboard-home .plan-card .plan-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
 .dashboard-home .plan-card .plan-meeting-btn {
   display: inline-flex;
   align-items: center;

@@ -118,7 +118,7 @@ function activityLabel(at: string | undefined, now: Date) {
 export function ResumeCard({ continuation, now, hidden, style, pending, result, onResume, onSpace, onEdit, onSaveStep, onComplete, onDocument, onTabs, covers, children, onPointerDown, dataWidgetId, className, rowSpan, colSpan, size, onNewSpace }: Props) {
   const reduced = useReducedMotion()
   const isCompactRow = rowSpan !== undefined && rowSpan <= 2
-  const isSmall = (rowSpan !== undefined && rowSpan <= 4) || (colSpan !== undefined && colSpan <= 5) || size === 'S'
+  const isSmall = (rowSpan !== undefined && rowSpan <= 3) || (colSpan !== undefined && colSpan <= 4) || size === 'S'
 
   if (!continuation) {
     const handleCreate = () => {
@@ -129,8 +129,8 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
     return (
       <motion.section
         layout="position"
-        initial={reduced ? undefined : { y: 2 }}
-        animate={reduced ? undefined : { y: 0 }}
+        initial={reduced ? undefined : { opacity: 0 }}
+        animate={reduced ? undefined : { opacity: 1 }}
         transition={reduced ? fluidInstant : fluidSpring.slow}
         className={`calm-card resume-card context-resume resume-card-empty ${isCompactRow ? 'is-compact-row' : ''} ${isSmall ? 'is-small-card' : ''} ${className || ''}`}
         data-widget="resume"
@@ -177,7 +177,7 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
                 <div className="resume-subtitle-row">
                   <span className="resume-subtitle">Нет открытых пространств</span>
                 </div>
-                <p className="resume-next-step">Создайте пространство для организации вкладок, документов и контекста</p>
+                <p className="resume-next-step" title="Создайте пространство для организации вкладок, документов и контекста">Создайте пространство для организации вкладок, документов и контекста</p>
                 <div className="resume-footer-row">
                   <div />
                   <div className="resume-actions">
@@ -211,8 +211,8 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
 
   return <motion.section
     layout="position"
-    initial={reduced ? undefined : { y: 2 }}
-    animate={reduced ? undefined : { y: 0 }}
+    initial={reduced ? undefined : { opacity: 0 }}
+    animate={reduced ? undefined : { opacity: 1 }}
     transition={reduced ? fluidInstant : fluidSpring.slow}
     className={`calm-card resume-card context-resume ${isCompactRow ? 'is-compact-row' : ''} ${isSmall ? 'is-small-card' : ''} ${className || ''}`}
     data-widget="resume"
@@ -286,7 +286,7 @@ export function ResumeCard({ continuation, now, hidden, style, pending, result, 
             {isCabinetPreview && space.kind !== 'day' && <NextStepLine step={checkpoint?.nextStep} onSave={onSaveStep} className="resume-next" />}
             {checkpoint?.note && <p className="resume-note">{checkpoint.note}</p>}
             {isBlank && (
-              <p className="resume-next-step">Откройте вкладки или добавьте файлы — всё сохранится здесь</p>
+              <p className="resume-next-step" title="Откройте вкладки или добавьте файлы — всё сохранится здесь">Откройте вкладки или добавьте файлы — всё сохранится здесь</p>
             )}
             <ContinuationFooter
               primaryLabel="Продолжить"

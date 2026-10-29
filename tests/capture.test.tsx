@@ -193,4 +193,19 @@ describe('прямое управление датой и напоминание
       (globalThis as any).MediaRecorder = originalMediaRecorder
     }
   })
+
+  it('распознаёт ссылку на созвон, отображает бейдж и передаёт meetingUrl при сохранении', async () => {
+    seed('Созвон в 14:00 https://meet.google.com/abc-defg-hij')
+    await mount()
+    expect(document.querySelector('.capture-meeting-badge')).not.toBeNull()
+    expect(document.querySelector('.capture-meeting-badge')?.textContent).toContain('Ссылка на созвон определена')
+    await click(button('Сохранить'))
+    expect(onSave).toHaveBeenCalledWith(
+      'Созвон',
+      new Date(2026, 8, 30, 14, 0).toISOString(),
+      '2026-09-30',
+      'task',
+      'https://meet.google.com/abc-defg-hij'
+    )
+  })
 })

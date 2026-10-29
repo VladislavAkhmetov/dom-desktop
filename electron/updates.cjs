@@ -1,6 +1,6 @@
 // Release channel: GitHub Releases of this repository. Must match "publish" in electron-builder.json
 // (tests/updates.test.ts keeps both in sync).
-const RELEASES = Object.freeze({ owner: 'VladislavAkhmetov', repo: 'dom-desktop' })
+const RELEASES = Object.freeze({ owner: 'VladislavAkhmetov', repo: 'dombro-releases' })
 
 // electron-updater replaces only NSIS installs. The portable exe is a single self-extracting file
 // that cannot replace itself, so it only learns about a newer release and links to its page.

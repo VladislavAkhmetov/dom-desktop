@@ -12,8 +12,8 @@
 .dashboard-home .custom-grid .plan-card,
 .dashboard-home .editing-grid .plan-card { min-height: 0; }
 .dashboard-home .custom-grid .plan-card,
-.dashboard-home .editing-grid .plan-card { padding: 28px; gap: 20px; }
-.dashboard-home .quick-widget .quick-entry { min-height: auto; padding: 28px; }
+.dashboard-home .editing-grid .plan-card { padding: var(--card-pad); gap: 20px; }
+.dashboard-home .quick-widget .quick-entry { min-height: auto; padding: var(--card-pad); }
 .entry-form textarea { flex: 1; min-width: 0; resize: vertical; max-height: 150px; border: 0; outline: none; background: transparent; font-size: 16px; line-height: 24px; color: #1c2621; }
 .first-run-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 14px; }
 .first-run-actions button { padding: 10px 13px; border-radius: var(--radius-sm); background: rgba(249,252,246,.96); font-size: 14px; }
@@ -39,7 +39,7 @@
   grid-row: 1 / span 4 !important;
   height: auto !important;
   min-height: 0;
-  padding: 28px !important;
+  padding: var(--card-pad) !important;
   gap: 20px !important;
 }
 .dashboard-home .standard-grid > [data-widget=capture],
@@ -904,9 +904,9 @@
   height: 38px !important;
 }
 
-/* Small Vertical Resume Card (ensures button always stays safely inside on S or 3-4 rows) */
+/* Small Vertical Resume Card (ensures button always stays safely inside on S or compact rows) */
 .dashboard-home .resume-card.is-small-card {
-  padding: 16px 20px 14px !important;
+  padding: var(--card-pad) 20px 14px !important;
   gap: 8px !important;
   box-sizing: border-box;
   justify-content: flex-start;
@@ -1104,7 +1104,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-  height: 28px;
+  min-height: 40px;
 }
 
 .reading-shelf-title {

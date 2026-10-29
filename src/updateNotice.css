@@ -1,0 +1,130 @@
+/* Update notification button & popover (Calm Tech) */
+
+.chrome-button.chrome-update-notice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-quiet);
+  color: var(--accent-quiet-ink);
+  font: var(--t-label);
+  border: 1px solid var(--line-soft);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: background-color var(--motion-hover) var(--ease-calm),
+              color var(--motion-hover) var(--ease-calm),
+              box-shadow var(--motion-hover) var(--ease-calm),
+              transform var(--motion-hover) var(--ease-calm);
+}
+
+.chrome-button.chrome-update-notice:hover {
+  background: var(--accent-quiet-hover);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chrome-button.chrome-update-notice.active {
+  background: var(--accent-soft-hover);
+}
+
+.update-notice-icon {
+  flex-shrink: 0;
+  color: var(--accent-quiet-ink);
+}
+
+.update-notice-pill {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Update Popover */
+.update-popover {
+  position: fixed;
+  z-index: 120;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 18px;
+  border-radius: var(--radius-popover);
+  border: 1px solid var(--line-soft);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(var(--blur-popover));
+  -webkit-backdrop-filter: blur(var(--blur-popover));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--ink-1);
+  --enter-y: -8px;
+  --enter-scale: .97;
+  animation: calm-in var(--motion-enter) var(--ease-calm) both;
+}
+
+.update-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.update-popover-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-popover-title {
+  font: var(--t-headline);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+
+.update-popover-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.update-popover-close {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background-color var(--motion-hover) var(--ease-calm),
+              color var(--motion-hover) var(--ease-calm);
+}
+
+.update-popover-close:hover {
+  background: var(--state-hover);
+  color: var(--ink-1);
+}
+
+.update-popover-body {
+  font: var(--t-body);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.update-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

@@ -173,6 +173,24 @@
 .browser-day-task > div { display: grid; gap: 3px; min-width: 0; }
 .browser-day-task strong { font-size: var(--fs-meta); line-height: 1.55; font-weight: 500; overflow-wrap: anywhere; }
 .browser-day-task small { font-size: var(--fs-meta); line-height: 1.5; color: var(--muted); }
+.browser-day-task-meeting-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-quiet);
+  color: var(--accent-quiet-ink);
+  font: var(--t-meta);
+  margin-left: auto;
+  flex: none;
+  border: 0;
+  cursor: pointer;
+  transition: background-color var(--motion-hover) var(--ease-calm);
+}
+.browser-day-task-meeting-btn:hover {
+  background: var(--accent-quiet-hover);
+}
 .browser-day-empty-text { font-size: var(--fs-meta); line-height: 1.75; color: var(--muted); margin: 0 0 10px; }
 .browser-day-more, .browser-day-earlier { display: flex; align-items: center; gap: 8px; font-size: var(--fs-meta); color: var(--muted); min-height: 35px; }
 .browser-day-earlier { color: #776542; }

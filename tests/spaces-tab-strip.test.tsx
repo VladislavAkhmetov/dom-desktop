@@ -183,14 +183,14 @@ describe('полоса вкладок рабочих пространств (Chr
     expect(scrollBySpy).toHaveBeenCalledWith(expect.objectContaining({ left: 200 }))
   })
 
-  it('при 6+ пространствах полоса остаётся короткой (закреплённые и открытое), а переключатель хранит все', async () => {
+  it('при 6+ пространствах все пространства собираются в полосе, а переключатель хранит полный список', async () => {
     await mount()
     for (let i = 0; i < 4; i++) await createSpaceFromSwitcher()
 
     const homeBtn = document.querySelector('.chrome-spaces-home .chrome-space')
     expect(homeBtn?.textContent?.trim()).toBe('Мой день')
-    // At most three pinned spaces plus the open one — no endless tab strip.
-    expect(document.querySelectorAll('.chrome-spaces-track .chrome-space').length).toBeLessThanOrEqual(4)
+    // Все созданные пространства собираются вкладками в треке
+    expect(document.querySelectorAll('.chrome-spaces-track .chrome-space')).toHaveLength(6)
 
     await openSwitcher()
     const names = switcherNames()

@@ -145,6 +145,7 @@ export interface Reminder {
   deadline?: string | null
   spaceId?: string
   sourceUrl?: string
+  meetingUrl?: string
   trigger?: { kind: 'return'; spaceId: string; armedAt: string } | { kind: 'event'; eventId: string; offsetMinutes: number }
 }
 
@@ -257,6 +258,12 @@ export interface AppState {
   liveHints?: boolean
   /** Off by default: typed search text goes to Google only after the user turns this on (docs/security.md). */
   searchSuggestions?: boolean
+  /** Default search engine for omnibox queries. */
+  searchEngine?: 'google' | 'duckduckgo' | 'yandex' | 'ecosia'
+  /** Global adblock filter toggle (Ghostery Blocker). Defaults to true. */
+  adblockEnabled?: boolean
+  /** Idle time before background tabs are automatically parked (in minutes). 0 = never. Defaults to 30. */
+  tabParkingTimeoutMinutes?: number
   dismissedNotices?: string[]
   notifiedNotices?: string[]
   mailAccounts?: MailAccount[]
@@ -384,6 +391,7 @@ export interface DomBridge {
   onToast?(callback: (message: string) => void): () => void
   onUpdateReady?(callback: (update: AppUpdate) => void): () => void
   openReleasePage?(): Promise<boolean>
+  installUpdate?(): Promise<boolean>
   onFocusCapture(callback: () => void): () => void
   onVoiceToggle?(callback: () => void): () => void
   onStateChanged(callback: (state: AppState) => void): () => void

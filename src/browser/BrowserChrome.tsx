@@ -13,6 +13,7 @@ import { PermissionPrompt, type PermissionRequestInfo } from './PermissionPrompt
 import { PasswordSavePrompt } from './PasswordSavePrompt'
 import { AdblockShield } from './AdblockShield'
 import { TranslateButton } from './TranslateButton'
+import { UpdateNoticeButton } from '../UpdateNoticeButton'
 import '../cabinet.css'
 import '../profile.css'
 import { ProfileGlyph } from '../ProfileGlyph'
@@ -343,6 +344,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
         <button onClick={onCapture} aria-label="Записать" title="Записать мысль или дело"><PencilLine size={18} /></button>
         {isAssistantEnabled && <button onClick={onAssistant} aria-label="Спросить ИИ" title="Спросить ИИ"><Sparkles size={18} /></button>}
       </div>
+      <UpdateNoticeButton />
       {onProfile && (() => {
         const userProfile = getUserProfile(profile ? { userProfile: profile } as any : undefined)
         return (

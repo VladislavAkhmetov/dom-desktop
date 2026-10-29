@@ -130,15 +130,15 @@ export function PasswordSettings() {
   return (
     <div className="settings-columns">
       {/* Рекомендуемый безопасный менеджер: Bitwarden в 1-2 касания */}
-      <div className="settings-card" style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, rgba(23,93,220,0.06), rgba(40,167,69,0.04))', border: '1px solid rgba(23,93,220,0.18)' }}>
+      <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#175ddc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flex: 'none' }}>
               <KeyRound size={20} />
             </div>
             <div>
-              <h4 style={{ margin: 0, fontSize: 16 }}>Менеджер паролей: Bitwarden</h4>
-              <p style={{ margin: '2px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
+              <h4 style={{ margin: 0, fontSize: 16, color: 'var(--ink-1)' }}>Менеджер паролей: Bitwarden</h4>
+              <p style={{ margin: '3px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--ink-3)' }}>
                 Пароль остаётся в Bitwarden. dombro поле пароля не читает и не сохраняет.
               </p>
             </div>
@@ -155,7 +155,7 @@ export function PasswordSettings() {
           </div>
         </div>
 
-        <p style={{ margin: '14px 0 0', fontSize: 'var(--fs-meta)', lineHeight: 1.45 }}>{bitwardenLine(bitwarden)}</p>
+        <p style={{ margin: '14px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--ink-2)', lineHeight: 1.45 }}>{bitwardenLine(bitwarden)}</p>
       </div>
 
       <div className="settings-card settings-collection-card">
@@ -173,11 +173,11 @@ export function PasswordSettings() {
         </div>
 
         {importOpen && (
-          <div style={{ padding: '12px', background: 'rgba(255,255,255,0.7)', borderRadius: 14, marginBottom: 14, border: '1px solid rgba(100,143,125,0.25)' }}>
-            <span style={{ fontSize: 'var(--fs-meta)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+          <div style={{ padding: 14, background: 'var(--surface-control)', borderRadius: 'var(--radius-lg)', marginBottom: 14, border: '1px solid var(--line-strong)' }}>
+            <span style={{ fontSize: 'var(--fs-meta)', fontWeight: 600, color: 'var(--ink-1)', display: 'block', marginBottom: 6 }}>
               Импорт паролей из CSV
             </span>
-            <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
+            <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--ink-3)', margin: '0 0 8px', lineHeight: 1.4 }}>
               Вставьте содержимое экспорта паролей (формат Chrome: <code>name,url,username,password</code>).
             </p>
             <textarea
@@ -185,9 +185,9 @@ export function PasswordSettings() {
               value={importCsv}
               onChange={e => setImportCsv(e.target.value)}
               placeholder="url,username,password..."
-              style={{ width: '100%', font: 'inherit', fontSize: 'var(--fs-meta)', padding: 8, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxSizing: 'border-box' }}
+              style={{ width: '100%', font: 'inherit', fontSize: 'var(--fs-meta)', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--line-strong)', background: 'var(--surface-field)', color: 'var(--ink-1)', boxSizing: 'border-box' }}
             />
-            {importStatus && <p style={{ fontSize: 'var(--fs-meta)', color: '#386348', margin: '6px 0' }}>{importStatus}</p>}
+            {importStatus && <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--accent-quiet-ink)', margin: '6px 0' }}>{importStatus}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button className="soft-button" type="button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
               <button className="calm-primary" type="button" onClick={handleImport} disabled={!importCsv.trim()}>{t('settings.passwords.import_btn')}</button>
@@ -207,21 +207,14 @@ export function PasswordSettings() {
               return (
                 <div
                   key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: 14,
-                    background: 'rgba(255,255,255,0.5)',
-                    border: '1px solid rgba(100,143,125,0.15)'
-                  }}
+                  className="settings-list-item"
+                  style={{ minHeight: 48, padding: '8px 12px' }}
                 >
                   <div style={{ display: 'grid', gap: 2, minWidth: 0, flex: 1, marginRight: 8 }}>
-                    <strong style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <strong style={{ fontSize: 14, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.title || item.origin}
                     </strong>
-                    <small style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <small style={{ fontSize: 'var(--fs-meta)', color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.username} · {show ? visiblePasswords[item.id] : '••••••••'}
                     </small>
                   </div>
@@ -242,7 +235,7 @@ export function PasswordSettings() {
                       title={isCopied ? 'Скопировано!' : 'Скопировать пароль'}
                       aria-label={isCopied ? 'Скопировано' : 'Скопировать пароль'}
                     >
-                      {isCopied ? <Check size={15} color="#2e6c49" /> : <Copy size={15} />}
+                      {isCopied ? <Check size={15} color="var(--accent)" /> : <Copy size={15} />}
                     </button>
                     <button
                       className="calm-icon"
@@ -310,10 +303,10 @@ export function PasswordSettings() {
           </button>
         </form>
 
-        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(100,143,125,0.15)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <ShieldCheck size={20} color="#486955" style={{ flex: 'none', marginTop: 2 }} />
-          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.45 }}>
-            Пароли в этом списке шифруются средствами ОС. Со страницы они сюда не попадают. Автозаполнение с сайта в этой сборке не работает.
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line-soft)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <ShieldCheck size={20} color="var(--accent)" style={{ flex: 'none', marginTop: 2 }} />
+          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--ink-3)', lineHeight: 1.45 }}>
+            Пароли в этом списке шифруются средствами ОС. Со страницы они сюда не попадают.
           </p>
         </div>
       </div>

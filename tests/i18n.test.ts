@@ -33,12 +33,12 @@ describe('i18n core engine', () => {
     expect(translate('fr', 'settings.sections.general')).toBe('Général')
     expect(translate('zh', 'settings.sections.general')).toBe('通用')
 
-    expect(translate('ru', 'settings.sections.passwords')).toBe('Пароли и ключи')
-    expect(translate('en', 'settings.sections.passwords')).toBe('Passwords & keys')
-    expect(translate('de', 'settings.sections.passwords')).toBe('Passwörter & Schlüssel')
-    expect(translate('es', 'settings.sections.passwords')).toBe('Contraseñas y claves')
-    expect(translate('fr', 'settings.sections.passwords')).toBe('Mots de passe et clés')
-    expect(translate('zh', 'settings.sections.passwords')).toBe('密码与密钥')
+    expect(translate('ru', 'settings.sections.passwords')).toBe('Пароли и защита')
+    expect(translate('en', 'settings.sections.passwords')).toBe('Passwords & Security')
+    expect(translate('de', 'settings.sections.passwords')).toBe('Passwörter & Schutz')
+    expect(translate('es', 'settings.sections.passwords')).toBe('Contraseñas y seguridad')
+    expect(translate('fr', 'settings.sections.passwords')).toBe('Mots de passe et sécurité')
+    expect(translate('zh', 'settings.sections.passwords')).toBe('密码与安全')
   })
 
   it('interpolates template parameters correctly', () => {

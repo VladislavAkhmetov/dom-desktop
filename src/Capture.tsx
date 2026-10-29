@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Mic } from 'lucide-react'
+import { ArrowRight, Mic, Video } from 'lucide-react'
 import { Dialog } from './Dialog'
 import { CaptureSchedule } from './CaptureSchedule'
 import { fromLocalInput, toLocalInput, parseCapture } from './reminders'
@@ -13,7 +13,7 @@ interface Props {
   initialWhen: string
   initialReminderAt?: string
   onClose: () => void
-  onSave: (title: string, dueAt: string | null, plannedDate?: string | null, kind?: 'note' | 'task') => unknown
+  onSave: (title: string, dueAt: string | null, plannedDate?: string | null, kind?: 'note' | 'task', meetingUrl?: string) => unknown
 }
 
 function readDraft() {
@@ -120,7 +120,11 @@ export function Capture({ initialWhen, initialReminderAt, onClose, onSave }: Pro
     setSaving(true)
     setSaveError('')
     try {
-      const result = await onSave(title.trim(), dueAt, plannedDate, plannedDate || dueAt ? 'task' : 'note')
+      const meetingUrl = parsed.meetingUrl
+      const kind = plannedDate || dueAt || meetingUrl ? 'task' : 'note'
+      const result = meetingUrl !== undefined
+        ? await onSave(title.trim(), dueAt, plannedDate, kind, meetingUrl)
+        : await onSave(title.trim(), dueAt, plannedDate, kind)
       if (result !== false) {
         sessionStorage.removeItem('dom-capture-draft')
         sessionStorage.removeItem('dom-capture-details')
@@ -180,6 +184,12 @@ export function Capture({ initialWhen, initialReminderAt, onClose, onSave }: Pro
       {voiceStatus === 'transcribing' && (
         <div className="capture-voice-badge transcribing" role="status">
           <span>Распознаём запись…</span>
+        </div>
+      )}
+      {parsed.meetingUrl && (
+        <div className="capture-meeting-badge" title={parsed.meetingUrl}>
+          <Video size={14} />
+          <span>Ссылка на созвон определена</span>
         </div>
       )}
     </div>

@@ -98,7 +98,7 @@ describe('Settings language switching', () => {
     expect(document.querySelector('.settings-section-heading h3')?.textContent).toBe('General')
     expect(document.querySelector('.settings-card-heading h4')?.textContent).toBe('Interface Language')
     expect(button('General')).toBeDefined()
-    expect(button('Calendars')).toBeDefined()
+    expect(button('Profile')).toBeDefined()
   })
 
   it('switches to German when clicking Deutsch', async () => {
@@ -108,7 +108,7 @@ describe('Settings language switching', () => {
     expect(document.querySelector('.settings-section-heading h3')?.textContent).toBe('Allgemein')
     expect(document.querySelector('.settings-card-heading h4')?.textContent).toBe('Oberflächensprache')
     expect(button('Allgemein')).toBeDefined()
-    expect(button('Kalender')).toBeDefined()
+    expect(button('Profil')).toBeDefined()
   })
 
   it('switches to Spanish when clicking Español', async () => {
@@ -117,7 +117,7 @@ describe('Settings language switching', () => {
     expect(current.locale).toBe('es')
     expect(document.querySelector('.settings-section-heading h3')?.textContent).toBe('General')
     expect(document.querySelector('.settings-card-heading h4')?.textContent).toBe('Idioma de la interfaz')
-    expect(button('Calendarios')).toBeDefined()
+    expect(button('Perfil')).toBeDefined()
   })
 
   it('switches to French when clicking Français', async () => {
@@ -126,7 +126,7 @@ describe('Settings language switching', () => {
     expect(current.locale).toBe('fr')
     expect(document.querySelector('.settings-section-heading h3')?.textContent).toBe('Général')
     expect(document.querySelector('.settings-card-heading h4')?.textContent).toBe('Langue de l\'interface')
-    expect(button('Calendriers')).toBeDefined()
+    expect(button('Profil')).toBeDefined()
   })
 
   it('switches to Chinese when clicking 中文', async () => {
@@ -135,6 +135,6 @@ describe('Settings language switching', () => {
     expect(current.locale).toBe('zh')
     expect(document.querySelector('.settings-section-heading h3')?.textContent).toBe('通用')
     expect(document.querySelector('.settings-card-heading h4')?.textContent).toBe('界面语言')
-    expect(button('日历')).toBeDefined()
+    expect(button('个人资料')).toBeDefined()
   })
 })

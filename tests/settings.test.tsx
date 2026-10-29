@@ -58,44 +58,40 @@ async function fill(element: HTMLInputElement | HTMLTextAreaElement, value: stri
 function panel() { return document.querySelector<HTMLElement>('.settings-panel:not([hidden])')! }
 
 describe('разделы настроек', () => {
-  it('сохраняет черновики календаря и RSS при переключении разделов', async () => {
+  it('переключает разделы и сохраняет выбранную поисковую систему', async () => {
     await mount()
     expect(document.activeElement).toBe(button('Общие'))
-    await click(button('Календари'))
-    const calendar = panel().querySelectorAll('input')
-    await fill(calendar[0], 'Работа')
-    await fill(calendar[1], 'webcal://example.com/calendar.ics')
-    await click(button('Дайджест'))
-    const feed = panel().querySelectorAll<HTMLInputElement>('.news-add-source input')
-    await fill(feed[0], 'Дизайн')
-    await fill(feed[1], 'https://example.com/design.xml')
-    await click(button('Календари'))
-    expect(calendar[0].value).toBe('Работа')
-    expect(calendar[1].value).toBe('webcal://example.com/calendar.ics')
-    await click(button('Дайджест'))
-    expect(feed[0].value).toBe('Дизайн')
-    await click(button('Добавить'))
-    expect(current.feedSources?.[0]).toMatchObject({ name: 'Дизайн', url: 'https://example.com/design.xml' })
-    expect(feed[0].value).toBe('')
+    await click(button('Браузер и память'))
+    expect(panel().getAttribute('aria-label')).toBe('Браузер и память')
+    const select = panel().querySelector<HTMLSelectElement>('select[aria-label="Поисковая система"]')!
+    await act(async () => {
+      select.value = 'duckduckgo'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(current.searchEngine).toBe('duckduckgo')
+    await click(button('Общие'))
+    expect(panel().getAttribute('aria-label')).toBe('Общие')
+    await click(button('Браузер и память'))
+    expect(panel().querySelector<HTMLSelectElement>('select[aria-label="Поисковая система"]')?.value).toBe('duckduckgo')
   })
 
   it('ищет по ключевым словам и позволяет очистить пустой результат', async () => {
     await mount()
     const search = document.querySelector<HTMLInputElement>('input[type="search"]')!
-    await fill(search, 'RSS')
-    expect([...document.querySelectorAll('.settings-nav button')].map(item => item.textContent)).toEqual(['Дайджест'])
-    await click(button('Дайджест'))
-    expect(panel().getAttribute('aria-label')).toBe('Дайджест')
+    await fill(search, 'обои')
+    expect([...document.querySelectorAll('.settings-nav button')].map(item => item.textContent)).toEqual(['Общие'])
+    await click(button('Общие'))
+    expect(panel().getAttribute('aria-label')).toBe('Общие')
     await fill(search, 'несуществующий раздел')
     expect(document.querySelector('.settings-search-empty')?.textContent).toBe('Раздел не найден')
     await click(document.querySelector('[aria-label="Очистить поиск разделов"]')!)
-    expect(document.querySelectorAll('.settings-nav button')).toHaveLength(7)
+    expect(document.querySelectorAll('.settings-nav button')).toHaveLength(5)
   })
 
   it('позволяет редактировать профиль и запускать импорт из Chrome', async () => {
     const onImport = vi.fn()
     let localState = structuredClone(initial)
-    await act(async () => root.render(<Settings state={localState} onChange={update => { localState = typeof update === 'function' ? update(localState) : update }} onClose={onClose} onDashboard={onDashboard} autostart={false} onAutostart={vi.fn()} onBackup={onBackup} calendarName="" calendarUrl="" onCalendarName={vi.fn()} onCalendarUrl={vi.fn()} onAddCalendar={vi.fn()} onRemoveCalendar={vi.fn()} onCalendarRefresh={vi.fn()} calendarRefreshing={false} onNewsRefresh={vi.fn()} newsRefreshing={false} initialSection="profile" onImport={onImport} />))
+    await act(async () => root.render(<Settings state={localState} onChange={update => { localState = typeof update === 'function' ? update(localState) : update }} onClose={onClose} onDashboard={onDashboard} autostart={false} onAutostart={vi.fn()} onBackup={onBackup} initialSection="profile" onImport={onImport} />))
     expect(panel().getAttribute('aria-label')).toBe('Профиль')
     const nameInput = panel().querySelector<HTMLInputElement>('input[aria-label="Имя пользователя"]')!
     await fill(nameInput, 'Мария')
@@ -113,23 +109,44 @@ describe('разделы настроек', () => {
     expect(current.liveHints).toBe(false)
     await click(document.querySelector('[aria-label="Анимация напоминаний"]')!)
     expect(current.liveHints).toBe(true)
+    await click(button('Браузер и память'))
     await click(button('Настроить'))
     expect(onDashboard).toHaveBeenCalledOnce()
+    await click(button('О программе'))
     await click(button('Создать'))
     expect(onBackup).toHaveBeenCalledOnce()
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('изменяет важных отправителей только у выбранного аккаунта', async () => {
+  it('управляет блокировкой рекламы и тайм-аутом выгрузки памяти', async () => {
     await mount()
-    await click(button('Почта Gmail'))
-    const select = panel().querySelector('select')!
-    await act(async () => { select.value = 'second'; select.dispatchEvent(new Event('change', { bubbles: true })) })
-    await fill(panel().querySelector('textarea')!, 'team@example.com')
-    expect(current.mailAccounts?.[0].importantSenders).toBeUndefined()
-    expect(current.mailAccounts?.[1].importantSenders).toEqual(['team@example.com'])
-    expect(current.mailMessages?.map(item => item.important)).toEqual([false, true])
+    await click(button('Пароли и защита'))
+    const adblockToggle = document.querySelector('[aria-label="Блокировка рекламы"]')!
+    expect(adblockToggle.getAttribute('aria-checked')).toBe('true')
+    await click(adblockToggle)
+    expect(current.adblockEnabled).toBe(false)
+    await click(adblockToggle)
+    expect(current.adblockEnabled).toBe(true)
+
+    await click(button('Браузер и память'))
+    const parkSelect = panel().querySelector<HTMLSelectElement>('select[aria-label="Выгрузка неактивных вкладок"]')!
+    await act(async () => {
+      parkSelect.value = '15'
+      parkSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(current.tabParkingTimeoutMinutes).toBe(15)
+  })
+
+  it('прокручивает панель настроек при прокрутке колеса над заголовком', async () => {
+    await mount()
+    const activePanel = panel()
+    activePanel.scrollTop = 0
+    const header = document.querySelector<HTMLElement>('.settings-section-heading')!
+    await act(async () => {
+      header.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }))
+    })
+    expect(activePanel.scrollTop).toBe(120)
   })
 })
 

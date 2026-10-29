@@ -118,3 +118,16 @@
   background: #395c44;
 }
 
+.capture-meeting-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-quiet);
+  color: var(--accent-quiet-ink);
+  font: var(--t-meta);
+  width: fit-content;
+}
+

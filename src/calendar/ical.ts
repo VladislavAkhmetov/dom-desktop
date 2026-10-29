@@ -66,20 +66,27 @@ export function parseICalDate(val: string): Date | null {
 }
 
 /**
- * Extracts meeting link (Google Meet, Zoom, Yandex Telemost, MS Teams) from text.
+ * Extracts meeting link (Google Meet, Zoom, Yandex Telemost, MS Teams, SberJazz, VK, Webex, Jitsi) from text.
  */
 export function extractMeetingUrl(text?: string): string | undefined {
   if (!text) return undefined
   const patterns = [
-    /https?:\/\/meet\.google\.com\/[a-z0-9-]+/i,
-    /https?:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/j\/\d+(?:\?[^\s"'>]+)?/i,
-    /https?:\/\/telemost\.yandex\.ru\/j\/\d+/i,
-    /https?:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s"'>]+/i
+    /https?:\/\/meet\.google\.com\/(?:[a-z0-9-]+|lookup\/[a-z0-9-]+)(?:\?[^\s"'>]+)?/i,
+    /https?:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/(?:j\/\d+|my\/[a-z0-9._-]+|w\/\d+|wc\/[^\s"'>]+)(?:\?[^\s"'>]+)?/i,
+    /https?:\/\/telemost\.yandex\.ru\/(?:j|live)\/\d+(?:\?[^\s"'>]+)?/i,
+    /https?:\/\/(?:teams\.microsoft\.com\/l\/meetup-join|teams\.live\.com\/meet)\/[^\s"'>]+/i,
+    /https?:\/\/jazz\.sber\.ru\/[a-z0-9-]+(?:\?[^\s"'>]+)?/i,
+    /https?:\/\/(?:vk\.com\/call\/join|calls\.vk\.ru)\/[a-z0-9._-]+(?:\?[^\s"'>]+)?/i,
+    /https?:\/\/(?:[a-z0-9-]+\.)?webex\.com\/(?:meet|join)\/[^\s"'>]+/i,
+    /https?:\/\/meet\.jit\.si\/[a-z0-9-_]+(?:\?[^\s"'>]+)?/i
   ]
 
   for (const pattern of patterns) {
     const match = text.match(pattern)
-    if (match) return match[0]
+    if (match) {
+      // Strip trailing punctuation common in natural language (e.g. «...», ..., ".", ")")
+      return match[0].replace(/[.,;:!?)»"'>]+$/, '')
+    }
   }
 
   return undefined

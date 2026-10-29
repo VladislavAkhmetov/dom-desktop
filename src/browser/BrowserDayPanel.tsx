@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, Clock3, Mail, Pin, Plus, Sparkles, Timer, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, Check, Clock3, Mail, Pin, Plus, Sparkles, Timer, Video, X } from 'lucide-react'
 import type { AppState, Resource } from '../types'
 import type { ZenTimerState } from '../focus/zenTimer'
 import { isAssistantEnabled } from '../assistantModel'
@@ -51,7 +51,26 @@ export function BrowserDayPanel({ state, model, now, focus, pinned, onPin, onClo
         {model.calendarErrors.length > 0 && <p className="browser-day-warning">Не обновился календарь: {model.calendarErrors.map(source => source.name).join(', ')}. Показаны сохранённые события.</p>}
       </section>
       <section className="browser-day-tasks" aria-label="Дела на сегодня"><div className="browser-day-section-heading"><h3>Сегодня</h3><span>{model.tasks.length ? `${model.tasks.length} осталось` : 'Свободный день'}</span></div>
-        {displayedTasks.length ? displayedTasks.slice(0, 5).map(task => <div className="browser-day-task" key={task.id}><button className="browser-task-check" disabled={Boolean(pending)} onClick={() => void save(task.id, () => onComplete(task.id))} aria-label={`Завершить дело: ${task.title}`}><Check size={14} /></button><div><strong>{task.title}</strong><small>{task.dueAt && <time dateTime={task.dueAt}>{new Date(task.dueAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · </time>}{state.spaces.find(space => space.id === task.spaceId)?.name || 'Мой день'}</small></div></div>) : <p className="browser-day-empty-text">Можно выбрать одно дело или оставить время свободным.</p>}
+        {displayedTasks.length ? displayedTasks.slice(0, 5).map(task => (
+          <div className="browser-day-task" key={task.id}>
+            <button className="browser-task-check" disabled={Boolean(pending)} onClick={() => void save(task.id, () => onComplete(task.id))} aria-label={`Завершить дело: ${task.title}`}><Check size={14} /></button>
+            <div>
+              <strong>{task.title}</strong>
+              <small>{task.dueAt && <time dateTime={task.dueAt}>{new Date(task.dueAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · </time>}{state.spaces.find(space => space.id === task.spaceId)?.name || 'Мой день'}</small>
+            </div>
+            {task.meetingUrl && (
+              <button
+                className="browser-day-task-meeting-btn"
+                onClick={() => onOpen({ id: task.id, name: task.title, kind: 'link', target: task.meetingUrl!, createdAt: now.toISOString() })}
+                title={task.meetingUrl}
+              >
+                <Video size={13} />
+                <span>Войти</span>
+                <ArrowUpRight size={13} />
+              </button>
+            )}
+          </div>
+        )) : <p className="browser-day-empty-text">Можно выбрать одно дело или оставить время свободным.</p>}
         {displayedTasks.length > 5 && <button className="browser-day-more" onClick={onHome}>Все дела · {displayedTasks.length} <ArrowRight size={14} /></button>}
         {model.overdue.length > 0 && <button className="browser-day-earlier" onClick={onHome}>С прошлых дней · {model.overdue.length}<ArrowUpRight size={14} /></button>}
       </section>
