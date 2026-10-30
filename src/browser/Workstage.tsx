@@ -86,7 +86,7 @@ export function Workstage({
 }: WorkstageProps) {
   const strip = useRef<HTMLDivElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [tabWidth, setTabWidth] = useState(210)
+  const [tabWidth, setTabWidth] = useState(192)
   const [previewIds, setPreviewIds] = useState<string[]>([])
   const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null)
   const pointerDrag = useRef<{ id: string; x: number; y: number; pointerId: number; element: HTMLElement; started: boolean } | null>(null)
@@ -115,7 +115,7 @@ export function Workstage({
       const pinnedWidth = pinnedTabs.reduce((sum, node) => sum + node.offsetWidth, 0)
       const available = element.clientWidth - plus.offsetWidth - parseFloat(plusStyle.marginLeft) - parseFloat(plusStyle.marginRight)
         - parseFloat(listStyle.paddingLeft) - parseFloat(listStyle.paddingRight) - parseFloat(listStyle.columnGap) * Math.max(0, tabs.length - 1) - pinnedWidth
-      setTabWidth(Math.max(minimum, Math.min(210, available / Math.max(1, tabs.length - pinnedTabs.length))))
+      setTabWidth(Math.max(minimum, Math.min(192, available / Math.max(1, tabs.length - pinnedTabs.length))))
     }
     resizeTabs()
     const observer = new ResizeObserver(resizeTabs)
@@ -379,13 +379,13 @@ export function Workstage({
               pointerDrag.current = { id: tab.id, x: event.clientX, y: event.clientY, pointerId: event.pointerId, element: event.currentTarget, started: false }
             }}
             onDragStart={event => startDrag(event, tab)} onDragEnd={finishDrag}>
-            <button role="tab" aria-selected={tab.id === activeTab?.id} tabIndex={tab.id === activeTab?.id ? 0 : -1} onClick={() => { if (!suppressClick.current) onSelectTab(tab.id) }} title={tabTitle(tab)}><TabIcon tab={tab} /><span>{tabTitle(tab)}</span>{tab.pinned && <Pin size={16} aria-label="Закреплено" />}{tab.protected && <Shield size={16} aria-label="Незавершённая работа" />}</button>
-            <button className="horizontal-tab-close" onClick={() => onCloseTab(tab.id)} aria-label={`Закрыть ${tabTitle(tab)}`}><X size={18} /></button>
+            <button role="tab" aria-selected={tab.id === activeTab?.id} tabIndex={tab.id === activeTab?.id ? 0 : -1} onClick={() => { if (!suppressClick.current) onSelectTab(tab.id) }} title={tabTitle(tab)}><TabIcon tab={tab} /><span>{tabTitle(tab)}</span>{tab.pinned && <Pin size={14} aria-label="Закреплено" />}{tab.protected && <Shield size={14} aria-label="Незавершённая работа" />}</button>
+            <button className="horizontal-tab-close" onClick={() => onCloseTab(tab.id)} aria-label={`Закрыть ${tabTitle(tab)}`}><X size={15} /></button>
           </div>)}
         </div>
-        <button className="strip-new-tab" onClick={onAddTab} title="Новая вкладка · Ctrl T" aria-label="Новая вкладка"><Plus size={22} /></button>
+        <button className="strip-new-tab" onClick={onAddTab} title="Новая вкладка · Ctrl T" aria-label="Новая вкладка"><Plus size={18} /></button>
         </div>
-        {onOverview && <button className="browser-tabs-overview" onClick={onOverview} title="Обзор и поиск вкладок · Ctrl Shift A" aria-label="Обзор и поиск вкладок"><LayoutGrid size={16} /><span>Вкладки</span><small>{tabs.length}</small></button>}
+        {onOverview && <button className="browser-tabs-overview" onClick={onOverview} title="Обзор и поиск вкладок · Ctrl Shift A" aria-label="Обзор и поиск вкладок"><LayoutGrid size={15} /><span>Вкладки</span><small>{tabs.length}</small></button>}
         <ActionMenu className="browser-menu" label="Действия с вкладками" actions={[
           ...(activeTab && tabs.length > 1 ? [{ label: 'Открыть рядом', icon: <Columns2 size={20} />, onSelect: () => onSplitTab(activeTab.id) }] : []),
           ...(activeTab?.parentTabId && tabs.some(tab => tab.id === activeTab.parentTabId) ? [{ label: 'К исходной вкладке', icon: <ArrowUpRight size={16} />, onSelect: () => onSelectTab(activeTab.parentTabId!) }] : []),
@@ -423,7 +423,7 @@ export function Workstage({
       </div>
       {sidePanel}
       </div>
-      {dragPointer && dragLayout.current && draggedTab && createPortal(<div className={`tab-drag-preview ${dragLayout.current.width <= 86 ? 'compact' : ''}`} aria-hidden="true" style={{ left: dragPointer.x - dragLayout.current.grabOffset, top: dragPointer.y - 19, width: dragLayout.current.width }}><TabIcon tab={draggedTab} /><span>{tabTitle(draggedTab)}</span><X size={18} /></div>, document.body)}
+      {dragPointer && dragLayout.current && draggedTab && createPortal(<div className={`tab-drag-preview ${dragLayout.current.width <= 86 ? 'compact' : ''}`} aria-hidden="true" style={{ left: dragPointer.x - dragLayout.current.grabOffset, top: dragPointer.y - 17, width: dragLayout.current.width }}><TabIcon tab={draggedTab} /><span>{tabTitle(draggedTab)}</span><X size={15} /></div>, document.body)}
     </main>
   )
 }

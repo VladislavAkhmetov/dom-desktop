@@ -1425,6 +1425,57 @@
 
 /* ══ Space page v4 ════════════════════════════════════════════════════════ */
 
+.space-threshold-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+.space-threshold-when { margin: 0; font: var(--t-meta); color: var(--ink-3); }
+
+.space-threshold-note-bubble {
+  display: inline-flex; align-items: center; gap: 8px;
+  max-width: 640px; padding: 6px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-2); font: var(--t-body);
+  text-align: left; cursor: pointer;
+  transition: background var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm);
+}
+.space-threshold-note-bubble:hover { background: #ffffff; color: var(--ink-1); }
+.space-threshold-note-edit input {
+  min-width: 280px; max-width: 640px;
+  padding: 8px 12px; border-radius: var(--radius-md);
+  background: #ffffff; border: 1px solid var(--line-strong);
+  color: var(--ink-1); font: var(--t-body); outline: none;
+}
+.space-threshold-note-edit input:focus { box-shadow: 0 0 0 2px var(--focus-ring); }
+.space-threshold-add-note {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--radius-full);
+  background: transparent; border: 1px dashed var(--line-strong);
+  color: var(--ink-3); font: var(--t-meta); cursor: pointer;
+  transition: background var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm), border-color var(--motion-hover) var(--ease-calm);
+}
+.space-threshold-add-note:hover { background: rgba(255, 255, 255, .7); color: var(--ink-1); border-style: solid; }
+
+.space-threshold-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.space-threshold-primary {
+  height: 44px; padding: 0 18px 0 20px; gap: 10px;
+  border-radius: var(--radius-md); background: var(--accent-quiet); color: var(--accent-quiet-ink);
+  font: var(--t-label); display: inline-flex; align-items: center; border: 0; cursor: pointer;
+  transition: background var(--motion-hover) var(--ease-calm);
+}
+.space-threshold-primary:hover { background: var(--accent-quiet-hover); }
+.space-threshold-primary svg { color: #2f6b4f; transition: transform var(--motion-state) var(--ease-calm); }
+.space-threshold-primary:hover svg { transform: translateX(2px); }
+
+.space-threshold-focus {
+  height: 44px; padding: 0 16px; gap: 8px;
+  border-radius: var(--radius-md); background: rgba(255, 255, 255, .72);
+  border: 1px solid var(--line-soft); color: var(--ink-2); font: var(--t-label);
+  display: inline-flex; align-items: center; cursor: pointer;
+  transition: background var(--motion-hover) var(--ease-calm), color var(--motion-hover) var(--ease-calm);
+}
+.space-threshold-focus:hover { background: #ffffff; color: var(--ink-1); }
+.space-threshold-focus svg { color: #2f6b4f; }
+
 /* Threshold footer = the «Мой день» resume footer, same geometry and colors */
 .space-threshold .continuation-footer {
   display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap;

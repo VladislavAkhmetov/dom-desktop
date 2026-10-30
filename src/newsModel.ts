@@ -1,6 +1,6 @@
 import type { AppState, FeedArticle } from './types'
 
-export const suggestedNewsTopics = ['ИТ', 'Спорт', 'Политика', 'Наука', 'Культура', 'Бизнес']
+export const suggestedNewsTopics = ['ИТ', 'ИИ', 'Спорт', 'Политика', 'Наука', 'Культура', 'Бизнес']
 
 export function newsTopics(state: AppState): string[] {
   return [...new Set(state.newsPreferences?.topics ?? state.feedSources?.map(source => source.topic).filter((topic): topic is string => Boolean(topic)) ?? [])]

@@ -95,7 +95,7 @@ describe('обновление сохранённого экрана новос�
     expect(updated.spaces).toEqual(saved.spaces)
     expect(updated.reminders).toEqual(saved.reminders)
     expect(updated.feedSources).toEqual(defaultNewsSources)
-    expect(updated.newsPreferences?.topics).toEqual(['ИТ', 'Спорт', 'Политика'])
+    expect(updated.newsPreferences?.topics).toEqual(['ИТ', 'ИИ', 'Спорт', 'Политика'])
     expect(updated.newsEditions).toEqual([])
     expect(exampleDay()).toEqual(updated)
   })
@@ -117,12 +117,12 @@ describe('обновление сохранённого экрана новос�
     })
     vi.stubGlobal('fetch', fetcher)
     await act(async () => root.render(<NewsScreen />))
-    expect(fetcher).toHaveBeenCalledTimes(3)
-    expect([...document.querySelectorAll('.news-tabs button')].map(item => item.textContent)).toEqual(['Главное', 'ИТ', 'Спорт', 'Политика'])
-    expect(document.querySelectorAll('.news-tile img')).toHaveLength(6)
-    expect(new Set([...document.querySelectorAll('.news-tile-category')].slice(0, 3).map(item => item.textContent))).toEqual(new Set(['ИТ', 'Спорт', 'Политика']))
+    expect(fetcher).toHaveBeenCalledTimes(defaultNewsSources.length)
+    expect([...document.querySelectorAll('.news-tabs button')].map(item => item.textContent)).toEqual(['Главное', 'ИТ', 'ИИ', 'Спорт', 'Политика'])
+    expect(document.querySelectorAll('.news-tile img')).toHaveLength(defaultNewsSources.length * 2)
+    expect(document.querySelector('.news-tile-category')).toBeNull()
     expect(document.querySelector('.news-preview')?.getAttribute('aria-busy')).toBe('false')
-    expect(exampleDay().newsEditions?.[0].articles).toHaveLength(6)
+    expect(exampleDay().newsEditions?.[0].articles).toHaveLength(defaultNewsSources.length * 2)
     expect(document.body.textContent).not.toContain('Демонстрационный источник')
   })
 })
@@ -138,7 +138,7 @@ describe('чтение и быстрый ввод', () => {
     expect(first.querySelector('.news-tile-media')).toBeNull()
     expect(first.querySelector('.news-tile-excerpt')?.textContent).toBe('Фрагмент 4')
     expect(first.textContent).toContain('Новость 4')
-    expect(first.textContent).toContain('ИТ')
+    expect(first.querySelector('.news-tile-category')).toBeNull()
     await act(async () => (first.querySelector('button') as HTMLElement).click())
     expect(document.querySelector('.news-article-dialog h2')?.textContent).toBe('Новость 4')
   })
@@ -219,5 +219,49 @@ describe('горизонтальная полоса прокрутки', () => {
     expect(viewport.scrollLeft).toBe(1200)
     await pointer('pointerup', 180)
     expect(scrollbar.releasePointerCapture).toHaveBeenCalledWith(1)
+  })
+  it('переводит зарубежные новости про ИИ на русский язык и показывает их в категории ИИ без тегов в карточках', async () => {
+    const translateText = vi.fn(async (text: string) => `[Перевод] ${text}`)
+    const bridgeModule = await import('../src/bridge')
+    const originalBrowser = bridgeModule.bridge.browser
+    bridgeModule.bridge.browser = { ...originalBrowser, translateText } as unknown as typeof originalBrowser
+
+    const aiState: AppState = {
+      version: 2,
+      spaces: [],
+      reminders: [],
+      dismissedUntil: null,
+      feedSources: [
+        { id: 'news-theverge-ai', name: 'The Verge AI', url: 'https://www.theverge.com/rss/ai/index.xml', topic: 'ИИ' },
+      ],
+      newsPreferences: { topics: ['ИИ'] },
+      newsEditions: [],
+    }
+
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => `<rss><channel><item><title>OpenAI launches new reasoning model</title><link>https://example.com/ai/1</link><description>New frontier reasoning capabilities announced.</description><pubDate>Thu, 01 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>`,
+    }))
+    vi.stubGlobal('fetch', fetcher)
+
+    let currentState = aiState
+    function AIScreen() {
+      const [state, setState] = useState(aiState)
+      currentState = state
+      const onChange = (update: (value: AppState) => AppState) => {
+        setState(previous => { const next = update(previous); currentState = next; return next })
+        return true
+      }
+      const news = useNews(state, onChange)
+      return <NewsWidget state={state} onSettings={vi.fn()} onChange={onChange} onAssistant={vi.fn()} onOpen={vi.fn()} onRefresh={news.refresh} refreshing={news.refreshing} />
+    }
+
+    await act(async () => root.render(<AIScreen />))
+    expect(translateText).toHaveBeenCalledWith('OpenAI launches new reasoning model', 'ru')
+    expect(currentState.newsEditions?.[0].articles[0].title).toBe('[Перевод] OpenAI launches new reasoning model')
+    expect(document.querySelector('.news-tile-title')?.textContent).toBe('[Перевод] OpenAI launches new reasoning model')
+    expect(document.querySelector('.news-tile-category')).toBeNull()
+
+    bridgeModule.bridge.browser = originalBrowser
   })
 })

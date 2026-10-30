@@ -20,34 +20,35 @@
 .browser-menu.action-menu-popover > button { min-height: 38px; gap: 10px; padding: 9px 12px; font-size: var(--text-ui); border-radius: var(--radius-md); }
 .browser-menu.action-menu-popover > button > span { overflow-wrap: anywhere; }
 .browser-menu.action-menu-popover svg { width: 18px; height: 18px; flex: none; }
-.browsing .browser-workstage { --browser-surface: #f9fcf6; background: transparent; backdrop-filter: none; }
-.browsing .browser-workstage .browser-tab-strip { height: 46px; align-items: flex-end; padding: 0 12px; gap: 6px; background: var(--glass); border: 0; z-index: 35; }
+.browsing .browser-workstage { --browser-surface: #ffffff; background: transparent; backdrop-filter: none; }
+.browsing .browser-workstage .browser-tab-strip { height: 36px; align-items: flex-end; padding: 0 10px; gap: 6px; background: rgba(228, 237, 230, .85); border: 0; backdrop-filter: blur(20px); z-index: 35; }
 .browser-workstage .tab-strip-scroll { display: flex; align-items: flex-end; flex: 1; min-width: 0; height: 100%; overflow-x: auto; scrollbar-width: none; }
-.browser-workstage .horizontal-tabs { flex: 0 0 auto; align-items: flex-end; overflow: visible; gap: 8px; padding: 6px 8px 0; scroll-behavior: auto; }
-.browser-workstage .horizontal-tab { position: relative; flex: 0 0 var(--browser-tab-width,210px); min-width: 64px; height: 38px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: transparent; container: browser-tab / inline-size; touch-action: none; user-select: none; }
-.browser-workstage .horizontal-tab.active { z-index: 2; background: var(--browser-surface); box-shadow: none; }
-.browser-workstage .horizontal-tab.active > [role=tab]::before, .browser-workstage .horizontal-tab.active > [role=tab]::after { content: ''; position: absolute; bottom: 0; width: 16px; height: 16px; background: var(--browser-surface); pointer-events: none; }
-.browser-workstage .horizontal-tab.active > [role=tab]::before { left: -16px; mask-image: radial-gradient(circle at 0 0, transparent 16px, #000 16.5px); }
-.browser-workstage .horizontal-tab.active > [role=tab]::after { right: -16px; mask-image: radial-gradient(circle at 100% 0, transparent 16px, #000 16.5px); }
-.browser-workstage .horizontal-tab:hover:not(.active) { background: rgba(255,255,255,.36); }
-.browser-workstage .horizontal-tab.split-active { outline: 0; background: rgba(219,234,219,.8); }
-.browser-workstage .horizontal-tab > [role=tab] { min-height: 38px; padding: 8px 6px 8px 12px; gap: 8px; font-size: var(--text-ui); }
-.browser-workstage .horizontal-tab > [role=tab] > span:not(.site-mark) { flex: 1; }
-.browser-workstage .horizontal-tab-close { width: 30px; height: 34px; border-radius: var(--radius-full); opacity: 1; color: var(--muted); }
+.browser-workstage .horizontal-tabs { flex: 0 0 auto; align-items: flex-end; overflow: visible; gap: 8px; padding: 2px 6px 0; scroll-behavior: auto; }
+.browser-workstage .horizontal-tab { position: relative; flex: 0 0 var(--browser-tab-width,192px); min-width: 64px; height: 34px; border-radius: var(--radius-md) var(--radius-md) 0 0; background: rgba(255,255,255,.32); container: browser-tab / inline-size; touch-action: none; user-select: none; }
+.browser-workstage .horizontal-tab.active { z-index: 2; background: var(--browser-surface); box-shadow: 0 -1px 3px rgba(24,40,30,.05), 0 2px 6px rgba(24,40,30,.04); }
+.browser-workstage .horizontal-tab.active > [role=tab]::before, .browser-workstage .horizontal-tab.active > [role=tab]::after { content: ''; position: absolute; bottom: 0; width: 12px; height: 12px; background: var(--browser-surface); pointer-events: none; }
+.browser-workstage .horizontal-tab.active > [role=tab]::before { left: -12px; mask-image: radial-gradient(circle at 0 0, transparent 12px, #000 12.5px); }
+.browser-workstage .horizontal-tab.active > [role=tab]::after { right: -12px; mask-image: radial-gradient(circle at 100% 0, transparent 12px, #000 12.5px); }
+.browser-workstage .horizontal-tab:hover:not(.active) { background: rgba(255,255,255,.75); }
+.browser-workstage .horizontal-tab.split-active { outline: 0; background: rgba(219,234,219,.9); }
+.browser-workstage .horizontal-tab > [role=tab] { min-height: 34px; height: 34px; padding: 0 6px 0 10px; gap: 7px; font-size: var(--fs-tab); color: var(--ink-2); line-height: 1.3; }
+.browser-workstage .horizontal-tab.active > [role=tab] { color: var(--ink-1); font-weight: 500; }
+.browser-workstage .horizontal-tab:hover:not(.active) > [role=tab] { color: var(--ink-1); }
+.browser-workstage .horizontal-tab-close { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-full); opacity: 1; color: var(--muted); }
 .browser-workstage .horizontal-tab-close:hover { background: rgba(63,94,72,.08); color: var(--ink); }
 /* Calm strip: only the active tab keeps its close button; others reveal it on hover/focus, so titles get the room. */
-.browser-workstage .horizontal-tab:not(.active) .horizontal-tab-close { position: absolute; top: 50%; right: 4px; width: 28px; height: 28px; transform: translateY(-50%); background: rgba(249,252,246,.94); opacity: 0; pointer-events: none; transition: opacity var(--motion-hover) var(--ease-calm); }
+.browser-workstage .horizontal-tab:not(.active) .horizontal-tab-close { position: absolute; top: 50%; right: 4px; width: 24px; height: 24px; transform: translateY(-50%); background: rgba(255,255,255,.94); opacity: 0; pointer-events: none; transition: opacity var(--motion-hover) var(--ease-calm); }
 .browser-workstage .horizontal-tab:not(.active):is(:hover, :focus-within) .horizontal-tab-close { opacity: 1; pointer-events: auto; }
-.browser-workstage .horizontal-tab:not(.active) > [role=tab] { padding-right: 10px; }
-/* Pinned tabs: icon only, fixed 48px; the pin itself is implied by the compact shape. */
-.browser-workstage .horizontal-tab.is-pinned { flex: 0 0 48px; min-width: 48px; }
-.browser-workstage .horizontal-tab.is-pinned > [role=tab] { justify-content: center; padding: 8px 0; gap: 0; }
+.browser-workstage .horizontal-tab:not(.active) > [role=tab] { padding-right: 8px; }
+/* Pinned tabs: icon only, fixed 44px; the pin itself is implied by the compact shape. */
+.browser-workstage .horizontal-tab.is-pinned { flex: 0 0 44px; min-width: 44px; }
+.browser-workstage .horizontal-tab.is-pinned > [role=tab] { justify-content: center; padding: 0; gap: 0; }
 .browser-workstage .horizontal-tab.is-pinned > [role=tab] > span:not(.site-mark),
 .browser-workstage .horizontal-tab.is-pinned > [role=tab] > svg[aria-label="Закреплено"],
 .browser-workstage .horizontal-tab.is-pinned .horizontal-tab-close { display: none; }
-.site-mark.tab-site-mark { flex: none; width: 20px; height: 20px; border-radius: var(--radius-sm); font-size: var(--fs-glyph); }
+.site-mark.tab-site-mark { flex: none; width: 18px; height: 18px; border-radius: var(--radius-sm); font-size: var(--fs-glyph); }
 .browser-workstage .horizontal-tab.is-dragging { opacity: .35; z-index: 4; pointer-events: none; }
-.tab-drag-preview { position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px; height: 38px; padding: 8px 10px 8px 12px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: #f9fcf6; box-shadow: 0 5px 18px #23482b26; color: var(--ink); font-size: var(--text-ui); pointer-events: none; }
+.tab-drag-preview { position: fixed; z-index: 1000; display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border-radius: var(--radius-md) var(--radius-md) 0 0; background: #f9fcf6; box-shadow: 0 5px 18px #23482b26; color: var(--ink); font-size: var(--fs-tab); pointer-events: none; }
 .tab-drag-preview > svg, .tab-drag-preview > img { flex: none; }
 .tab-drag-preview > span:not(.site-mark) { min-width: 0; flex: 1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .tab-drag-preview.compact { gap: 6px; padding-left: 6px; padding-right: 6px; }
@@ -58,14 +59,14 @@
 @container browser-tab (max-width:86px) {
   .horizontal-tab > [role=tab] { padding-left: 6px; padding-right: 4px; gap: 0; }
   .horizontal-tab > [role=tab] > span:not(.site-mark) { display: none; }
-  .horizontal-tab .horizontal-tab-close { width: 28px; }
+  .horizontal-tab .horizontal-tab-close { width: 24px; }
 }
-.tab-favicon { width: 18px; height: 18px; object-fit: contain; flex: none; }
-.browser-workstage .strip-new-tab, .browser-workstage .strip-overview, .browser-workstage .browser-menu > .task-more { display: grid; place-items: center; flex: none; width: 36px; height: 38px; padding: 8px; border-radius: var(--radius-full); background: transparent; }
+.tab-favicon { width: 16px; height: 16px; object-fit: contain; flex: none; }
+.browser-workstage .strip-new-tab, .browser-workstage .strip-overview, .browser-workstage .browser-menu > .task-more { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 4px; border-radius: var(--radius-full); background: transparent; }
 .browser-workstage .strip-new-tab:hover, .browser-workstage .strip-overview:hover, .browser-workstage .browser-menu > .task-more:hover { background: rgba(255,255,255,.36); }
-.browser-workstage .strip-new-tab > svg, .browser-workstage .strip-overview > svg { width: 18px; height: 18px; }
-.browser-workstage .strip-new-tab, .browser-workstage .strip-new-tab:hover { position: sticky; right: 0; z-index: 3; margin: 0 6px 3px; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
-.browser-workstage .browser-tab-strip > .browser-menu { margin-bottom: 3px; }
+.browser-workstage .strip-new-tab > svg, .browser-workstage .strip-overview > svg { width: 16px; height: 16px; }
+.browser-workstage .strip-new-tab, .browser-workstage .strip-new-tab:hover { position: sticky; right: 0; z-index: 3; margin: 0 4px 2px; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
+.browser-workstage .browser-tab-strip > .browser-menu { margin-bottom: 2px; }
 .browser-workstage .context-picker { width: auto; max-width: 180px; min-width: 0; flex: none; padding: 0; }
 .browser-workstage .context-picker .menu-trigger { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 7px 12px; border-radius: var(--radius-xl); font-size: var(--fs-meta); background: rgba(255,255,255,.57); }
 .browser-workstage .context-picker .menu-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

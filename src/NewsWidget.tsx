@@ -4,10 +4,10 @@ import type { AppState, AIContext, FeedArticle, NewsEdition, Resource, WidgetCon
 import { Dialog } from './Dialog'
 import { NewsSetup } from './NewsSetup'
 import { HorizontalRail } from './HorizontalRail'
-import { articleTopic, newsExcerpt, newsForTopic, newsRailArticles, newsTimeLabel, newsTopics } from './newsModel'
+import { newsExcerpt, newsForTopic, newsRailArticles, newsTimeLabel, newsTopics } from './newsModel'
 import './digest.css'
 
-function NewsTile({ article, category, onOpen }: { article: FeedArticle; category: string; onOpen: () => void }) {
+function NewsTile({ article, onOpen }: { article: FeedArticle; onOpen: () => void }) {
   const [failedImage, setFailedImage] = useState<string>()
   const hasImage = Boolean(article.image && article.image !== failedImage)
   return <article className="news-tile" data-rail-item role="listitem">
@@ -15,7 +15,6 @@ function NewsTile({ article, category, onOpen }: { article: FeedArticle; categor
       {hasImage && <span className="news-tile-media" aria-hidden="true"><img src={article.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(article.image)} /></span>}
       <strong className="news-tile-title">{article.title.replace(/^Пример:\s*/, '')}</strong>
       {!hasImage && newsExcerpt(article) && <span className="news-tile-excerpt">{newsExcerpt(article)}</span>}
-      <span className="news-tile-category">{category}{article.source === 'Демонстрационный источник' && category !== 'Пример' ? ' · Пример' : ''}</span>
     </button>
   </article>
 }
@@ -61,7 +60,7 @@ export function NewsWidget({ state, onOpen, onChange, onAssistant, onRefresh, re
       <button className="calm-icon news-settings-button" title="Темы и источники" aria-label="Настроить темы и источники" onClick={() => setSettings(true)}><Settings2 size={19} /></button>
     </div>
     <div className="news-preview" role="tabpanel" aria-busy={refreshing} id={`${id}-panel`} aria-labelledby={`${id}-tab-${tabs.findIndex(tab => tab.value === active)}`}>
-      {articles.length ? <HorizontalRail label="Новости" itemCount={articles.length} resetKey={active}>{articles.map(article => <NewsTile key={article.id} article={article} category={articleTopic(article, state) || (article.source === 'Демонстрационный источник' ? 'Пример' : 'Новости')} onOpen={() => openArticle(article)} />)}</HorizontalRail> : refreshing ? <div className="news-loading" role="status" aria-label="Загружаем новости">{Array.from({ length: 4 }, (_, index) => <div className="news-skeleton" key={index} aria-hidden="true"><span className="news-tile-media" /><span className="news-skeleton-title"><span /><span /><span /></span><span className="news-skeleton-category" /></div>)}</div> : <div className="news-empty"><Newspaper size={26} strokeWidth={1.5} aria-hidden="true" /><div><p>{!state.feedSources?.length && !edition ? 'Новости по вашим интересам' : active !== 'all' ? 'В этой теме пока нет новостей' : 'Не удалось загрузить новости'}</p><button className="calm-text-button" onClick={state.feedSources?.length && active === 'all' && onRefresh ? onRefresh : () => setSettings(true)}>{state.feedSources?.length && active === 'all' && onRefresh ? 'Обновить' : state.feedSources?.length || edition ? 'Темы и источники' : 'Выбрать темы'}<ChevronRight size={17} /></button></div></div>}
+      {articles.length ? <HorizontalRail label="Новости" itemCount={articles.length} resetKey={active}>{articles.map(article => <NewsTile key={article.id} article={article} onOpen={() => openArticle(article)} />)}</HorizontalRail> : refreshing ? <div className="news-loading" role="status" aria-label="Загружаем новости">{Array.from({ length: 4 }, (_, index) => <div className="news-skeleton" key={index} aria-hidden="true"><span className="news-tile-media" /><span className="news-skeleton-title"><span /><span /><span /></span></div>)}</div> : <div className="news-empty"><Newspaper size={26} strokeWidth={1.5} aria-hidden="true" /><div><p>{!state.feedSources?.length && !edition ? 'Новости по вашим интересам' : active !== 'all' ? 'В этой теме пока нет новостей' : 'Не удалось загрузить новости'}</p><button className="calm-text-button" onClick={state.feedSources?.length && active === 'all' && onRefresh ? onRefresh : () => setSettings(true)}>{state.feedSources?.length && active === 'all' && onRefresh ? 'Обновить' : state.feedSources?.length || edition ? 'Темы и источники' : 'Выбрать темы'}<ChevronRight size={17} /></button></div></div>}
     </div>
     {settings && <Dialog title="Темы и источники" className="news-settings-dialog" onClose={() => setSettings(false)}>{edition && <button className="calm-text-button news-more" onClick={() => { setOpened(structuredClone(edition)); setSettings(false) }}>Все новости<ChevronRight size={17} /></button>}<NewsSetup state={state} onChange={onChange} onRefresh={onRefresh} refreshing={refreshing} /></Dialog>}
     {opened && !selected && <Dialog title="Дайджест" className="news-edition-dialog" onClose={() => setOpened(null)}><div className="news-edition-list">{newsForTopic(opened.articles, active, state).map(article => row(article, true))}</div>{!newsForTopic(opened.articles, active, state).length && <p>В этой теме пока нет новостей.</p>}<div className="calm-dialog-actions"><button className="calm-primary" disabled={!newsForTopic(opened.articles, active, state).length} onClick={() => { onAssistant('Сделай короткий дайджест этих материалов со ссылками на источники. Переданы только заголовки и фрагменты.', newsForTopic(opened.articles, active, state).slice(0, 20).map(article => ({ id: article.id, title: article.title, url: article.url, text: article.summary }))); setOpened(null) }}><Sparkles size={18} />Сжать с ИИ</button></div></Dialog>}

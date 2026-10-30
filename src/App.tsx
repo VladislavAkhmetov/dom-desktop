@@ -2123,6 +2123,8 @@ function App() {
                   onOpenTabs={() => openWorkstage(currentSpace.id)}
                   onOpenFile={resource => { void openResource(resource) }}
                   onSaveStep={isDayDraft(currentSpace) ? undefined : step => { void commit(previous => saveCheckpoint(previous, currentSpace.id, { contextId: currentContext(currentSpace).id, nextStep: step })) }}
+                  onSaveNote={isDayDraft(currentSpace) ? undefined : note => { void commit(previous => saveCheckpoint(previous, currentSpace.id, { contextId: currentContext(currentSpace).id, note })) }}
+                  onFocus={() => openFocus(currentSpace.id)}
                   dayNote={isDayDraft(currentSpace) ? (isPastDay(currentSpace) ? 'Прошлый день' : dayLabel(currentSpace.day!)) : undefined}
                   dayHint={isDayDraft(currentSpace) ? (isPastDay(currentSpace) ? 'Хранится 14 дней' : 'Вкладки без пространства · утром — с чистого листа') : undefined}
                   primaryLabel={isDayDraft(currentSpace) && !isPastDay(currentSpace) ? 'Открыть браузер' : 'Открыть вкладки'}

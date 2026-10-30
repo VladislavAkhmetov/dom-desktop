@@ -189,7 +189,25 @@ const browserBridge: DomBridge = {
       return { enabled: true, siteDisabled: false, blockedCount: 0, blockCookies: true, isDark: false }
     },
     async getReaderContent() { return null },
-    async translateText(text) { return text },
+    async translateText(text, targetLang = 'ru') {
+      if (!text || typeof text !== 'string') return ''
+      const trimmed = text.trim()
+      if (!trimmed) return ''
+      try {
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed.slice(0, 450))}&langpair=autodetect|${targetLang}`
+        const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
+        const json = await res.json()
+        if (json.responseData?.translatedText) {
+          return json.responseData.translatedText
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;|&apos;/g, "'")
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+        }
+      } catch { /* Fallback to trimmed */ }
+      return trimmed
+    },
     async translateTab() { return { ok: true, count: 0 } },
     async autofill() { return true }
   },

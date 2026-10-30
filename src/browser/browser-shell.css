@@ -1,5 +1,5 @@
 /* Browser chrome uses the same surfaces and typography as the dashboard. */
-.browsing .browser-topbar { height: auto; min-height: 68px; padding: 0; border-bottom: 0; background: var(--glass); backdrop-filter: blur(28px) saturate(1.2); color: var(--ink); z-index: 45; }
+.browsing .browser-topbar { height: auto; min-height: 68px; padding: 0; border-bottom: 1px solid var(--line-soft); background: var(--glass); backdrop-filter: blur(28px) saturate(1.2); color: var(--ink); z-index: 45; }
 .browser-topbar-main { display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 10px 20px; }
 .desktop:not(.platform-mac) .browser-topbar-main { padding-right: 150px; }
 .browser-topbar .browser-home { display: flex; align-items: center; flex: none; gap: 9px; width: auto; font-size: 21px; }
@@ -138,9 +138,9 @@
 .browser-main-menu { flex: none; }
 .browser-main-menu > .task-more { width: 34px; height: 38px; display: grid; place-items: center; border-radius: var(--radius-md); }
 .browser-main-menu > .task-more:hover { background: rgba(255,255,255,.6); }
-.browser-tabs-overview { display: flex; align-items: center; gap: 7px; min-height: 37px; padding: 7px 10px; margin-bottom: 3px; border-radius: var(--radius-md); color: var(--muted); font-size: var(--fs-meta); flex: none; }
+.browser-tabs-overview { display: flex; align-items: center; gap: 6px; min-height: 28px; height: 28px; padding: 3px 8px; margin-bottom: 2px; border-radius: var(--radius-md); color: var(--muted); font-size: var(--fs-tab); flex: none; }
 .browser-tabs-overview:hover { background: rgba(255,255,255,.5); }
-.browser-tabs-overview small { font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
+.browser-tabs-overview small { font-size: var(--fs-tab); font-variant-numeric: tabular-nums; }
 .browser-stage-body { display: flex; flex: 1; width: 100%; min-height: 0; min-width: 0; }
 .browsing .compact-stage .browser-stage-body > .workstage-canvas { width: 0; flex: 1; min-width: 0; }
 .browser-day-panel { display: flex; flex-direction: column; flex: 0 0 340px; width: 340px; min-height: 0; min-width: 0; color: var(--ink); background: var(--glass); backdrop-filter: blur(28px) saturate(1.1); border-left: 1px solid rgba(129,155,137,.25); }

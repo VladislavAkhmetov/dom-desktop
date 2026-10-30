@@ -76,7 +76,7 @@ async function run() {
   assert.equal(first.bounds.y + first.bounds.height, window.getContentBounds().height, 'Страница доходит до нижнего края окна')
   assert.equal(await renderer(() => getComputedStyle(document.querySelector('.strip-new-tab')).backgroundColor), 'rgba(0, 0, 0, 0)', 'У плюса нет круглой подложки')
   await waitFor(() => renderer(() => document.querySelector('.horizontal-tab').getBoundingClientRect().width <= 65), 'Вкладки сужаются до компактного размера')
-  assert.equal(await window.webContents.executeJavaScript('getComputedStyle(document.querySelector("[role=tab]")).fontSize'), '14px')
+  assert.equal(await window.webContents.executeJavaScript('getComputedStyle(document.querySelector("[role=tab]")).fontSize'), '13px')
   assert.equal(manager.tabs.size, 1, 'Не загрузились остальные 299 страниц')
   await first.view.webContents.executeJavaScript('document.querySelector("#draft").value="Сохранённый при переключении текст"; document.querySelector("#draft").dispatchEvent(new Event("input",{bubbles:true}))')
   await waitFor(() => first.protected, 'защита формы')

@@ -76,6 +76,7 @@
 
   /* ── type floor (AGENTS.md: no readable text below 14px) ── */
   --fs-meta: 14px;                        /* smallest readable text: meta, captions, badges with words, shortcuts */
+  --fs-tab: 13px;                         /* compact tab bar labels */
   --fs-glyph: 13px;                       /* letters inside icon-like marks only: file badges, site/app marks, avatar */
 
   /* ── sizes ── */
