@@ -1,8 +1,10 @@
-const { WebContentsView, dialog, session, app } = require('electron')
+const { WebContentsView, dialog, session, app, Menu, clipboard } = require('electron')
 const path = require('node:path')
+const crypto = require('node:crypto')
 const { AdblockManager } = require('./adblock.cjs')
 const { parseReaderContent, applyDarkMode } = require('./reader.cjs')
 const { translateText } = require('./translate.cjs')
+const { pageMenuTemplate } = require('./page-menu.cjs')
 
 // Executables and scripts that Windows runs on double-click. dombro has no download malware scanning
 // (Electron ships without Safe Browsing), so these get one explicit question before saving.
@@ -12,7 +14,7 @@ function permissionKey(contents, permission) {
   try { const origin = new URL(contents.getURL()).origin; return origin && origin !== 'null' ? `${origin}|${permission}` : '' } catch { return '' }
 }
 
-const { idleTabs } = require('./tab-memory.cjs')
+const { idleTabs, discardDelay } = require('./tab-memory.cjs')
 
 function validURL(value) { try { return ['https:', 'http:'].includes(new URL(value).protocol) } catch { return false } }
 // Tab covers live only in renderer memory (≤40). JPEG keeps a 1000px frame several times smaller than PNG.
@@ -22,8 +24,10 @@ function coverImage(frame) {
 }
 
 class BrowserManager {
-  constructor(window, partitionName = 'persist:dom-browser') {
+  // options.getIdleMinutes(): the user's «Выгрузка неактивных вкладок» setting (see tab-memory.cjs → discardDelay).
+  constructor(window, partitionName = 'persist:dom-browser', options = {}) {
     this.window = window
+    this.getIdleMinutes = typeof options.getIdleMinutes === 'function' ? options.getIdleMinutes : () => undefined
     this.tabs = new Map()
     this.blocked = false
     this.partition = partitionName
@@ -31,6 +35,8 @@ class BrowserManager {
     this.permissions = new Map()
     try { for (const [key, value] of Object.entries(JSON.parse(require('node:fs').readFileSync(this.permissionsFile, 'utf8')))) if (typeof value === 'boolean' && key.includes('|')) this.permissions.set(key, value) } catch { /* no saved decisions yet */ }
     this.pendingPermissions = new Map()
+    // «Заглянуть»: ids of temporary pages that have not been kept as tabs yet (see glance()).
+    this.glanceIds = new Set()
     // Passwords captured from a page stay here until the user answers the save prompt.
     // The interface only gets a token (see takePasswordOffer).
     this.passwordOffers = new Map()
@@ -172,6 +178,11 @@ class BrowserManager {
         return { action: 'deny' }
       })
       contents.on('before-input-event', (event, input) => {
+        if (input.type === 'keyDown' && input.key === 'Escape' && this.glanceIds.has(record.id)) {
+          event.preventDefault()
+          this.send({ type: 'glance-close', tabId: record.id })
+          return
+        }
         if (input.type === 'keyDown' && input.key === 'F11') {
           event.preventDefault()
           this.window.setFullScreen(!this.window.isFullScreen())
@@ -184,6 +195,7 @@ class BrowserManager {
         }
       })
       contents.loadURL(tab.url).catch(() => undefined)
+      contents.on('context-menu', (_event, params) => this.openPageMenu(record, params))
       if (tab.scrollY) contents.once('did-finish-load', () => contents.executeJavaScript(`window.scrollTo(0, ${Number(tab.scrollY) || 0})`).catch(() => undefined))
     } else if (record.url !== tab.url) {
       record.url = tab.url
@@ -196,7 +208,43 @@ class BrowserManager {
     record.view.setBounds(record.bounds)
     record.view.setVisible(!this.blocked)
   }
-  move(id, spaceId) { const record = this.tabs.get(id); if (record && typeof spaceId === 'string') record.spaceId = spaceId }
+  // Moving a page into a space also keeps a «glance» page: it becomes an ordinary tab.
+  move(id, spaceId) { this.glanceIds.delete(id); const record = this.tabs.get(id); if (record && typeof spaceId === 'string') record.spaceId = spaceId }
+  // «Заглянуть»: the renderer shows the page beside the current one without adding a tab.
+  // The page is an ordinary record (same session, preload and ad blocking); only Esc behaves differently.
+  glance(record, url, title) {
+    if (!record || !validURL(url)) return
+    const id = crypto.randomUUID()
+    this.glanceIds.add(id)
+    // Nothing else tracks an id that was never shown, so cap the set.
+    if (this.glanceIds.size > 20) this.glanceIds.delete(this.glanceIds.values().next().value)
+    this.send({ type: 'glance', id, spaceId: record.spaceId, parentTabId: record.id, url, title: typeof title === 'string' ? title.slice(0, 200) : '' })
+  }
+  pageGlance(sender, value) {
+    const record = [...this.tabs.values()].find(item => item.view.webContents.id === sender.id)
+    if (!record || !value || typeof value !== 'object') return
+    this.glance(record, value.url, value.title)
+  }
+  openPageMenu(record, params) {
+    const contents = record.view.webContents
+    if (contents.isDestroyed()) return
+    const history = contents.navigationHistory
+    const template = pageMenuTemplate(params, {
+      glance: (url, title) => this.glance(record, url, title),
+      newTab: (url, background) => this.send({ type: 'new-tab', spaceId: record.spaceId, parentTabId: record.id, url, background }),
+      later: (url, title) => this.send({ type: 'save-later', spaceId: record.spaceId, url, title }),
+      copyText: text => clipboard.writeText(text),
+      copyImage: () => contents.copyImageAt(params.x, params.y),
+      saveImage: url => contents.downloadURL(url),
+      savePage: () => this.send({ type: 'save-page', tabId: record.id }),
+      canGoBack: history.canGoBack(),
+      canGoForward: history.canGoForward(),
+      back: () => history.goBack(),
+      forward: () => history.goForward(),
+      reload: () => contents.reload()
+    })
+    if (template.length) Menu.buildFromTemplate(template).popup({ window: this.window })
+  }
   hide(id) {
     const record = this.tabs.get(id)
     if (!record) return
@@ -209,7 +257,11 @@ class BrowserManager {
   }
   // Memory Saver (tab-memory.cjs). close(id, false) also keeps pages that ask to stay (beforeunload).
   async discardIdle(now = Date.now()) {
-    const idle = idleTabs([...this.tabs.values()].filter(record => !record.view.webContents.isDestroyed()), now)
+    let minutes
+    try { minutes = await this.getIdleMinutes() } catch { /* no saved setting: the default applies */ }
+    const after = discardDelay(minutes)
+    if (!after) return 0 // «Никогда»: neither the timer nor the cap on hidden live tabs
+    const idle = idleTabs([...this.tabs.values()].filter(record => !record.view.webContents.isDestroyed()), now, { after })
     for (const record of idle) await this.close(record.id, false)
     return idle.length
   }
@@ -260,6 +312,7 @@ class BrowserManager {
     }
     this.window.contentView.removeChildView(record.view)
     this.tabs.delete(id)
+    this.glanceIds.delete(id)
     for (const [key, offer] of this.passwordOffers) if (offer.tabId === id) this.passwordOffers.delete(key)
     return true
   }
@@ -330,11 +383,13 @@ class BrowserManager {
     record.protected = Boolean(record.dirty || record.playing)
     if (signal.readerable !== undefined) record.readerable = Boolean(signal.readerable)
     if (signal.lang !== undefined) record.lang = String(signal.lang)
+    if (signal.hasVideo !== undefined) record.hasVideo = Boolean(signal.hasVideo)
     this.metadata(record, {
       protected: record.protected,
       scrollY: Math.max(0, Number(signal.scrollY) || 0),
       readerable: record.readerable,
-      lang: record.lang
+      lang: record.lang,
+      hasVideo: record.hasVideo
     })
   }
   pagePasswordSubmit(sender, data) {
@@ -390,6 +445,23 @@ class BrowserManager {
     if (!cred) return false
     record.view.webContents.send('page:autofill', { username: cred.username || '', password: cred.password || '' })
     return true
+  }
+  // Picture-in-picture for the page's video: the one that plays, otherwise the largest. Needs a user gesture,
+  // so it only runs from the button (the interface calls it on a click). A second call closes the window.
+  async pictureInPicture(tabId) {
+    const record = this.tabs.get(tabId)
+    if (!record || record.view.webContents.isDestroyed()) return { ok: false }
+    try {
+      const state = await record.view.webContents.executeJavaScript(`(async () => {
+        if (document.pictureInPictureElement) { await document.exitPictureInPicture(); return 'closed' }
+        const videos = [...document.querySelectorAll('video')].filter(item => !item.disablePictureInPicture && item.readyState >= 1 && item.videoWidth > 0)
+        videos.sort((a, b) => (Number(!b.paused) - Number(!a.paused)) || (b.videoWidth * b.videoHeight - a.videoWidth * a.videoHeight))
+        if (!videos[0]) return 'none'
+        await videos[0].requestPictureInPicture()
+        return 'opened'
+      })()`, true)
+      return { ok: state !== 'none', state }
+    } catch { return { ok: false } }
   }
   async applyDarkMode(tabId, enabled) {
     const record = this.tabs.get(tabId)

@@ -13,4 +13,11 @@ function idleTabs(records, now = Date.now(), { after = DISCARD_AFTER_MS, keep = 
   return hidden.filter((record, index) => index < excess || now - record.hiddenAt >= after)
 }
 
-module.exports = { DISCARD_AFTER_MS, MAX_HIDDEN_LIVE, idleTabs }
+// The «Выгрузка неактивных вкладок» setting (AppState.tabParkingTimeoutMinutes): minutes, 0 = never.
+// Anything unusable (not saved yet, a bad value) falls back to the default of 30 minutes.
+function discardDelay(minutes) {
+  if (minutes === 0) return 0
+  return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : DISCARD_AFTER_MS
+}
+
+module.exports = { DISCARD_AFTER_MS, MAX_HIDDEN_LIVE, idleTabs, discardDelay }

@@ -6,6 +6,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { createStorage } = require('./storage.cjs')
 const { BrowserManager } = require('./browser.cjs')
+const { addressFromArgv, createLinkQueue, webAddress } = require('./external-link.cjs')
 const { bitwardenExtensionStatus } = require('./bitwarden-extension.cjs')
 const { Vault } = require('./vault.cjs')
 const { Gmail } = require('./gmail.cjs')
@@ -49,6 +50,14 @@ let quitting = false
 let storage
 let checkingReminders = false
 let browser
+// Addresses from outside (command line, second launch, macOS open-url) reach the interface through this queue.
+const externalLinks = createLinkQueue(address => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app:open-url', address) })
+function openExternalAddress(value) {
+  const address = webAddress(value)
+  if (!address) return
+  externalLinks.push(address)
+  if (mainWindow && !mainWindow.isDestroyed()) { if (mainWindow.isMinimized()) mainWindow.restore(); showWindow() }
+}
 let captureWindow
 let vault, gmail, ai
 let approved
@@ -442,7 +451,7 @@ function createWindow() {
     }
   })
 
-  browser = new BrowserManager(mainWindow, isCabinetPilot ? 'persist:dom-cabinet-browser' : 'persist:dom-browser')
+  browser = new BrowserManager(mainWindow, isCabinetPilot ? 'persist:dom-cabinet-browser' : 'persist:dom-browser', { getIdleMinutes: async () => (await storage.get()).tabParkingTimeoutMinutes })
   mainWindow.on('close', event => {
     if (!quitting) {
       event.preventDefault()
@@ -457,6 +466,7 @@ function createWindow() {
     if (!trustedURL(url)) { event.preventDefault(); if (/^https?:\/\//i.test(url)) shell.openExternal(url) }
   })
   mainWindow.webContents.on('did-fail-load', (_event, code, description) => console.error('UI load failed:', code, description))
+  mainWindow.webContents.on('did-start-loading', () => externalLinks.reset())
   if (isDev) mainWindow.loadURL(isCabinetPilot ? `${DEV_URL}?cabinet=1` : DEV_URL)
   else mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), isCabinetPilot ? { search: 'cabinet=1' } : undefined)
 }
@@ -713,8 +723,11 @@ trustedHandle('browser:suggest', async (_event, query) => {
     return []
   }
 })
+ipcMain.on('app:open-url-ready', event => { if (event.sender === mainWindow?.webContents) externalLinks.ready() })
 ipcMain.on('page:signal', (event, value) => browser?.pageSignal(event.sender, value))
+ipcMain.on('page:glance', (event, value) => browser?.pageGlance(event.sender, value))
 ipcMain.on('page:password-submit', (event, data) => browser?.pagePasswordSubmit(event.sender, data))
+trustedHandle('browser:pip', (_event, tabId) => browser.pictureInPicture(tabId))
 trustedHandle('browser:autofill', async (_event, tabId, id) => browser?.autofill(tabId, url => vault.credentialFor(String(id), url)))
 trustedHandle('bitwarden:status', () => bitwardenExtensionStatus())
 
@@ -730,12 +743,15 @@ const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const address = addressFromArgv(argv)
+    if (address) { openExternalAddress(address); return }
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       showWindow()
     }
   })
+  app.on('open-url', (event, url) => { event.preventDefault(); openExternalAddress(url) })
 
   app.whenReady().then(async () => {
     if (components && typeof components.whenReady === 'function') {
@@ -760,6 +776,7 @@ if (!gotTheLock) {
     approved.adopt(await storage.get())
     await createIntegrations()
     createWindow()
+    externalLinks.push(addressFromArgv(process.argv)) // `dombro.exe https://…` at the first launch
     createTray()
     if (!isSmoke) {
       updates = initUpdates({ window: mainWindow, autoUpdater, fetchText: fetchLimited, currentVersion: app.getVersion() })

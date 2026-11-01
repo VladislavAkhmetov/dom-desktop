@@ -510,6 +510,24 @@ export function Settings({
 
                     <div className="setting-row">
                       <span>
+                        <strong>{currentLocale === 'en' ? 'Shelve old tabs of spaces' : 'Убирать давние вкладки пространств'}</strong>
+                        <small>{currentLocale === 'en' ? 'Tabs not opened for a while move to «Отложено» in the space; nothing is lost' : 'Вкладки, которые долго не открывали, уходят в «Отложено» внутри пространства. Закреплённые и с активной работой остаются'}</small>
+                      </span>
+                      <select
+                        aria-label="Убирать давние вкладки пространств"
+                        value={state.shelveAfterDays ?? 14}
+                        onChange={e => onChange(prev => ({ ...prev, shelveAfterDays: Number(e.target.value) }))}
+                        style={{ minWidth: 160, minHeight: 38, padding: '0 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--line-strong)', background: 'var(--surface-field)', color: 'var(--ink-1)', fontSize: 'var(--fs-meta)' }}
+                      >
+                        <option value={7}>Через 7 дней</option>
+                        <option value={14}>Через 14 дней (рекомендуется)</option>
+                        <option value={30}>Через 30 дней</option>
+                        <option value={0}>Никогда</option>
+                      </select>
+                    </div>
+
+                    <div className="setting-row">
+                      <span>
                         <strong>{currentLocale === 'en' ? 'Free memory immediately' : 'Освободить память сейчас'}</strong>
                         <small>{currentLocale === 'en' ? 'Unloads all eligible background tabs to free RAM' : 'Выгружает фоновые страницы и сохраняет zero-flicker обложки'}</small>
                       </span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookmarkPlus, Check, Globe2,
   FileText, Plus, RotateCw, X
@@ -19,6 +19,8 @@ export interface BrowserPaneProps {
   /** Cabinet mode: the bookmarks space («Избранное», kind 'web') shown on the new tab, outside any space. */
   favorites?: Space
   onCloseSplit?: () => void
+  /** Extra buttons in the label bar of a pane beside the page (the «Заглянуть» actions). */
+  labelActions?: ReactNode
   onUpdateTab?: (tabId: string, updates: Partial<BrowserTab>) => void
   onSaveTab: (tab: BrowserTab) => void
   onOpenExternal: (tab: BrowserTab) => void

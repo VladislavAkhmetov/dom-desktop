@@ -58,7 +58,8 @@ contextBridge.exposeInMainWorld('dom', {
     getReaderContent: tabId => ipcRenderer.invoke('browser:reader:content', tabId),
     translateText: (text, targetLang) => ipcRenderer.invoke('browser:translate:text', text, targetLang),
     translateTab: tabId => ipcRenderer.invoke('browser:translate:tab', tabId),
-    autofill: (tabId, credentialId) => ipcRenderer.invoke('browser:autofill', tabId, credentialId)
+    autofill: (tabId, credentialId) => ipcRenderer.invoke('browser:autofill', tabId, credentialId),
+    pictureInPicture: tabId => ipcRenderer.invoke('browser:pip', tabId)
   },
   bitwardenStatus: () => ipcRenderer.invoke('bitwarden:status'),
   pickResource: kind => ipcRenderer.invoke('resource:pick', kind),
@@ -80,6 +81,14 @@ contextBridge.exposeInMainWorld('dom', {
     const listener = () => callback()
     ipcRenderer.on('focus:capture', listener)
     return () => ipcRenderer.removeListener('focus:capture', listener)
+  },
+  // Addresses opened from outside the app (command line, second launch). Subscribing tells the main process
+  // the interface is ready, which flushes anything that arrived earlier.
+  onOpenUrl: callback => {
+    const listener = (_event, url) => callback(url)
+    ipcRenderer.on('app:open-url', listener)
+    ipcRenderer.send('app:open-url-ready')
+    return () => ipcRenderer.removeListener('app:open-url', listener)
   },
   onVoiceToggle: callback => {
     const listener = () => callback()

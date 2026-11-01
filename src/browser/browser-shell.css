@@ -3,6 +3,7 @@
 .browser-topbar-main { display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 10px 20px; }
 .desktop:not(.platform-mac) .browser-topbar-main { padding-right: 150px; }
 .browser-topbar .browser-home { display: flex; align-items: center; flex: none; gap: 9px; width: auto; font-size: 21px; }
+.browser-topbar .brand-logo { height: 22px; width: auto; display: block; }
 .browser-topbar .brand-mark { width: 32px; height: 32px; border-radius: var(--radius-md); font-size: 25px; }
 .browser-topbar-main > * { min-width: 0; -webkit-app-region: no-drag; }
 .browser-context-menu { flex: 0 1 auto; max-width: 205px; }

@@ -6,7 +6,7 @@ import type { BrowserPaneProps } from './BrowserPane'
 import { NewPage } from './NewPage'
 import { isCabinetPreview } from '../cabinetMode'
 
-export function NativePane({ tab, space, spaces, history, favorites, isSplit, isPaired, coverImage, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onNavigate }: BrowserPaneProps) {
+export function NativePane({ tab, space, spaces, history, favorites, isSplit, isPaired, coverImage, labelActions, onCloseSplit, onOpenExternal, onOpenResource, onAddLink, onNavigate }: BrowserPaneProps) {
   const viewport = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
   const [cover, setCover] = useState(coverImage || '')
@@ -26,7 +26,7 @@ export function NativePane({ tab, space, spaces, history, favorites, isSplit, is
     return () => { observer.disconnect(); window.removeEventListener('resize', show); off(); bridge.browser?.hide(tab.id) }
   }, [tab?.id, tab?.url, tab?.error, space.id, isSplit, isPaired])
   return <section className="native-pane" aria-label={isSplit ? 'Страница рядом' : 'Текущая страница'}>
-    {(isPaired || isSplit) && <div className="split-label"><span>{tab?.title || 'Страница рядом'}</span>{isSplit && <button onClick={onCloseSplit} aria-label="Закрыть просмотр рядом"><X size={18} /></button>}</div>}
+    {(isPaired || isSplit) && <div className="split-label"><span>{tab?.title || 'Страница рядом'}</span>{labelActions}{isSplit && <button onClick={onCloseSplit} aria-label="Закрыть просмотр рядом"><X size={18} /></button>}</div>}
     <div className="native-viewport" ref={viewport} data-workspace-tab-id={tab?.id}>
       {tab?.error ? <div className="browser-handoff"><h2>Не удалось открыть страницу</h2><p>{tab.error}</p><button className="resume-primary" onClick={() => bridge.browser?.action(tab.id, 'reload')}><RotateCw size={16} /> Попробовать снова</button></div>
       : tab?.url ? bridge.browser ? <>{cover && <motion.img layoutId={reduced ? undefined : `tab-cover-${space.id}-${tab.id}`} className="native-cover" src={cover} alt="" />}</> : prototypeUrl ? <iframe className="prototype-page" title={tab.title || 'Страница пространства'} src={prototypeUrl} sandbox="allow-same-origin" /> : <div className="browser-handoff"><Globe2 size={32} /><h2>{tab.title}</h2><button className="resume-primary" onClick={() => onOpenExternal(tab)}>Открыть в браузере <ArrowUpRight size={20} /></button></div>

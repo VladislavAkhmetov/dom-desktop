@@ -2,7 +2,8 @@
 .app-shell.browsing { background-image: var(--app-bg); background-position: center; background-size: cover; }
 .browsing .browser-chrome { height: auto; min-height: 58px; background: var(--glass); border-bottom: 1px solid var(--line-soft); backdrop-filter: blur(28px) saturate(1.25); }
 .browsing .chrome-main { height: 58px; min-height: 58px; gap: 12px; padding-top: 9px; padding-bottom: 9px; }
-.browsing .chrome-main .brand { width: auto; flex: none; gap: 9px; font-size: var(--text-title); }
+.browsing .chrome-main .brand { width: auto; flex: none; gap: 9px; font-size: var(--text-title); display: inline-flex; align-items: center; }
+.browsing .chrome-main .brand-logo { height: 22px; width: auto; display: block; }
 .browsing .chrome-main .brand-mark { width: 32px; height: 32px; font-size: 24px; border-radius: var(--radius-md); }
 .browsing .chrome-button { width: 36px; height: 38px; padding: 8px; border-radius: var(--radius-full); }
 .chrome-actions .chrome-browser, .browsing .chrome-actions .chrome-browser { width: auto; gap: 8px; padding: 0 12px; border-radius: var(--radius-xl); font-size: var(--text-ui); }
@@ -184,6 +185,7 @@
 }
 @media (max-width:520px) {
   .browsing .chrome-main .brand > span:last-child { display: none; }
+  .browsing .chrome-main .brand-logo { height: 18px; }
   .browsing .chrome-actions { gap: 0; }
   .chrome-main .chrome-actions .chrome-browser { width: 36px; padding: 8px; }
   .chrome-main .chrome-actions .chrome-browser > span { display: none; }

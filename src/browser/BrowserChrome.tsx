@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, History, KeyRound, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer, X } from 'lucide-react'
+import { Archive, ArrowLeft, ArrowRight, Bookmark, BookOpen, CalendarDays, Check, ChevronDown, Folder, History, KeyRound, LayoutGrid, Music2, PanelRight, Pause, PencilLine, Pin, PictureInPicture2, RotateCw, Search, Settings2, Sparkles, SquarePlus, Star, Timer, X } from 'lucide-react'
 import type { BrowserTab, CredentialSummary, HistoryItem, PasswordSavePromptInfo, Space, UserProfile } from '../types'
 import { audioManager } from '../player/audioStream'
 import { getUserProfile } from '../userProfile'
@@ -212,7 +212,7 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
       onFocusCapture={event => setFocusedControl(holdsFocus(event.target))}
       onBlurCapture={event => setFocusedControl(holdsFocus(event.relatedTarget))}>
       <div className="browser-context-controls">
-      <button className="brand browser-home" data-workspace-navigation onClick={onHome} aria-label="Вернуться в дашборд" title="Вернуться в дашборд"><span className="brand-mark">✳</span><span>dombro<span className="brand-dot">.</span></span></button>
+      <button className="brand browser-home" data-workspace-navigation onClick={onHome} aria-label="Вернуться в дашборд" title="Вернуться в дашборд"><img src="/logo.png" alt="dombro." className="brand-logo" /></button>
       <ActionMenu className="browser-menu browser-context-menu" label="Выбрать пространство" triggerContent={<><span>{space.kind === 'web' ? 'Браузинг' : space.name}</span><ChevronDown size={14} /></>} actions={[
         ...(space.kind !== 'web' ? [{ id: 'current-space', label: 'Материалы пространства', icon: <Folder size={17} />, onSelect: onSpaceDashboard }] : []),
         // Cabinet mode: free browsing is the «Сегодня» day draft, listed first below; Избранное lives on the new tab.
@@ -265,6 +265,11 @@ export function BrowserChrome({ space, spaces, tab, history = [], attentionIslan
             title={isReaderActive ? 'Выйти из режима чтения' : 'Режим чистого чтения'}
           >
             <BookOpen size={16} />
+          </button>
+        )}
+        {tab?.hasVideo && bridge.browser?.pictureInPicture && (
+          <button type="button" className="browser-pip-toggle" onClick={() => { void bridge.browser!.pictureInPicture!(tab.id) }} aria-label="Картинка в картинке" title="Картинка в картинке">
+            <PictureInPicture2 size={16} />
           </button>
         )}
         <TranslateButton tabId={tab?.id} lang={tab?.lang} onAiSummary={onAssistant} />

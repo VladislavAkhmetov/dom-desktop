@@ -307,6 +307,14 @@ button:active:not(:disabled), .schedule-event-pill:active, .morning-tab-row:acti
   font-weight: 700; 
   letter-spacing: -.055em; 
 }
+.brand-logo {
+  height: 22px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
 .brand-mark { 
   display: grid; 
   place-items: center; 

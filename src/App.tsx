@@ -23,6 +23,8 @@ import { useCalendarSync } from './useCalendarSync'
 import { cachedUfaWeather, fetchUfaWeather, type UfaWeather } from './weather'
 import { AmbientDate, AmbientWeather, WeatherDetails } from './AmbientPreviews'
 import { Workstage } from './browser/Workstage'
+import { glanceTab, isGlanceVisible, keepGlance, type Glance } from './browser/glance'
+import { forgetShelvedTab, shelveAfterDays, shelveStaleTabs, unshelveTab } from './browser/shelf'
 import { BottomDock } from './BottomDock'
 import { SpaceSwitcher } from './SpaceSwitcher'
 import { dayLabel, ensureDayDraft, isDayDraft, isPastDay, pastDays, promoteDayDraft, todayDraft } from './dayDraft'
@@ -155,6 +157,10 @@ function App() {
   const [documentName, setDocumentName] = useState('')
   const [browserDayPinned, setBrowserDayPinned] = useState(false)
   const [savePage, setSavePage] = useState<{ tab: BrowserTab; sourceSpaceId?: string } | null>(null)
+  // «Заглянуть» (src/browser/glance.ts): renderer-only, never written to the state until it is kept.
+  const [glance, setGlance] = useState<Glance | null>(null)
+  const glanceRef = useRef<Glance | null>(null)
+  glanceRef.current = glance
   const [browserFocus, setBrowserFocus] = useState(zenTimer.getState())
   useEffect(() => zenTimer.subscribe(setBrowserFocus), [])
   useEffect(() => { if (route.type !== 'browse' && !browserDayPinned) setBrowserDayOpen(false) }, [route.type, browserDayPinned])
@@ -312,7 +318,24 @@ function App() {
   }, [])
 
   useEffect(() => {
-    return bridge.browser?.onEvent(event => {
+    return bridge.browser?.onEvent(incoming => {
+      const open = glanceRef.current
+      // A link opened from the glance page (new tab or another glance) belongs to the page the glance came from.
+      const event = (incoming.type === 'new-tab' || incoming.type === 'glance') && open && incoming.parentTabId === open.id ? { ...incoming, parentTabId: open.parentTabId } : incoming
+      if (event.type === 'glance') { openGlance(event); return }
+      if (event.type === 'glance-close') { if (open?.id === event.tabId) void closeGlance(); return }
+      if (event.type === 'save-later') { void saveForLater(event.url, event.title, event.spaceId); return }
+      if (event.type === 'save-page') {
+        const owner = state?.spaces.find(space => space.activeSession?.tabs.some(tab => tab.id === event.tabId))
+        const tab = owner?.activeSession?.tabs.find(item => item.id === event.tabId) || (open?.id === event.tabId ? glanceTab(open) : undefined)
+        if (tab) requestSaveTab(tab, owner?.id || open?.spaceId)
+        return
+      }
+      if (event.type === 'update' && open?.id === event.tabId) {
+        const { url, title, favicon } = event.updates
+        setGlance(value => value?.id === event.tabId ? { ...value, url: url ?? value.url, title: title ?? value.title, favicon: favicon ?? value.favicon } : value)
+        return
+      }
       if (event.type === 'cover' && isTabCover(event.image)) {
         setTabCovers(previous => Object.fromEntries([...Object.entries(previous).filter(([id]) => id !== event.tabId), [event.tabId, event.image]].slice(-40)))
       }
@@ -387,6 +410,35 @@ function App() {
       }
     })
   }, [state, activeTabId, splitTabId, isWorkstageOpen])
+
+  // The glance lives only beside the page it came from: leaving that page, space or the browser closes it.
+  const glanceShown = isGlanceVisible(glance, { open: isWorkstageOpen, spaceId: targetWorkstageSpace?.id, activeTabId, splitTabId })
+  useEffect(() => { if (glance && !glanceShown) void closeGlance() }, [glance?.id, glanceShown])
+
+  // An address handed to the app from outside (`dombro https://…`, a second launch): it opens in «Сегодня» like
+  // any page opened without a space. The main process holds it until this subscription asks (state is loaded).
+  const openExternalRef = useRef<(url: string) => void>(() => undefined)
+  openExternalRef.current = (url: string) => {
+    if (!/^https?:\/\//i.test(url)) return
+    let host = url
+    try { host = new URL(url).hostname.replace(/^www\./, '') } catch { /* keep the address as the title */ }
+    const draft = isCabinetPreview && state ? todayDraft(state) : undefined
+    if (draft) openLinkInSpace(draft.id, url, host)
+    else openAddress(url, host)
+  }
+  useEffect(() => { if (state) return bridge.onOpenUrl?.(url => openExternalRef.current(url)) }, [Boolean(state)])
+
+  // Quiet shelving (src/browser/shelf.ts): the same moments as the day draft check. Spaces on screen are skipped.
+  const shelveSkip = useRef<string[]>([])
+  shelveSkip.current = route.type === 'browse' || route.type === 'space' ? [route.spaceId] : []
+  useEffect(() => {
+    if (!isCabinetPreview || !state) return
+    const pass = () => { void commit(previous => shelveStaleTabs(previous, new Date(), shelveAfterDays(previous), shelveSkip.current)) }
+    pass()
+    const timer = window.setInterval(pass, 5 * 60000)
+    window.addEventListener('focus', pass)
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', pass) }
+  }, [Boolean(state)])
 
   useEffect(() => {
     setReaderArticle(null)
@@ -1252,6 +1304,68 @@ function App() {
     setModal('focus')
   }
 
+  function openGlance(next: Omit<Glance, 'favicon'>) {
+    // Only next to the page it was opened from; anything else (a background page, another space) is dropped.
+    if (!isGlanceVisible(next, { open: isWorkstageOpen, spaceId: targetWorkstageSpace?.id, activeTabId, splitTabId })) return
+    const previous = glanceRef.current
+    if (previous) void bridge.browser?.close(previous.id).catch(() => undefined)
+    setGlance(next)
+  }
+
+  // Closing asks about unfinished input like any tab; if the page stays, so does the glance.
+  async function closeGlance() {
+    const current = glanceRef.current
+    if (!current) return
+    try { if (bridge.browser && await bridge.browser.close(current.id) === false) return } catch { /* the page is already gone */ }
+    setGlance(value => value?.id === current.id ? null : value)
+  }
+
+  function keepCurrentGlance() {
+    const current = glanceRef.current
+    if (!current) return
+    void bridge.browser?.move?.(current.id, current.spaceId)
+    setGlance(null)
+    commit(previous => keepGlance(previous, current))
+  }
+
+  // «Отложить на потом»: the link is saved into the space's materials (it appears in «Почитать») without opening a tab.
+  async function saveForLater(url: string, title: string, spaceId?: string) {
+    const target = state?.spaces.find(space => space.id === spaceId && !space.archivedAt)
+    if (!target) { setToast('Не удалось отложить: пространство недоступно.'); return false }
+    let name = title.trim()
+    if (!name) { try { name = new URL(url).hostname.replace(/^www\./, '') } catch { name = url } }
+    let created: string | undefined
+    try {
+      const saved = await commit(previous => {
+        const result = savePageToDestination(previous, { id: 'later', title: name, url }, { destination: { spaceId: target.id }, name })
+        created = result.alreadySaved ? undefined : result.resource.id
+        return result.state
+      })
+      if (saved === false) return false
+    } catch (error) { setToast(error instanceof Error ? error.message : 'Не удалось отложить ссылку.'); return false }
+    if (!created) { setToast('Эта ссылка уже отложена.'); return true }
+    const resourceId = created
+    setUndoAction({ label: 'Ссылка отложена в «Почитать»', restore: () => { void commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id !== target.id ? space : { ...space, resources: space.resources.filter(item => item.id !== resourceId) }) })) } })
+    return true
+  }
+
+  async function laterCurrentGlance() {
+    const current = glanceRef.current
+    if (current && await saveForLater(current.url, current.title, current.spaceId)) await closeGlance()
+  }
+
+  function restoreShelvedTab(spaceId: string, tabId: string) {
+    commit(previous => unshelveTab(previous, spaceId, tabId))
+    setRoute({ type: 'browse', spaceId })
+  }
+
+  function forgetShelved(spaceId: string, tabId: string) {
+    const tab = state?.spaces.find(space => space.id === spaceId)?.shelf?.find(item => item.id === tabId)
+    if (!tab) return
+    commit(previous => forgetShelvedTab(previous, spaceId, tabId))
+    setUndoAction({ label: 'Вкладка убрана из «Отложено»', restore: () => { commit(previous => ({ ...previous, spaces: previous.spaces.map(space => space.id !== spaceId || space.shelf?.some(item => item.id === tabId) ? space : { ...space, shelf: [tab, ...(space.shelf || [])] }) })) } })
+  }
+
   async function handleCloseTab(tabId: string, spaceId = targetWorkstageSpace?.id) {
     if (!state || !spaceId) return
     const owner = state.spaces.find(space => space.id === spaceId)
@@ -1655,7 +1769,7 @@ function App() {
     onReorderSpace: (id, targetId, after) => reorderSpace(id, targetId, after)
   })
 
-  if (!state) return <div className="loading-screen"><span className="brand-mark">✳</span><span>{toast || 'Загрузка…'}</span></div>
+  if (!state) return <div className="loading-screen"><img src="/logo.png" alt="dombro." className="brand-logo" /><span>{toast || 'Загрузка…'}</span></div>
 
   const collectionColumns = hubBounds.width > 1000 ? 3 : hubBounds.width > 600 ? 2 : 1
   const resourceRows = !visibleSpaceCheckpoint && hubBounds.height >= 480 && hubBounds.width > 600 ? 2 : 1
@@ -1740,7 +1854,7 @@ function App() {
         /> : <header className="browser-chrome">
           <div className="chrome-main">
             <button className="brand" onClick={isWorkstageOpen ? returnToDashboard : returnHome} aria-label={isWorkstageOpen ? 'Вернуться в дашборд' : 'На главную dombro'}>
-              <span className="brand-mark">✳</span><span>dombro<span className="brand-dot">.</span></span>
+              <img src="/logo.png" alt="dombro." className="brand-logo" />
             </button>
             {isWorkstageOpen && targetWorkstageSpace && targetWorkstageSpace.kind !== 'web' && <button className="browser-space-chip" onClick={() => openSpace(targetWorkstageSpace.id)} aria-label={`Вернуться в пространство ${targetWorkstageSpace.name}`} title={targetWorkstageSpace.name}><Folder size={16} /><span>{targetWorkstageSpace.name}</span></button>}
             {!isWorkstageOpen && <div className="calm-omnibox" ref={homeOmniboxRef}>
@@ -2052,6 +2166,10 @@ function App() {
               onSplitTab={tabId => splitExistingTab(targetWorkstageSpace!.id, tabId)}
               readerArticle={readerArticle}
               onCloseReader={() => setReaderArticle(null)}
+              glance={glanceShown ? glance : null}
+              onKeepGlance={keepCurrentGlance}
+              onLaterGlance={() => { void laterCurrentGlance() }}
+              onCloseGlance={() => { void closeGlance() }}
             />
           )
         ) : showSpaces && !currentSpace ? (
@@ -2145,6 +2263,7 @@ function App() {
                 onOpen={resource => { void openResource(resource) }} onRemove={removeResource} onCopy={copyToCabinet} onAddDocument={() => addDocumentReference(currentSpace.id)} onAddLink={() => startLink(currentSpace.id)}
                 onAddWindow={() => openWindowPicker(currentSpace.id)}
                 onOpenTabs={() => openWorkstage(currentSpace.id)}
+                onRestoreShelved={id => restoreShelvedTab(currentSpace.id, id)} onForgetShelved={id => forgetShelved(currentSpace.id, id)}
                 onStartDrag={startCabinetDrag} onFinishDrag={finishCabinetDrag}
                 suggestedRecentFile={suggestedRecentFile} onAddRecentFile={file => addRecentDocument(file, currentSpace.id)} onDismissRecentFile={dismissRecentDocument} /> : currentSpace.resources.length ? <><div className="resource-grid" style={{ '--resource-rows': resourceRows, gridTemplateColumns: `repeat(${collectionColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${resourceRows}, minmax(0, 1fr))` } as React.CSSProperties}>{sortedResources.slice(visibleResourcePage * resourcePageSize, visibleResourcePage * resourcePageSize + resourcePageSize).map(resource => <div className="resource-card card" key={resource.id}><button className="resource-open" onClick={() => openResource(resource)}><span className={`resource-kind kind-${resource.kind}`}>{resourceIcon(resource.kind, 25)}</span><span className="resource-name" title={resource.name}>{resource.name}</span><span className="resource-open-label">{resourceAppLabel(resource)} <ExternalLink size={15} /></span></button><button className="resource-remove" onClick={() => removeResource(resource.id)} aria-label={`Убрать ${resource.name}`} title="Убрать из пространства"><X size={16} /></button></div>)}</div></> : <div className="empty-space card"><span className="empty-space-icon"><Folder size={28} strokeWidth={1.3} /></span><div className="empty-space-copy"><h2>Нет материалов</h2></div><div className="empty-space-actions"><button onClick={() => startLink(currentSpace.id)}><Link2 size={17} />Сохранить сайт</button><button onClick={() => addDocumentReference(currentSpace.id)}><Plus size={17} />Документ</button></div></div>}
               {!isCabinetPreview && currentSpace.resources.length > resourcePageSize && <div className="page-controls"><div><button onClick={() => setResourcePage(visibleResourcePage - 1)} disabled={visibleResourcePage === 0} aria-label="Предыдущая страница"><ChevronLeft size={20} /></button><span>{visibleResourcePage + 1} / {resourcePages}</span><button onClick={() => setResourcePage(visibleResourcePage + 1)} disabled={visibleResourcePage >= resourcePages - 1} aria-label="Следующая страница"><ChevronRight size={20} /></button></div></div>}
@@ -2185,7 +2304,14 @@ function App() {
       {assistantOpen && <AssistantPanel state={state} onChange={commit} spaceId={targetWorkstageSpace?.id} tabId={activeTabId} initialContexts={assistantContexts} onOpen={openResource} draft={assistantDraft} preferences={assistantPreferences} onPreferencesChange={setAssistantPreferences} onDraftChange={setAssistantDraft} onClose={() => setAssistantOpen(false)} />}
       {savePage && <SavePageDialog state={state} tab={savePage.tab} sourceSpaceId={savePage.sourceSpaceId} onClose={() => setSavePage(null)} onSave={saveBrowserPage} />}
       {modal === 'capture' && <Capture initialWhen={captureDefaultWhen} initialReminderAt={captureTimed ? captureDefaultWhen : undefined} onClose={() => setModal(null)} onSave={saveCapture} />}
-      {modal === 'search' && <ContextSearch state={state} localOnly={isDemo || !isDesktop} onClose={() => setModal(null)} onSelect={item => {
+      {modal === 'search' && <ContextSearch state={state} localOnly={isDemo || !isDesktop} actions={[
+        { id: 'new-tab', label: 'Новая вкладка', keywords: 'открыть страница адрес', onSelect: () => handleAddTab() },
+        { id: 'new-space', label: 'Новое пространство', keywords: 'создать задача', onSelect: createStream },
+        { id: 'desk', label: 'Стол — все вкладки', keywords: 'обзор вкладки окна', onSelect: () => openTabsOverview('all') },
+        { id: 'capture', label: 'Записать мысль или дело', keywords: 'заметка напомнить', onSelect: openCapture },
+        ...(isWorkstageOpen ? [{ id: 'park', label: 'Сохранить и вернуться', keywords: 'пауза выйти закрыть', onSelect: parkSpace }] : []),
+        { id: 'settings', label: 'Настройки', keywords: 'параметры', onSelect: () => openSettings() }
+      ]} onClose={() => setModal(null)} onSelect={item => {
         const owner = state.spaces.find(space => space.id === item.spaceId)
         const resource = owner?.resources.find(value => value.id === item.id)
         const tab = owner?.activeSession?.tabs.find(value => value.id === item.id)

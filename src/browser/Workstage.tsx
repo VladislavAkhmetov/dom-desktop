@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Columns2, FolderInput, Globe2, LayoutGrid, Plus, X, Pin, Archive, BookmarkPlus, GitBranch, FileInput, Pencil, Shield } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, Columns2, FolderInput, Globe2, LayoutGrid, Plus, X, Pin, Archive, BookmarkPlus, GitBranch, FileInput, Pencil, Shield, PanelTopOpen } from 'lucide-react'
 import type { BrowserTab, HistoryItem, ReaderArticle, ResearchSource, Resource, Space } from '../types'
 import { NativePane } from './NativePane'
 import { ReaderView } from './ReaderView'
@@ -11,6 +11,7 @@ import { normalizeSpace } from '../../shared/state'
 import { orderedTabs, tabTitle } from './tabModel'
 import { TabIcon } from './TabIcon'
 import { isCabinetPreview } from '../cabinetMode'
+import { glanceTab, type Glance } from './glance'
 
 export interface WorkstageProps {
   space: Space
@@ -47,6 +48,11 @@ export interface WorkstageProps {
   covers?: Record<string, string>
   readerArticle?: ReaderArticle | null
   onCloseReader?: () => void
+  /** «Заглянуть»: a link opened beside the page; it takes the place of the split pane while it exists. */
+  glance?: Glance | null
+  onKeepGlance?: () => void
+  onLaterGlance?: () => void
+  onCloseGlance?: () => void
 }
 
 export function Workstage({
@@ -82,7 +88,11 @@ export function Workstage({
   onSplitTab,
   covers,
   readerArticle,
-  onCloseReader
+  onCloseReader,
+  glance,
+  onKeepGlance,
+  onLaterGlance,
+  onCloseGlance
 }: WorkstageProps) {
   const strip = useRef<HTMLDivElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -331,7 +341,7 @@ export function Workstage({
         space={space}
         coverImage={covers?.[tab.id]}
         isSplit={secondary}
-        isPaired={Boolean(splitTab)}
+        isPaired={Boolean(splitTab || glance)}
         onCloseSplit={onCloseSplit}
         onUpdateTab={onUpdateTab}
         onSaveTab={onSaveTab}
@@ -412,9 +422,14 @@ export function Workstage({
       </div>
       {addressEditor}
       <div className="browser-stage-body">
-      <div className={`workstage-canvas ${splitTab ? 'split' : ''}`} style={{ position: 'relative' }}>
+      <div className={`workstage-canvas ${splitTab || glance ? 'split' : ''}`} style={{ position: 'relative' }}>
         {pane(activeTab)}
-        {splitTab && pane(splitTab, true)}
+        {glance ? <NativePane key={glance.id} space={space} spaces={spaces} history={history} tab={glanceTab(glance)} coverImage={covers?.[glance.id]} isSplit isPaired
+          onCloseSplit={onCloseGlance} onSaveTab={onSaveTab} onOpenExternal={onOpenTab} onOpenResource={onOpenResource} onAddLink={onAddLink}
+          labelActions={<>
+            <button onClick={onKeepGlance} aria-label="Оставить вкладкой" title="Оставить вкладкой"><PanelTopOpen size={18} /></button>
+            <button onClick={onLaterGlance} aria-label="Отложить на потом" title="Отложить на потом"><BookmarkPlus size={18} /></button>
+          </>} /> : splitTab && pane(splitTab, true)}
         {readerArticle && onCloseReader && <ReaderView article={readerArticle} onClose={onCloseReader} />}
         {dragId && <div className="browser-drag-layer" data-browser-drag-layer>
           {tabs.length > 1 && <div data-tab-drop-action="split" className={`browser-drop-split ${dropAction === 'split' ? 'is-over' : ''}`} onDragOver={event => { event.preventDefault(); setDropAction('split') }} onDrop={event => { event.preventDefault(); onSplitTab(dragId); finishDrag() }}><Columns2 size={26} /><span>Рядом</span></div>}

@@ -45,6 +45,10 @@ export interface BrowserTab {
   pinned?: boolean
   favicon?: string
   lastAccessedAt?: string
+  /** Last time the user selected the tab (lastAccessedAt follows navigation only). Drives quiet shelving. */
+  lastActiveAt?: string
+  /** Set when a tab is moved to Space.shelf. */
+  shelvedAt?: string
   parentTabId?: string
   branchId?: string
   scrollY?: number
@@ -54,6 +58,8 @@ export interface BrowserTab {
   readerable?: boolean
   lang?: string
   blockedCount?: number
+  /** The page has a <video> (page-preload.cjs): shows the picture-in-picture button. */
+  hasVideo?: boolean
 }
 
 export interface BrowserSession {
@@ -99,6 +105,8 @@ export interface Space {
   lastActiveAt?: string
   archivedAt?: string | null
   activeSession?: BrowserSession
+  /** Tabs put aside by quiet shelving (src/browser/shelf.ts). Restorable, never loaded. */
+  shelf?: BrowserTab[]
   workContexts?: WorkContext[]
   activeContextId?: string
   researchArtifacts?: ResearchArtifact[]
@@ -264,6 +272,8 @@ export interface AppState {
   adblockEnabled?: boolean
   /** Idle time before background tabs are automatically parked (in minutes). 0 = never. Defaults to 30. */
   tabParkingTimeoutMinutes?: number
+  /** Days without opening before a tab of a space is shelved. 0 = never. Defaults to 14. */
+  shelveAfterDays?: number
   dismissedNotices?: string[]
   notifiedNotices?: string[]
   mailAccounts?: MailAccount[]
@@ -370,6 +380,7 @@ export interface DomBridge {
     translateText?(text: string, targetLang?: string): Promise<string>
     translateTab?(tabId: string): Promise<{ ok: boolean; count?: number; error?: string }>
     autofill?(tabId: string, credentialId: string): Promise<boolean>
+    pictureInPicture?(tabId: string): Promise<{ ok: boolean; state?: 'opened' | 'closed' | 'none' }>
   }
   bitwardenStatus?(): Promise<BitwardenExtensionStatus>
   pickResource(kind: 'app' | 'file'): Promise<string | null>
@@ -393,6 +404,8 @@ export interface DomBridge {
   openReleasePage?(): Promise<boolean>
   installUpdate?(): Promise<boolean>
   onFocusCapture(callback: () => void): () => void
+  /** Web addresses handed to the app from outside (command line, second launch). Desktop only. */
+  onOpenUrl?(callback: (url: string) => void): () => void
   onVoiceToggle?(callback: () => void): () => void
   onStateChanged(callback: (state: AppState) => void): () => void
 }
@@ -472,6 +485,10 @@ export type NativeBrowserEvent =
   | { type: 'cover'; tabId: string; image: string }
   | { type: 'permission-request'; id: string; tabId?: string; hostname: string; origin: string; permission: string; details?: string }
   | { type: 'adblock-stats'; tabId: string; count: number }
+  | { type: 'glance'; id: string; spaceId: string; parentTabId: string; url: string; title: string }
+  | { type: 'glance-close'; tabId: string }
+  | { type: 'save-later'; spaceId: string; url: string; title: string }
+  | { type: 'save-page'; tabId: string }
   | { type: 'password-save-offer'; tabId: string; origin: string; hostname: string; username: string; token: string }
 
 /** manual: portable build — a newer release exists and has to be downloaded from its page. */

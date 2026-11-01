@@ -14,7 +14,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .page-wrap { padding: 18px 28px 22px; }
 .browser-chrome { flex: none; width: 100%; max-width: 1600px; margin: 0 auto 24px; border-radius: var(--radius-lg); background: rgba(244, 249, 246, .86); backdrop-filter: blur(24px); color: var(--ink); }
 .chrome-main { display: flex; align-items: center; gap: 24px; min-height: 62px; padding: 8px 18px; }
-.browser-chrome .brand { flex: none; width: auto; font-family: var(--font-display); font-weight: 700; font-size: var(--text-title); color: #2e453b; letter-spacing: -0.02em; }
+.browser-chrome .brand { flex: none; width: auto; font-family: var(--font-display); font-weight: 700; font-size: var(--text-title); color: #2e453b; letter-spacing: -0.02em; display: inline-flex; align-items: center; }
+.browser-chrome .brand-logo { height: 24px; width: auto; display: block; object-fit: contain; }
 .browser-chrome .brand-mark { width: 32px; height: 32px; border-radius: var(--radius-md); background: #385f4e; font-size: var(--text-title); }
 .browser-chrome .brand-dot { color: #385f4e; }
 .browser-chrome .calm-omnibox { height: 39px; width: auto; flex: 1; max-width: 720px; margin: 0 auto; border-radius: var(--radius-sm); background: rgba(255,255,255,.65); padding: 0 14px; backdrop-filter: none; }

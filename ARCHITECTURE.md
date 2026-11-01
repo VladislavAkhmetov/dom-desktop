@@ -25,7 +25,7 @@
 * **Сборка и бандлинг:** Vite 6, `tsc` (строгая проверка типов), `electron-builder` (NSIS и Portable сборки под Windows).
 * **Хранилище данных:** `better-sqlite3` с FTS5-полнотекстовым поиском, шифрование через `safeStorage` (Windows DPAPI / macOS Keychain).
 * **Анимации и физика:** Motion (`motion/react`) с соблюдением стандарта доступности `prefers-reduced-motion`.
-* **Тестирование:** Vitest 4 (56 тест-файлов, 391 тест), JSDOM, кастомные нативные тест-раннеры Electron (`tests/cabinet-native.cjs`, `scripts/test-storage.cjs`).
+* **Тестирование:** Vitest 4 (80 тест-файлов, 498 тестов), JSDOM, кастомные нативные тест-раннеры Electron (`tests/cabinet-native.cjs`, `tests/glance-native.cjs`, `scripts/test-storage.cjs`).
 
 ---
 
@@ -104,7 +104,7 @@ stateDiagram-v2
 * Защищённые вкладки остаются активными в фоновом режиме; пользователю выводится уведомление о количестве удержанных в памяти вкладок.
 
 ### Автовыгрузка неактивных вкладок (Memory Saver, [`electron/tab-memory.cjs`](electron/tab-memory.cjs))
-* Раз в минуту `BrowserManager.discardIdle()` закрывает скрытые незащищённые вкладки, скрытые 30 минут и дольше, и старейшие скрытые сверх 12 живых.
+* Раз в минуту `BrowserManager.discardIdle()` закрывает скрытые незащищённые вкладки, скрытые дольше срока из настройки «Выгрузка неактивных вкладок» (по умолчанию 30 минут, «Никогда» отключает выгрузку; `discardDelay`), и старейшие скрытые сверх 12 живых.
 * Видимые и защищённые (ввод, воспроизведение, звук) не трогаются; `close(id, false)` оставляет страницы, которые просят остаться.
 * Вкладка остаётся в сессии: при возврате `show()` создаёт страницу заново по URL с позицией прокрутки, до загрузки виден снимок из `tabCovers`.
 
@@ -117,6 +117,17 @@ stateDiagram-v2
 * **Островок внимания в шапке** (`AttentionIsland` с `browser`): в свёрнутом виде — прозрачная кнопка с тем же значком сигнала, что у «Уведомлений» на дашборде (колокольчик, если сигнала нет). При сигнале — маленькая зелёная метка (не красная, без числа), в широком виде — мягкая плашка с текстом 14px рядом со значком.
 * **«Стол» (`TabOverview`)**: у вкладки без снимка вместо пустоты — поле с монограммой домена той же высоты, что снимок, поэтому сетка ровная; кнопки «…» и «×» на карточках видны при наведении, фокусе или выделении (на сенсорных экранах — всегда); подписи 14px.
 * **Шапка:** прямой вход «Новое пространство» сохранён (продуктовое правило «одна задача — одно пространство»), но оформлен прозрачной кнопкой-иконкой, как соседние, без белой подложки; подпись «Материалы» — 14px.
+
+### Меню страницы, «Заглянуть», «Отложить на потом», «Отложено» и палитра Ctrl+K (подробно — [`docs/arc-inspired-browsing.md`](docs/arc-inspired-browsing.md))
+Цель: ссылка не обязана становиться вкладкой. Всё устроено поверх существующих механизмов, новых слоёв и процессов нет.
+* **Меню страницы.** `BrowserManager` подписывает каждую страницу на `context-menu` и показывает нативное `Menu` по шаблону из чистой функции `pageMenuTemplate` ([`electron/page-menu.cjs`](electron/page-menu.cjs)); в нём только http/https-ссылки. Нативное меню рисуется поверх страниц, поэтому `browser.block()` не нужен. Действия возвращаются в интерфейс тем же каналом `browser:event`: `new-tab` (уже был), `glance`, `save-later`, `save-page`.
+* **«Заглянуть».** Shift+клик ловит [`electron/page-preload.cjs`](electron/page-preload.cjs) (только `isTrusted`, только http/https) и шлёт `page:glance`; `BrowserManager.pageGlance` находит страницу-отправителя среди своих, проверяет адрес `validURL`, выдаёт id и кладёт его в `glanceIds`. Интерфейс держит одно окно `Glance` ([`src/browser/glance.ts`](src/browser/glance.ts)) в `useState` и **не пишет его в состояние**. `Workstage` рисует его вместо парной страницы (`NativePane` с `labelActions`), поэтому геометрия, обложки, блокировщик, пароли и `block()` работают как у любой страницы. Esc в нативной странице перехватывается в `before-input-event` только для id из `glanceIds`. «Оставить вкладкой»: `browser.move(id, spaceId)` снимает id с `glanceIds`, `keepGlance` вставляет вкладку с тем же id после исходной, перезагрузки нет. Закрытие идёт через обычный `browser.close(id)` (с вопросом о незавершённой работе); эффект в `App` закрывает окно, когда исходная страница ушла с экрана.
+* **«Отложить на потом».** `App.saveForLater` → `savePageToDestination` (то же сохранение, что у закладки). Ссылка идёт в материалы пространства и видна в «Почитать».
+* **Тихая уборка и «Отложено».** `shelveStaleTabs` ([`src/browser/shelf.ts`](src/browser/shelf.ts)) переносит давние вкладки пространств в `Space.shelf`; запускается в `App` вместе с проверкой «Сегодня» (старт, фокус окна, раз в 5 минут) и пропускает пространство на экране. Время даёт `BrowserTab.lastActiveAt`, которое проход ставит активной и парной вкладке дела (не чаще раза в час); `lastActiveAt` и `shelvedAt` не перестраивают FTS (`storage-worker.cjs`). Срок: `AppState.shelveAfterDays` (по умолчанию 14, 0 = не убирать), настройка в «Браузер и память». Раздел «Отложено» — в `CabinetContents`.
+* **Ctrl+K.** `ContextSearch` показывает действия (`matchActions`) и вкладки всех дел (`searchTabs`) вместе с результатами хранилища.
+* **Картинка в картинке.** Прелоад добавляет `hasVideo` в `page:signal`; `BrowserManager.pageSignal` пишет его в метаданные вкладки, `BrowserChrome` показывает кнопку, `browser:pip` → `BrowserManager.pictureInPicture` (выполнение с жестом пользователя, второй вызов закрывает окно).
+* **Адреса извне.** [`electron/external-link.cjs`](electron/external-link.cjs): `addressFromArgv` (первый http/https в командной строке) и очередь `createLinkQueue`. `main.cjs` кладёт в очередь адрес первого запуска, `second-instance` и `open-url` (macOS); интерфейс подписывается через `bridge.onOpenUrl`, что отправляет `app:open-url-ready` (принимается только от главного окна) и сбрасывает ожидание; `App` открывает адрес в «Сегодня». Регистрация браузером по умолчанию не реализована (см. спецификацию).
+* **Срок выгрузки вкладок.** `BrowserManager` принимает `getIdleMinutes` (главный процесс читает `tabParkingTimeoutMinutes` из хранилища); `discardDelay` из [`electron/tab-memory.cjs`](electron/tab-memory.cjs) даёт срок, `0` отключает выгрузку.
 
 ### Кэш обложек вкладок (`tabCovers`) и превью при наведении
 * **Когда снимается:** `BrowserManager.hide()` (вкладка ушла с экрана) и `block()` (поверх нативной страницы открыт диалог/меню). Снимок ужимается до ширины ≤1000px и кодируется в JPEG (качество 82) функцией `coverImage()` в [`electron/browser.cjs`](electron/browser.cjs); JPEG в 3–5 раз легче прежнего PNG при том же разрешении, которого достаточно для zero-flicker подложки `.native-cover`.
@@ -460,6 +471,10 @@ stateDiagram-v2
 | :--- | :--- |
 | [`electron/main.cjs`](file:///d:/dev/tools/browser/electron/main.cjs) | Точка входа Electron: окна, трей, глобальные шорткаты, маршрутизация IPC. |
 | [`electron/browser.cjs`](file:///d:/dev/tools/browser/electron/browser.cjs) | Менеджер нативных WebContentsView: геометрия, аудио-детекция, парковка, права. |
+| [`electron/page-menu.cjs`](electron/page-menu.cjs) | Шаблон правого клика по странице (чистая функция): ссылки, изображения, ввод, навигация. |
+| [`electron/external-link.cjs`](electron/external-link.cjs) | Адрес из командной строки или второго запуска и очередь до готовности интерфейса. |
+| [`src/browser/glance.ts`](src/browser/glance.ts) | «Заглянуть»: модель окна рядом, видимость, «Оставить вкладкой». |
+| [`src/browser/shelf.ts`](src/browser/shelf.ts) | Тихая уборка давних вкладок пространств в «Отложено», возврат и «забыть». |
 | [`electron/adblock.cjs`](file:///d:/dev/tools/browser/electron/adblock.cjs) | Ядро блокировки рекламы и трекеров: кэширование, белый список, статистика. |
 | [`electron/os-windows.cjs`](file:///d:/dev/tools/browser/electron/os-windows.cjs) | Наблюдатель за окнами Windows: Win32 FFI через koffi, перечисление, сворачивание и фокус окон. |
 | [`electron/reader.cjs`](file:///d:/dev/tools/browser/electron/reader.cjs) | Парсинг статей через Readability и управление темами DarkReader. |
@@ -476,6 +491,8 @@ stateDiagram-v2
 | [`src/useAssistantSession.ts`](file:///d:/dev/tools/browser/src/useAssistantSession.ts) | Открытие ассистента, черновик, выбранные контексты и роль. |
 | [`src/assistantModel.ts`](file:///d:/dev/tools/browser/src/assistantModel.ts) | Модель ассистента, роли, предпочтения и флаг видимости точек входа `isAssistantEnabled` (кнопки ИИ временно скрыты в верхнем и нижнем барах). |
 | [`src/productIcon.tsx`](file:///d:/dev/tools/browser/src/productIcon.tsx) | Значки известных программ в материалах и выборе окон. |
+| [`public/logo.png`](public/logo.png) | Официальный логотип `dombro.` в цвете `#385f4e`. В шапке и на сплэш-экране отображается без сопутствующих иконок-знаков. |
+| [`build/icon.ico`](build/icon.ico) | Многослойная иконка приложения Windows (16–256px) с фирменной литерой `d.` на шалфейно-зеленой плашке с округлыми углами. Генерируется скриптом `scripts/generate-icons.ps1` из `assets/icon-source.png`. |
 | [`src/CalmWindSvgFilter.tsx`](file:///d:/dev/tools/browser/src/CalmWindSvgFilter.tsx) | SVG-фильтр растворения текста при очистке заметки. |
 | [`src/bridge.ts`](file:///d:/dev/tools/browser/src/bridge.ts) | Универсальный мост UI к Electron (на десктопе) или IndexedDB (в браузере). |
 | [`src/browser/Workstage.tsx`](file:///d:/dev/tools/browser/src/browser/Workstage.tsx) | Рабочая область браузинга: полоса вкладок, сплит-режим, панель материалов, ReaderView. |
@@ -497,6 +514,7 @@ stateDiagram-v2
 ### Дополнительные спецификации подсистем (`docs/`)
 | Документ | Описание |
 |---|---|
+| [`docs/arc-inspired-browsing.md`](docs/arc-inspired-browsing.md) | Меню страницы, «Заглянуть», «Отложить на потом», тихая уборка в «Отложено», действия и вкладки в Ctrl+K, картинка в картинке, адреса из других приложений, срок выгрузки вкладок: поведение, устройство, ограничения, что проверено. |
 | [`docs/calm-sound-engine.md`](file:///d:/dev/tools/browser/docs/calm-sound-engine.md) | Процедурный саунд-движок: синтез тактильных звуков дерева, бумаги, тумблера и выдоха. |
 | [`docs/os-windows.md`](file:///d:/dev/tools/browser/docs/os-windows.md) | Привязка и управление открытыми окнами Windows в Кабинетах. |
 | [`docs/day-draft.md`](docs/day-draft.md) | Черновик дня «Сегодня»: утренний сброс в 04:00, прошлые дни (14 дней), «Сделать пространством», Избранное вне пространств. |
@@ -525,6 +543,9 @@ npm test
 
 # Запуск нативных тестов интеграции Electron (изоляция, вкладки, сохранение ввода)
 npm run test:cabinet-native
+
+# Нативная проверка меню страницы, «Заглянуть», PiP и срока выгрузки (в настоящем Electron)
+npm run test:glance-native
 
 # Проверка типов TypeScript и сборка продакшен-бандла
 npm run build

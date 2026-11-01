@@ -136,6 +136,13 @@ describe('разделы настроек', () => {
       parkSelect.dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(current.tabParkingTimeoutMinutes).toBe(15)
+    const shelveSelect = panel().querySelector<HTMLSelectElement>('select[aria-label="Убирать давние вкладки пространств"]')!
+    expect(shelveSelect.value).toBe('14')
+    await act(async () => {
+      shelveSelect.value = '0'
+      shelveSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(current.shelveAfterDays).toBe(0)
   })
 
   it('прокручивает панель настроек при прокрутке колеса над заголовком', async () => {

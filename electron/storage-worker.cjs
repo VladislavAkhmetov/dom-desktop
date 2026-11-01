@@ -80,7 +80,7 @@ async function start() {
   }
   function scheduleSearch(changes) {
     // Scrolling and notification metadata do not change what search finds.
-    const searchable = changes.some(change => ['spaces', 'reminders'].includes(change.path[0]) && !['scrollY', 'protected', 'error', 'favicon', 'lastAccessedAt', 'savedAt', 'notifiedAt', 'done'].includes(change.path.at(-1)))
+    const searchable = changes.some(change => ['spaces', 'reminders'].includes(change.path[0]) && !['scrollY', 'protected', 'error', 'favicon', 'lastAccessedAt', 'lastActiveAt', 'shelvedAt', 'hasVideo', 'savedAt', 'notifiedAt', 'done'].includes(change.path.at(-1)))
     if (!searchable) return
     searchDirty = true
     clearTimeout(searchTimer)

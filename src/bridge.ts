@@ -299,6 +299,7 @@ const browserBridge: DomBridge = {
   async openReleasePage() { return false },
   async installUpdate() { return false },
   onFocusCapture() { return () => undefined },
+  onOpenUrl() { return () => undefined },
   onVoiceToggle() { return () => undefined },
   onStateChanged() { return () => undefined }
 }

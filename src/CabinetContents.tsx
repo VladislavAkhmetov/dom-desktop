@@ -9,6 +9,7 @@ import {
   Folder,
   Globe2,
   Link2,
+  RotateCcw,
   Search,
   X
 } from 'lucide-react'
@@ -62,6 +63,8 @@ export function CabinetContents({
   onAddLink,
   onAddWindow,
   onOpenTabs,
+  onRestoreShelved,
+  onForgetShelved,
   onStartDrag,
   onFinishDrag,
   suggestedRecentFile,
@@ -95,6 +98,9 @@ export function CabinetContents({
   onAddLink: () => void
   onAddWindow?: () => void
   onOpenTabs?: () => void
+  /** Tabs put aside by quiet shelving (src/browser/shelf.ts): bring one back or forget it. */
+  onRestoreShelved?: (id: string) => void
+  onForgetShelved?: (id: string) => void
   onStartDrag: (event: DragEvent<HTMLElement>, value: CabinetDrag) => void
   onFinishDrag: () => void
   pointerTabTarget?: string
@@ -155,6 +161,9 @@ export function CabinetContents({
   const tools = filter === 'all' ? rawTools.filter(resource => matches(resource.name, resource.target)) : []
 
   const shownTabs = expanded || needle ? tabs : tabs.slice(0, 6)
+  const [shelfExpanded, setShelfExpanded] = useState(false)
+  const shelved = onRestoreShelved && onForgetShelved && space.kind !== 'day' ? (space.shelf || []).filter(tab => filter !== 'file' && matches(tab.title, tab.url)) : []
+  const shownShelved = shelfExpanded || needle ? shelved : shelved.slice(0, 4)
   const peek = useTabPeek(covers)
   useEffect(() => peek.hide(), [needle, expanded, filter, peek.hide])
 
@@ -330,6 +339,44 @@ export function CabinetContents({
                               </span>
                             )}
                           </small>
+                        </span>
+                      </span>
+                    </button>
+                    <ActionMenu label={label} actions={actions} />
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Отложено: давние вкладки, убранные тихой уборкой (src/browser/shelf.ts). Не загружаются, пока их не вернут. */}
+        {shelved.length > 0 && (
+          <section className="cabinet-content-section cabinet-shelf" aria-label="Отложенные вкладки">
+            <div className="cabinet-section-heading">
+              <h2>Отложено <span>{shelved.length}</span></h2>
+              {!needle && shelved.length > 4 && (
+                <button aria-expanded={shelfExpanded} onClick={() => setShelfExpanded(value => !value)}>
+                  {shelfExpanded ? 'Свернуть' : `Показать все · ${shelved.length}`}
+                  {shelfExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </button>
+              )}
+            </div>
+            <div className="cabinet-tab-grid">
+              {shownShelved.map(tab => {
+                const label = `Действия с отложенной вкладкой «${tab.title}»`
+                const actions: MenuAction[] = [
+                  { label: 'Вернуть', icon: <RotateCcw size={18} />, onSelect: () => onRestoreShelved!(tab.id) },
+                  { label: 'Убрать из «Отложено»', icon: <X size={18} />, onSelect: () => onForgetShelved!(tab.id) }
+                ]
+                return (
+                  <div key={tab.id} data-tab-id={tab.id} className="cabinet-tab-card card is-shelved" onContextMenu={event => context.open(event, label, actions)} onKeyDown={event => context.open(event, label, actions)}>
+                    <button className="cabinet-tab-open" aria-label={`Вернуть вкладку «${tab.title}»`} data-tooltip-off="" onClick={() => onRestoreShelved!(tab.id)}>
+                      <span className="cabinet-tab-copy">
+                        {tab.favicon ? <span className="cabinet-site-icon"><TabIcon tab={tab} /></span> : <SiteMark url={tab.url} title={tab.title} />}
+                        <span>
+                          <strong title={tab.title}>{tab.title || pageDomain(tab.url)}</strong>
+                          <small>{pageDomain(tab.url)}</small>
                         </span>
                       </span>
                     </button>

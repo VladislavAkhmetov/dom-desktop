@@ -96,6 +96,7 @@ function report() {
     ipcRenderer.send('page:signal', {
       dirty,
       playing: [...document.querySelectorAll('video,audio')].some(item => !item.paused && !item.ended),
+      hasVideo: Boolean(document.querySelector('video')),
       scrollY: window.scrollY,
       readerable: props.readerable,
       lang: props.lang
@@ -220,10 +221,21 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
   }, true)
+    // Shift+click on a link: «Заглянуть» — the main process asks the shell to open it beside this page.
+  document.addEventListener('click', event => {
+    if (!event.isTrusted || event.button !== 0 || !event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return
+    const link = event.target && event.target.closest ? event.target.closest('a[href]') : null
+    if (!link) return
+    let url = ''
+    try { const parsed = new URL(link.href); if (!['http:', 'https:'].includes(parsed.protocol)) return; url = parsed.href } catch { return }
+    event.preventDefault()
+    event.stopPropagation()
+    ipcRenderer.send('page:glance', { url, title: (link.textContent || '').trim().slice(0, 200) })
+  }, true)
   for (const name of ['play', 'pause', 'ended']) document.addEventListener(name, report, true)
   window.addEventListener('scroll', report, { passive: true })
 })
 window.addEventListener('DOMContentLoaded', () => {
   const props = inspectPageProperties()
-  ipcRenderer.send('page:signal', { dirty: false, playing: false, scrollY: 0, readerable: props.readerable, lang: props.lang })
+  ipcRenderer.send('page:signal', { dirty: false, playing: false, scrollY: 0, readerable: props.readerable, lang: props.lang, hasVideo: Boolean(document.querySelector('video')) })
 })

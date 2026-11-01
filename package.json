@@ -12,6 +12,7 @@
     "test:storage": "node scripts/test-storage.cjs",
     "test:browser": "npm run build && node scripts/test-browser.cjs",
     "test:cabinet-native": "npm run build && node scripts/test-cabinet-native.cjs",
+    "test:glance-native": "node scripts/test-glance-native.cjs",
     "postinstall": "node --experimental-require-module ./node_modules/electron-builder/cli.js install-app-deps",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "dev:cabinet": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev --cabinet-pilot\"",

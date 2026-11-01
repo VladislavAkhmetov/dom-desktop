@@ -282,7 +282,9 @@ describe('браузерный пилот кабинетов', () => {
     await click(document.querySelector('.overview-space[data-space-id="work"] .overview-space-open'))
     expect(document.querySelector('.hub-content .space-detail')?.getAttribute('aria-label')).toBe('Логотип')
     expect(document.querySelector('.browser-topbar')).toBeNull()
-    expect(realSpaces().map(space => space.activeSession)).toEqual(sessions)
+    // The quiet-shelving pass only stamps lastActiveAt (src/browser/shelf.ts); tabs and their order stay as they were.
+    const withoutStamp = (session: typeof sessions[number]) => session && { ...session, tabs: session.tabs.map(({ lastActiveAt: _stamp, ...tab }) => tab) }
+    expect(realSpaces().map(space => withoutStamp(space.activeSession))).toEqual(sessions.map(withoutStamp))
   })
   it('создаёт кабинет из дашборда без смены режима и без формы имени', async () => {
     await mount()

@@ -60,7 +60,6 @@
         animation: none;
         opacity: 0;
       }
-      .brand-mark,
       .progress-bar {
         animation: none;
       }
@@ -69,33 +68,20 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 5px;
-      margin-top: 4px;
+      gap: 7px;
+      margin-top: 6px;
     }
     .brand-header {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
     }
-    .brand-mark {
-      font-size: 22px;
-      line-height: 1;
-      color: #2e5543;
-      display: inline-block;
-      animation: gentle-spin 12s linear infinite;
-    }
-    @keyframes gentle-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    .brand-title {
-      font-size: 24px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      color: #1e3529;
-    }
-    .brand-dot {
-      color: #4a8264;
+    .brand-logo {
+      height: 28px;
+      width: auto;
+      display: block;
+      user-select: none;
+      -webkit-user-drag: none;
     }
     .brand-sub {
       font-size: 12.5px;
@@ -170,8 +156,7 @@
   <div class="splash-card">
     <div class="brand-section">
       <div class="brand-header">
-        <span class="brand-mark">✳</span>
-        <span class="brand-title">dombro<span class="brand-dot">.</span></span>
+        <img src="../public/logo.png" onerror="this.onerror=null;this.src='../dist/logo.png'" alt="dombro." class="brand-logo" />
       </div>
       <div class="brand-sub">спокойный рабочий дашборд</div>
     </div>
