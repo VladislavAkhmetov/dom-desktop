@@ -32,6 +32,12 @@ export function resolveWallpaperUrl(url?: string): string {
 
 export const defaultWallpapers: WallpaperOption[] = [
   {
+    id: 'window-shadows-draft',
+    name: 'Свет и тени (черновик)',
+    url: '/backgrounds/window-shadows.png',
+    description: 'Статичная проба мягких теней жалюзи и растения'
+  },
+  {
     id: 'abstract-hills',
     name: 'Волны: Полдень (по умолчанию)',
     url: '/backgrounds/abstract-hills.jpg',
