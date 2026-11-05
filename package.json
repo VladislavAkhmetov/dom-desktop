@@ -2,7 +2,7 @@
   "name": "dombro",
   "private": true,
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.4.0",
   "description": "dombro — спокойный рабочий дашборд и браузер для жизни и работы",
   "author": "Dom Team",
   "main": "electron/main.cjs",

@@ -70,13 +70,13 @@ npm run test:cabinet-native
 ## 5. Правила версионирования и сборки Electron (Release & Versioning Rules)
 
 1. **Система нумерации версий:**
-   * Единственный номер — поле `version` в `package.json`. Сейчас это `0.0.1`. Следующий выпуск меняет только этот номер, например `0.0.2`.
+   * Единственный номер — поле `version` в `package.json`. Сейчас это `0.4.0`. Следующий выпуск меняет только этот номер, например `0.4.1`.
    * Отдельной подписи `0.001` нет. В интерфейсе и прелоадере версия показывается как `v` плюс `app.getVersion()`.
 2. **Синхронизация с прелоадером (Splash screen):**
    * Прелоадер [`electron/splash.html`](electron/splash.html) получает версию из главного процесса [`electron/main.cjs`](electron/main.cjs) через параметр запроса `?v=` на базе `app.getVersion()`.
-   * Запасной текст `#splash-version` совпадает с текущей версией (`v0.0.1`), пока параметр не подставился.
+   * Запасной текст `#splash-version` совпадает с текущей версией (`v0.4.0`), пока параметр не подставился.
 3. **Именование артефактов сборки:**
-   * Портативная сборка — один файл: `dombro-${version}-Portable.exe` (сейчас `dombro-0.0.1-Portable.exe`).
+   * Портативная сборка — один файл: `dombro-${version}-Portable.exe` (сейчас `dombro-0.4.0-Portable.exe`).
    * Второй копии с другим написанием версии нет. Отдельный `dombro-cabinet-…-Portable.exe` не собирается: режим кабинетов уже включён в этом exe.
    * Установщик NSIS, если он нужен отдельно: `dombro-Setup-${version}.exe`.
 4. **Обновления:** сами обновляются только установки NSIS (`electron-updater`). Portable лишь сообщает о новой версии. Канал выпусков задан в `electron-builder.json → publish` и `electron/updates.cjs → RELEASES` — менять оба вместе (см. [`docs/release-and-updates.md`](docs/release-and-updates.md)). Выпуск — только через тег и GitHub Actions.

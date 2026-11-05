@@ -628,7 +628,7 @@ export function Settings({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <strong style={{ fontSize: 18, color: 'var(--ink-1)' }}>dombro</strong>
-                          <span className="settings-about-badge">v0.0.1</span>
+                          <span className="settings-about-badge">v0.4.0</span>
                         </div>
                         <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--ink-3)', lineHeight: 1.45 }}>
                           {currentLocale === 'en'

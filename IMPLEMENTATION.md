@@ -712,3 +712,16 @@ Node из runtime и прямые команды из package.json (npm отсу
   * Стилизован класс `.brand-logo` в `src/styles.css`, `src/ui.css`, `src/browser/browsing.css`, `src/browser/compact.css` и `src/browser/browser-shell.css` с сохранением адаптивности и токенов Calm Tech.
   * Все 80 тестовых сьютов (501 тест), SQLite-тесты, `npm run build` и нативные тесты `npm run test:cabinet-native` пройдены успешно.
 
+## Этап 21 — Релиз 0.4.0: публичный канал выпусков и cross-repo GitHub Actions
+
+- [x] **Поднятие версии приложения до 0.4.0:**
+  * В `package.json` и `package-lock.json` установлена версия `0.4.0`.
+  * Обновлён бейдж версии в `src/Settings.tsx` (`v0.4.0`) и запасной текст прелоадера в `electron/splash.html` (`#splash-version`).
+  * Синхронизирована документация (`AGENTS.md`, `ARCHITECTURE.md`, `README.md`, `docs/release-and-updates.md`).
+- [x] **Подключение репозитория публичных релизов (`dombro-releases`):**
+  * Создан и привязан публичный репозиторий `VladislavAkhmetov/dombro-releases` для раздачи бинарных файлов без открытия приватного исходного кода.
+  * В приватном репозитории настроены секреты `RELEASE_GH_TOKEN` и `GH_TOKEN` с правами на запись релизов в публичный репозиторий.
+  * В workflow `.github/workflows/release.yml` настроена передача секрета `RELEASE_GH_TOKEN`.
+- [x] **Верификация:**
+  * `npm run build` и полный тестовый сьют `npm test` (80 файлов, 501 тест) пройдены успешно.
+
