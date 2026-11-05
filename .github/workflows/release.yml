@@ -34,7 +34,7 @@ jobs:
       - name: Build and upload to the draft release
         run: npm run dist -- --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_GH_TOKEN || secrets.GITHUB_TOKEN }}
           # Optional Windows code signing. Without these secrets the build is unsigned
           # (SmartScreen warns; update integrity then relies on the release's sha512 only).
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
