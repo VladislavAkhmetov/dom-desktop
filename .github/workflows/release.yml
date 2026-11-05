@@ -30,6 +30,14 @@ jobs:
           fi
       - run: npm ci
       - run: npm test
+      - name: Set screen resolution for native tests
+        shell: powershell
+        run: |
+          try {
+            Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          } catch {
+            Write-Warning "Could not set display resolution: $_"
+          }
       - run: npm run test:cabinet-native
       - name: Build and upload to the draft release
         run: npm run dist -- --publish always

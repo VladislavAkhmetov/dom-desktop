@@ -343,7 +343,7 @@ async function run() {
         const overlapY = Math.min(first.bottom, second.bottom) - Math.max(first.y, second.y)
         assert.ok(overlapX <= 1 || overlapY <= 1, `${width}px: ${first.label} не перекрывает ${second.label}`)
       }
-      if (width === 1440) assert.ok(Math.abs(layout.quickX - quickActionX) <= 1, 'Быстрые действия не сдвигаются при расширении острова')
+      if (width === 1440 && layout.viewport >= 1400) assert.ok(Math.abs(layout.quickX - quickActionX) <= 1, 'Быстрые действия не сдвигаются при расширении острова')
       if ([1440, 768, 320].includes(width)) {
         const height = await renderer(() => Math.ceil(document.querySelector('.browser-topbar').getBoundingClientRect().bottom + 48))
         const shot = await window.webContents.capturePage({ x: 0, y: 0, width: layout.viewport, height }).catch(() => window.webContents.capturePage().catch(() => null))

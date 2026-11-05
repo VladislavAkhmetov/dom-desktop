@@ -42,4 +42,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Set screen resolution for native tests
+        shell: powershell
+        run: |
+          try {
+            Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          } catch {
+            Write-Warning "Could not set display resolution: $_"
+          }
       - run: npm run test:cabinet-native
